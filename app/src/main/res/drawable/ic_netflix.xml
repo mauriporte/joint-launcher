@@ -1,0 +1,7 @@
+<!-- Netflix-style red N on grey, drawn for the sidebar / apps row -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FF3A3B40" android:pathData="M0,0h48v48h-48z" />
+    <path android:fillColor="#FFB1060F" android:pathData="M15,9h5.5v30h-5.5z M27.5,9h5.5v30h-5.5z" />
+    <path android:fillColor="#FFE50914" android:pathData="M15,9L20.5,9L33,39L27.5,39z" />
+</vector>

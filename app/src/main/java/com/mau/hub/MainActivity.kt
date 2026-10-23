@@ -45,7 +45,7 @@ class MainActivity : Activity() {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
     private val prefs by lazy { getSharedPreferences("hub", MODE_PRIVATE) }
-    private val server get() = prefs.getString("server", "http://jellyfin.example.com:8096")!!.trimEnd('/')
+    private val server get() = prefs.getString("server", BuildConfig.JELLYFIN_SERVER)!!.trimEnd('/')
     private val jfKey get() = prefs.getString("key", "")!!
     private val stremioKey get() = prefs.getString("stremio", "")!!
     private val ytTopic get() = prefs.getString("yt", "sports highlights")!!
@@ -591,6 +591,7 @@ class MainActivity : Activity() {
     }
 
     private fun loadProviderLogo(p: Provider, into: ImageView) {
+        customIcon(p.pkg)?.let { into.setImageDrawable(it); return }
         prefs.getString("logo_${p.source.name}", null)?.let { loadImage(it, into); return }
         pool.execute {
             val url = runCatching { Sources.providerLogo(p, country) }.getOrNull() ?: return@execute
@@ -1041,7 +1042,30 @@ class MainActivity : Activity() {
     private val iconCache = HashMap<String, Drawable>()
 
     /** Other apps' icons come from their APKs, which is slow on this TV; load them off the UI thread, once. */
+    /** Our own icons for a few apps whose TV icons are banners or hard to read at sidebar size. */
+    private fun customIcon(pkg: String?): Drawable? = when (pkg) {
+        Links.NETFLIX -> getDrawable(R.drawable.ic_netflix)
+        Links.SMARTTUBE -> getDrawable(R.drawable.ic_youtube)
+        PROVIDERS.first { it.source == Source.PRIME }.pkg -> primeIcon()
+        else -> null
+    }
+
+    /** "prime video" in white on Prime's light blue (a wordmark, so drawn as text rather than a vector). */
+    private fun primeIcon(): Drawable {
+        val s = 192
+        val b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(b)
+        c.drawColor(Source.PRIME.color)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textAlign = android.graphics.Paint.Align.CENTER; typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        }
+        p.textSize = 56f; c.drawText("prime", s / 2f, s / 2f, p)
+        p.textSize = 40f; p.typeface = Typeface.create("sans-serif", Typeface.NORMAL); c.drawText("video", s / 2f, s / 2f + 46f, p)
+        return android.graphics.drawable.BitmapDrawable(resources, b)
+    }
+
     private fun appIconInto(pkg: String, into: ImageView) {
+        customIcon(pkg)?.let { into.setImageDrawable(it); return }
         iconCache[pkg]?.let { into.setImageDrawable(it); return }
         into.tag = "icon:$pkg"
         imagePool.execute {
