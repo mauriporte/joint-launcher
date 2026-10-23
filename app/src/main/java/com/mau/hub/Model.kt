@@ -52,6 +52,112 @@ val PROVIDERS = listOf(
     Provider(Source.HBO, listOf("mxx"), setOf("max"), "com.wbd.stream"),
 )
 
+/**
+ * Live TV channels shown as rows in the Music / Movies / Series tabs ("Music channels · Jellyfin"...).
+ * One channel per line: its Jellyfin channel number, then a name that's only a label. Rows keep this order;
+ * numbers Jellyfin doesn't have are skipped. Edit freely.
+ */
+val LIVE_CATEGORIES: Map<String, List<String>> = mapOf(
+    "Music" to """
+        707 MTV Live
+        708 MTV2
+        784 MTV (US)
+        1428 MTV (DE)
+        1733 XITE Hits
+        1734 XITE Just Chill
+        1735 XITE Rock x Metal
+        776 XITE 90's Throwback
+        777 XITE Nuevo Latino
+        778 XITE Siempre Latino
+        1715 Stingray Hit List
+        1711 Stingray Classic Rock
+        1712 Stingray Classica
+        1713 Stingray Easy Listening
+        1714 Stingray Flashback 70's
+        1721 Stingray Nothin' But 90s
+        1722 Stingray Pop Adult
+        1723 Stingray Smooth Jazz
+        1724 Stingray Soul Storm
+        1726 Stingray Today's K-Pop
+        1717 Stingray Hot Country
+        1718 Stingray Jukebox Oldies
+        1719 Stingray Karaoke
+        741 Stingray Greatest Holiday Hits
+        1709 Qello Concerts by Stingray
+        1731 Trace Urban
+        531 Trace UK
+        1728 Trace Africa
+        1729 Trace Jama
+        1730 Trace Naija
+        640 CMT
+        520 NOW Rock
+        1700 360TuneBox
+        1707 Music Box 80s
+        1710 Qwest TV
+        1702 Corazon TV
+        1727 Tarima TV
+        149 POP World TV
+        166 Sol Musica
+        350 Cumbia Mix
+        398 Urban Mix
+        370 Quiero Musica en mi Idioma
+        401 X Level Media
+    """,
+    "Movies" to """
+        1200 De Pelicula Latin America
+        1201 Grjngo Western Movies
+        1206 Pluto TV Action
+        1211 Pluto TV Cine Romantico
+        1213 Pluto TV Harlequin
+        1215 Pluto TV Invasion Alien
+        1218 Pluto TV Kultfilmer
+        1221 Pluto TV Romantik
+        1222 Pluto TV Thrillers
+        1223 Pluto TV Western
+        1224 Pluto TV Wild West
+        1227 MyTime Movie Network (MX)
+        112 Cine Friki
+        113 Cine Western
+        158 Rakuten TV Comedy Movies
+        159 Rakuten TV Drama Movies
+        160 Rakuten TV Family Movies
+        161 Rakuten TV Top Movies
+        404 Xtrema Cine Clasico
+        600 24 Hour Free Movies
+        608 AMC
+        634 Cine Sony
+        635 Cinemax
+        636 Cinemax Classics
+        637 Cinemax Hits
+        679 Gravitas Movies
+        681 HBO
+        684 HBO Latin America
+        696 IFC
+        735 Showtime Family Zone
+        738 Starz
+        739 Starz Comedy
+        740 Starz Kids & Family
+        762 Universal Cinema
+    """,
+    "Series" to """
+        1300 Az Corazon
+        1301 Bondi Rescue
+        1303 Pluto TV K-Drama
+        1306 Pluto TV Series Sci-Fi
+        1311 Pluto TV Sci-Fi (DE)
+        1310 Tlnovelas Mexico
+        176 Todo Novelas
+        755 TNT Novelas
+        1424 RCN Novelas
+        1412 Kanal D Drama
+        502 BBC Drama
+        743 SYFY
+        1408 Comedy Central
+        649 Crime + Investigation
+        1402 American Crime Channel
+    """,
+).mapValues { (_, list) -> list.lines().mapNotNull { it.trim().substringBefore(' ').takeIf(String::isNotEmpty) } }
+
 /** Extra detail-screen info for a movie/series, from Stremio's catalogue (Cinemeta). */
 data class MetaInfo(
     val description: String?, val seasons: Int, val episodes: Int, val runtime: String?,

@@ -289,6 +289,15 @@ object Sources {
         server,
     )
 
+    /** The channels whose Number is in [numbers], in that list's order (see LIVE_CATEGORIES). */
+    fun jellyfinLiveByNumber(server: String, key: String, userId: String, numbers: List<String>): List<Item> =
+        pickChannels(get("$server/LiveTv/Channels?userId=$userId&addCurrentProgram=true&enableImages=true", Links.jfAuth(key)), numbers, server)
+
+    fun pickChannels(json: String, numbers: List<String>, server: String): List<Item> {
+        val byNumber = JSONObject(json).optJSONArray("Items").objs().associateBy { it.optString("Number") }
+        return parseLiveChannels(JSONObject().put("Items", JSONArray(numbers.mapNotNull(byNumber::get))).toString(), server)
+    }
+
     /** Mark / unmark a channel (or any item) as favourite on the Jellyfin account. */
     fun jellyfinFavourite(server: String, key: String, userId: String, itemId: String, on: Boolean) {
         (URL("$server/UserFavoriteItems/$itemId?userId=$userId").openConnection() as HttpURLConnection).run {
@@ -317,22 +326,38 @@ object Sources {
         }
     }
 
-    /** Asks the server how to play a live channel; returns an absolute HLS URL (it carries its own api key). */
-    fun jellyfinLiveUrl(server: String, key: String, userId: String, channelId: String): String {
+    /** url = absolute stream URL; id = live stream to close afterwards; videoCodec = the channel's original codec. */
+    class LiveStream(val url: String, val id: String?, val videoCodec: String?)
+
+    /**
+     * Asks the server how to play a live channel. Always a stream served by Jellyfin itself: direct play would hand us
+     * the tuner backend's own address (with its login), and Jellyfin's static stream URL refuses live channels. A plain
+     * MPEG-TS stream lets it copy MPEG-2/H.264/HEVC video untouched (MPEG-2 then plays in VLC, see PlayerActivity);
+     * HLS would force a re-encode, since Jellyfin won't put MPEG-2 in HLS.
+     */
+    fun jellyfinLiveUrl(server: String, key: String, userId: String, channelId: String): LiveStream {
         val profile = JSONObject(mapOf(
             "MaxStreamingBitrate" to 20_000_000,
-            "DirectPlayProfiles" to JSONArray(listOf(JSONObject(mapOf("Container" to "ts,mpegts,mp4,mkv", "Type" to "Video")))),
+            "DirectPlayProfiles" to JSONArray(),
             "TranscodingProfiles" to JSONArray(listOf(JSONObject(mapOf(
-                "Container" to "ts", "Type" to "Video", "VideoCodec" to "h264", "AudioCodec" to "aac", "Protocol" to "hls", "Context" to "Streaming",
+                // h264 first: it's what a channel in any other codec gets converted to
+                "Container" to "ts", "Type" to "Video", "VideoCodec" to "h264,mpeg2video,hevc", "AudioCodec" to "aac,mp2,ac3",
+                "Protocol" to "http", "Context" to "Streaming",
             )))),
         ))
         val r = JSONObject(post(
-            "$server/Items/$channelId/PlaybackInfo?userId=$userId&autoOpenLiveStream=true&isPlayback=true",
+            "$server/Items/$channelId/PlaybackInfo?userId=$userId&autoOpenLiveStream=true&isPlayback=true&enableDirectPlay=false&enableDirectStream=false",
             JSONObject(mapOf("DeviceProfile" to profile)).toString(), Links.jfAuth(key),
         ))
         val src = r.optJSONArray("MediaSources").objs().firstOrNull() ?: error("channel unavailable")
         val path = src.str("TranscodingUrl") ?: error("server offered no stream for this channel")
-        return server + path
+        val codec = src.optJSONArray("MediaStreams").objs().firstOrNull { it.optString("Type") == "Video" }?.str("Codec")
+        return LiveStream(server + path, src.str("LiveStreamId"), codec)
+    }
+
+    /** Frees the tuner a live channel held (Tvheadend only has a few). */
+    fun jellyfinCloseLive(server: String, key: String, liveStreamId: String) {
+        post("$server/LiveStreams/Close?liveStreamId=${enc(liveStreamId)}", "", Links.jfAuth(key))
     }
 
     // ---- Streaming providers via JustWatch (see PROVIDERS) ----

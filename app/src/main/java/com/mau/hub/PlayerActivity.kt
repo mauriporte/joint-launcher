@@ -26,24 +26,45 @@ class PlayerActivity : Activity() {
             setBackgroundColor(Color.BLACK)
             addView(video, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
         })
+        if (b != null) return // coming back from VLC after a restart: onActivityResult finishes us
+        if (intent.getBooleanExtra("vlc", false)) { playInVlc(); return }
         val key = intent.getStringExtra("key").orEmpty()
         video.setVideoURI(Uri.parse(intent.getStringExtra("url")), Links.jfAuth(key))
         video.setOnPreparedListener { video.seekTo(intent.getLongExtra("pos", 0).toInt()); video.start() }
         video.setOnCompletionListener { finish() }
-        video.setOnErrorListener { _, _, _ ->
-            // VLC decodes what the TV can't (TrueHD, DTS...). It can't send headers, so the token rides in api_key (LAN only).
-            val vlc = Intent(Intent.ACTION_VIEW).setPackage(VLC)
-                .setDataAndType(Uri.parse("${intent.getStringExtra("url")}&api_key=$key"), "video/*")
-                .putExtra("position", intent.getLongExtra("pos", 0))
-            try {
-                startActivity(vlc)
-                Toast.makeText(this, "Playing in VLC", Toast.LENGTH_SHORT).show()
-            } catch (_: ActivityNotFoundException) {
-                Toast.makeText(this, "Format not supported here, opening Jellyfin", Toast.LENGTH_LONG).show()
-                packageManager.getLeanbackLaunchIntentForPackage(Links.JELLYFIN)?.let(::startActivity)
-            }
-            finish(); true
+        video.setOnErrorListener { _, _, _ -> video.stopPlayback(); playInVlc(); true }
+    }
+
+    /**
+     * VLC decodes what the TV can't (TrueHD, DTS, MPEG-2 live TV...). It can't send headers, so the token rides in
+     * api_key (LAN only). Started for a result so we're told when it's closed, and can free the live stream then.
+     */
+    private fun playInVlc() {
+        val key = intent.getStringExtra("key").orEmpty()
+        val vlc = Intent(Intent.ACTION_VIEW).setPackage(VLC)
+            .setDataAndType(Uri.parse("${intent.getStringExtra("url")}&api_key=$key"), "video/*")
+            .putExtra("position", intent.getLongExtra("pos", 0))
+        try {
+            startActivityForResult(vlc, 1)
+            Toast.makeText(this, "Playing in VLC", Toast.LENGTH_SHORT).show()
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, "Format not supported here, opening Jellyfin", Toast.LENGTH_LONG).show()
+            packageManager.getLeanbackLaunchIntentForPackage(Links.JELLYFIN)?.let(::startActivity)
+            finish()
         }
+    }
+
+    @Deprecated("Activity result API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) = finish() // VLC closed
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isChangingConfigurations) return
+        // live TV: each open stream holds one of the tuner backend's few slots until closed
+        val live = intent.getStringExtra("liveStreamId") ?: return
+        val server = intent.getStringExtra("server") ?: return
+        val key = intent.getStringExtra("key").orEmpty()
+        Thread { runCatching { Sources.jellyfinCloseLive(server, key, live) } }.start()
     }
 
     companion object { private const val VLC = "org.videolan.vlc" }

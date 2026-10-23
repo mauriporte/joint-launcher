@@ -262,4 +262,11 @@ class RowOrderTest {
             Sources.explain(Sources.FetchError("jf.local:8096", null, java.net.ConnectException("refused"))))
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
     }
+
+    @Test fun categoryChannelsFollowTheListOrderAndSkipMissing() {
+        val json = """{"Items":[{"Id":"a","Name":"MTV Live","Number":"707"},{"Id":"b","Name":"MTV2","Number":"708"},{"Id":"c","Name":"News","Number":"1"}]}"""
+        assertEquals(listOf("708  MTV2", "707  MTV Live"), Sources.pickChannels(json, listOf("708", "999", "707"), "http://jf").map { it.title })
+        assertEquals(listOf("707", "708", "784"), LIVE_CATEGORIES.getValue("Music").take(3))
+        assertEquals(listOf(43, 34, 15), listOf("Music", "Movies", "Series").map { LIVE_CATEGORIES.getValue(it).size })
+    }
 }

@@ -203,7 +203,7 @@ class MainActivity : Activity() {
             when (it) {
                 Tab.LIVE -> jfKey.isNotEmpty()
                 Tab.SPORTS -> installed(Links.GEESPORTS)
-                Tab.MUSIC -> connected("spotify")
+                Tab.MUSIC -> connected("spotify") || jfKey.isNotEmpty()
                 Tab.VIDEOS -> connected("google")
                 else -> true
             }
@@ -288,6 +288,9 @@ class MainActivity : Activity() {
                 if (jellyfin) r("$word · Jellyfin") {
                     jf("/Items?userId=%s&recursive=true&includeItemTypes=${if (movie) "Movie" else "Series"}&sortBy=DateCreated&sortOrder=Descending&limit=60&$jfFields")
                 }
+                if (jellyfin) r("${if (movie) "Movie" else "Series"} channels · Jellyfin") {
+                    Sources.jellyfinLiveByNumber(server, jfKey, jfUser(), LIVE_CATEGORIES.getValue(word))
+                }
                 // more of this type: one row per genre, across all your services at once
                 if (providers.isNotEmpty()) Sources.GENRES.forEach { (code, name) ->
                     r(if (code == "doc") name else "$name ${word.lowercase()}") {
@@ -304,6 +307,8 @@ class MainActivity : Activity() {
             }
             Tab.SPORTS -> Sources.SPORT_ROWS.forEach { (name, leagues) -> r("$name · next 7 days · GeeSports") { Sources.sports(leagues, days = 7) } }
             Tab.MUSIC -> {
+                if (jellyfin) r("Music channels · Jellyfin") { Sources.jellyfinLiveByNumber(server, jfKey, jfUser(), LIVE_CATEGORIES.getValue("Music")) }
+                if (!connected("spotify")) return@buildList
                 r("New releases from artists you follow · Spotify") { Sources.spotifyNewReleases(token("spotify")!!) }
                 r("Your playlists · Spotify") { Sources.spotifyPlaylists(token("spotify")!!) }
                 r("Liked albums · Spotify") { Sources.spotifySavedAlbums(token("spotify")!!) }
@@ -1563,7 +1568,12 @@ class MainActivity : Activity() {
                 pool.execute {
                     val url = runCatching { Sources.jellyfinLiveUrl(server, jfKey, jfUser(), p.channelId) }
                     main.post {
-                        url.onSuccess { startActivity(Intent(this, PlayerActivity::class.java).putExtra("url", it).putExtra("key", jfKey)) }
+                        url.onSuccess { s ->
+                            startActivity(Intent(this, PlayerActivity::class.java).putExtra("url", s.url).putExtra("key", jfKey)
+                                .putExtra("server", server).putExtra("liveStreamId", s.id)
+                                // this TV's MPEG-2 hardware decoder is unusable (MediaCodec can't create it): VLC decodes those in software
+                                .putExtra("vlc", s.videoCodec in setOf("mpeg2video", "mpeg1video")))
+                        }
                             .onFailure { toast("Couldn't start this channel: ${it.message}") }
                     }
                 }
