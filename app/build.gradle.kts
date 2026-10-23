@@ -28,6 +28,9 @@ android {
 
 dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2") // rows: builds only what's near the screen, D-pad focus included
+    // player: audio/subtitle track choice, live MPEG-TS; MPEG-2 video still goes to VLC (this TV's decoder is unusable)
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // real org.json; Android's is stubbed in unit tests
 }

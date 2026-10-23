@@ -356,6 +356,15 @@ object Sources {
     }
 
     /** Frees the tuner a live channel held (Tvheadend only has a few). */
+    /**
+     * Tells Jellyfin what's playing so it can resume later and show it on the dashboard.
+     * event = "" (started), "Progress" or "Stopped".
+     */
+    fun jellyfinReport(server: String, key: String, event: String, itemId: String, posMs: Long, paused: Boolean) {
+        val body = JSONObject(mapOf("ItemId" to itemId, "PositionTicks" to posMs * 10_000, "IsPaused" to paused, "CanSeek" to true, "PlayMethod" to "DirectPlay"))
+        post("$server/Sessions/Playing" + if (event.isEmpty()) "" else "/$event", body.toString(), Links.jfAuth(key))
+    }
+
     fun jellyfinCloseLive(server: String, key: String, liveStreamId: String) {
         post("$server/LiveStreams/Close?liveStreamId=${enc(liveStreamId)}", "", Links.jfAuth(key))
     }
