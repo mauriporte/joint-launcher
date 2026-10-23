@@ -72,7 +72,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        heroImg = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+        HomeButtonService.restore(this)
+        heroImg =ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD); letterSpacing = -0.01f
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setShadowLayer(12f, 0f, 2f, 0x99000000.toInt())
