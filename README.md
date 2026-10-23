@@ -40,7 +40,8 @@ Credentials → Create OAuth client ID → type **Desktop app** → copy Client 
 
 ## Build
 
-JDK 17 and the Android SDK (platform 35), Gradle 8.9:
+JDK 17 and the Android SDK (platform 35), Gradle 8.9. Optionally put your Jellyfin server in `local.properties`
+(`jellyfin.server=http://your-server:8096`) so your builds point at it out of the box:
 
 ```bash
 gradle testDebugUnitTest assembleDebug
