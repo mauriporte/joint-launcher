@@ -110,8 +110,9 @@ class MainActivity : Activity() {
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
             if (!moveMode.active && sidebar.isOpen && now != null && !isInside(now, sidebar.rail)) sidebar.hide()
         }
-        // disk cache for every HTTP GET that allows caching (all the poster/backdrop/logo CDNs do)
-        runCatching { android.net.http.HttpResponseCache.install(java.io.File(cacheDir, "http"), 150L * 1024 * 1024) }
+        // disk cache for every HTTP GET that allows caching (all the poster/backdrop/logo CDNs do);
+        // small, because this TV has 4 GB in total and other apps' caches already fill it up
+        runCatching { android.net.http.HttpResponseCache.install(java.io.File(cacheDir, "http"), 40L * 1024 * 1024) }
         loadHome()
         nowPlaying.start()
     }

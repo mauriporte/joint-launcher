@@ -94,6 +94,14 @@ class Actions(private val a: MainActivity) {
         }
     }
 
+    /** "TV storage: 1.4 GB free of 4.0 GB · Joint Launcher uses 38 MB", so a full TV isn't a surprise. */
+    private fun storageLine(): String {
+        val s = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        fun size(b: Long) = if (b >= 1L shl 30) "%.1f GB".format(b / (1L shl 30).toDouble()) else "${b shr 20} MB"
+        val ours = a.cacheDir.walkTopDown().sumOf { it.length() } + a.filesDir.walkTopDown().sumOf { it.length() }
+        return "TV storage: ${size(s.availableBytes)} free of ${size(s.totalBytes)} · Joint Launcher uses ${size(ours)}"
+    }
+
     fun settings() {
         fun field(hint: String, value: String, password: Boolean = false) = EditText(a).apply {
             this.hint = hint; setText(value); isSingleLine = true
@@ -107,6 +115,7 @@ class Actions(private val a: MainActivity) {
             orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(8), a.dp(24), 0)
             listOf(url, key, email, pw).forEach(::addView)
         }
+        box.addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
         AlertDialog.Builder(a).setTitle("Settings").setView(box)
             .setPositiveButton("Save") { _, _ ->
                 if (key.text.toString().trim() != hub.jfKey) hub.prefs.edit().remove("uid").apply() // manual key: look the user up again
