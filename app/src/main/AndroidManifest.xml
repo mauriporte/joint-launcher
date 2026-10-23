@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- the TV's own network address, for the phone sign-in page's QR code -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- only takes effect if granted over adb; used solely to switch our Home button service back on after updates -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-feature android:name="android.software.leanback" android:required="false" />

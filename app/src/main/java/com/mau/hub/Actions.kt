@@ -62,14 +62,8 @@ class Actions(private val a: MainActivity) {
         fun tile(source: Source, pkg: String) = Item(source, "Connect ${source.label}", Play.App(pkg), wide = true,
             icon = runCatching { a.packageManager.getApplicationBanner(pkg) ?: a.packageManager.getApplicationIcon(pkg) }.getOrNull())
         if (hub.jfKey.isEmpty() && hub.installed(Links.JELLYFIN)) add(tile(Source.JELLYFIN, Links.JELLYFIN) to ::quickConnect)
-        if (!hub.connected("google") && hub.installed(Links.SMARTTUBE)) add(tile(Source.YOUTUBE, Links.SMARTTUBE) to { connectHelp("YouTube") })
-        if (!hub.connected("spotify") && hub.installed(Links.SPOTIFY)) add(tile(Source.SPOTIFY, Links.SPOTIFY) to { connectHelp("Spotify") })
-    }
-
-    private fun connectHelp(name: String) {
-        AlertDialog.Builder(a).setTitle("Connect $name")
-            .setMessage("On your PC, run tools\\connect.ps1 from the joint-launcher folder and sign in to $name in the browser it opens.\n\nThe script sends the login straight to this TV; then reopen Joint Launcher.")
-            .setPositiveButton("OK", null).show()
+        if (!hub.connected("google") && hub.installed(Links.SMARTTUBE)) add(tile(Source.YOUTUBE, Links.SMARTTUBE) to { ConnectScreen(a).show() })
+        if (!hub.connected("spotify") && hub.installed(Links.SPOTIFY)) add(tile(Source.SPOTIFY, Links.SPOTIFY) to { ConnectScreen(a).show() })
     }
 
     fun quickConnect() {
@@ -110,29 +104,20 @@ class Actions(private val a: MainActivity) {
         }
         val url = field("Jellyfin URL", hub.server)
         val key = field("Jellyfin API key (Dashboard → API Keys)", hub.jfKey)
-        val email = field(if (hub.stremioKey.isEmpty()) "Stremio email" else "Stremio: signed in (enter to switch account)", "")
-        val pw = field("Stremio password (not stored)", "", password = true)
         val box = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(8), a.dp(24), 0)
-            listOf(url, key, email, pw).forEach(::addView)
+            listOf(url, key).forEach(::addView)
+            addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
         }
-        box.addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
         AlertDialog.Builder(a).setTitle("Settings").setView(box)
             .setPositiveButton("Save") { _, _ ->
                 if (key.text.toString().trim() != hub.jfKey) hub.prefs.edit().remove("uid").apply() // manual key: look the user up again
                 hub.prefs.edit().putString("server", url.text.toString().trim()).putString("key", key.text.toString().trim()).apply()
                 hub.userId = null
-                val e = email.text.toString().trim(); val p = pw.text.toString()
-                if (e.isEmpty() || p.isEmpty()) a.loadHome() else hub.pool.execute {
-                    val r = runCatching { Sources.stremioLogin(e, p) }
-                    hub.main.post {
-                        r.onSuccess { hub.prefs.edit().putString("stremio", it).apply(); a.toast("Stremio connected") }
-                            .onFailure { a.toast("Stremio login failed: ${it.message}") }
-                        a.loadHome()
-                    }
-                }
+                a.loadHome()
             }
-            .setNeutralButton("Sign out of Stremio") { _, _ -> hub.prefs.edit().remove("stremio").apply(); a.loadHome() }
+            // Jellyseerr, Stremio, Spotify and YouTube: signed in from your phone (QR code), nothing to type here
+            .setNeutralButton("Connect accounts") { _, _ -> ConnectScreen(a).show() }
             .setNegativeButton("Cancel", null).show()
     }
 }
