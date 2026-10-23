@@ -321,7 +321,7 @@ class MainActivity : Activity() {
     }
 
     private fun loadHome() {
-        gen++; inSearch = false; rows.removeAllViews(); pendingRenders.clear()
+        gen++; inSearch = false; rows.removeAllViews(); pendingRenders.clear(); failedRows.clear()
         railDirty = true // built when the sidebar is first opened, not at startup
         val f = appFilter
         val appView = f != null && sidebarApps().any { it.filter == f }
@@ -926,7 +926,7 @@ class MainActivity : Activity() {
     }
 
     private fun search(q: String) {
-        gen++; inSearch = true; rows.removeAllViews(); nowStrip = null; pendingRenders.clear()
+        gen++; inSearch = true; rows.removeAllViews(); nowStrip = null; pendingRenders.clear(); failedRows.clear()
         railDirty = true
         buildTabs() // no tab is selected while showing results
         if (jfKey.isNotEmpty() && installed(Links.JELLYFIN)) row("In your library") {
@@ -1176,21 +1176,48 @@ class MainActivity : Activity() {
             val items = runCatching { ItemJson.decode(json) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return@execute
             main.post { if (myGen == gen && shown == null) { shown = json; render(items) } }
         }
-        pool.execute {
-            val results = fetchers.map { runCatching(it) }
-            val items = results.flatMap { it.getOrNull().orEmpty() }
-            val errors = results.mapNotNull { it.exceptionOrNull() }
-            val fresh = ItemJson.encode(items)
-            if (items.isNotEmpty() && cacheFile != null) runCatching { cacheFile.parentFile?.mkdirs(); cacheFile.writeText(fresh) }
-            main.post {
-                if (myGen != gen) return@post
-                if (items.isNotEmpty()) { if (fresh != shown) render(items) }
-                else if (shown == null) { // nothing cached and nothing fetched: hide the row, or say why
-                    if (errors.isEmpty()) { rows.removeView(header); rows.removeView(scroller) }
-                    errors.forEach { strip.addView(text(14f, 0xFFFF8080.toInt()).apply { text = "Couldn't load: ${it.message}" }) }
+        var loading = false
+        var attempt = 0
+        lateinit var retry: Runnable
+        fun load() {
+            loading = true
+            pool.execute {
+                val results = fetchers.map { runCatching(it) }
+                val items = results.flatMap { it.getOrNull().orEmpty() }
+                val errors = results.mapNotNull { it.exceptionOrNull() }
+                val fresh = ItemJson.encode(items)
+                if (items.isNotEmpty() && cacheFile != null) runCatching { cacheFile.parentFile?.mkdirs(); cacheFile.writeText(fresh) }
+                main.post {
+                    loading = false
+                    if (myGen != gen) return@post
+                    if (items.isNotEmpty()) { failedRows.remove(header); if (fresh != shown) render(items) }
+                    else if (shown == null) { // nothing cached and nothing fetched: hide the row, or say why
+                        if (errors.isEmpty()) { failedRows.remove(header); rows.removeView(header); rows.removeView(scroller); return@post }
+                        // e.g. Jellyfin answers 503 for minutes while it starts: retry with backoff, and on every return to Home
+                        val wait = 15_000L shl attempt++.coerceAtMost(4) // 15s, 30s, 1m, 2m, then every 4m
+                        strip.removeAllViews() // the previous attempt's error
+                        errors.map(Sources::explain).distinct().forEach {
+                            strip.addView(text(14f, 0xFFFF8080.toInt()).apply {
+                                text = "$it. Trying again in ${if (wait < 60_000) "${wait / 1000}s" else "${wait / 60_000} min"}."
+                            })
+                        }
+                        failedRows[header] = retry
+                        main.removeCallbacks(retry)
+                        main.postDelayed(retry, wait)
+                    }
                 }
             }
         }
+        retry = Runnable { if (myGen == gen && shown == null && !loading) load() }
+        load()
+    }
+
+    /** Rows showing "Couldn't load" (nothing cached), by header -> their retry. */
+    private val failedRows = LinkedHashMap<View, Runnable>()
+
+    override fun onResume() {
+        super.onResume()
+        failedRows.values.toList().forEach { main.removeCallbacks(it); it.run() }
     }
 
     // ---- lazy row building: only rows near the screen get their cards built (Google TV does the same) ----

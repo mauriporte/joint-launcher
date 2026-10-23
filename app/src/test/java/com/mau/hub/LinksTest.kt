@@ -254,4 +254,12 @@ class RowOrderTest {
         assertEquals(listOf("C", "A", "B"), RowOrder.move(l, 2, RowOrder.TOP))
         assertEquals(listOf("B", "C", "A"), RowOrder.move(l, 0, RowOrder.BOTTOM))
     }
+
+    @Test fun failedRowsSayWhichServerAndWhy() {
+        assertEquals("jf.local:8096 answered 503: it's down or still starting up", Sources.explain(Sources.FetchError("jf.local:8096", 503)))
+        assertEquals("api.example.com answered 401: it rejected the sign-in (reconnect the account)", Sources.explain(Sources.FetchError("api.example.com", 401)))
+        assertEquals("jf.local:8096: nothing answered (server off, or the address is wrong)",
+            Sources.explain(Sources.FetchError("jf.local:8096", null, java.net.ConnectException("refused"))))
+        assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
+    }
 }

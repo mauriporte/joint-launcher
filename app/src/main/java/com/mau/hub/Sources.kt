@@ -27,16 +27,45 @@ object Sources {
     fun post(url: String, body: String, headers: Map<String, String> = emptyMap()) =
         http(url, body, headers + ("Content-Type" to "application/json"))
 
-    private fun http(url: String, body: String?, headers: Map<String, String>): String =
-        (URL(url).openConnection() as HttpURLConnection).run {
-            connectTimeout = 6000; readTimeout = 12000
-            headers.forEach(::setRequestProperty)
-            if (body != null) { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) } }
-            try {
-                if (responseCode >= 400) error("HTTP $responseCode")
-                inputStream.bufferedReader().readText()
-            } finally { disconnect() }
+    /** A request that failed: which server, and either its HTTP status or the network error (no answer, timeout...). */
+    class FetchError(val host: String, val code: Int?, cause: Throwable? = null) :
+        Exception(code?.let { "HTTP $it from $host" } ?: "$host: ${cause?.message}", cause)
+
+    private fun http(url: String, body: String?, headers: Map<String, String>): String {
+        val u = URL(url)
+        val host = if (u.port > 0) "${u.host}:${u.port}" else u.host
+        return try {
+            (u.openConnection() as HttpURLConnection).run {
+                connectTimeout = 6000; readTimeout = 12000
+                headers.forEach(::setRequestProperty)
+                if (body != null) { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) } }
+                try {
+                    if (responseCode >= 400) throw FetchError(host, responseCode)
+                    inputStream.bufferedReader().readText()
+                } finally { disconnect() }
+            }
+        } catch (e: java.io.IOException) { throw FetchError(host, null, e) }
+    }
+
+    /** What failed and why, in words, for a row that couldn't load. */
+    fun explain(e: Throwable): String {
+        if (e !is FetchError) return e.message ?: e.javaClass.simpleName
+        val why = when (e.code) {
+            null -> when (e.cause) {
+                is java.net.UnknownHostException -> "can't find it (no internet, or the address is wrong)"
+                is java.net.SocketTimeoutException -> "it took too long to answer"
+                is java.net.ConnectException -> "nothing answered (server off, or the address is wrong)"
+                else -> "network error: ${e.cause?.message}"
+            }
+            401, 403 -> "it rejected the sign-in (reconnect the account)"
+            404 -> "it doesn't have this anymore"
+            429 -> "too many requests, it asked to slow down"
+            502, 503, 504 -> "it's down or still starting up"
+            in 500..599 -> "it hit an internal error"
+            else -> "it refused the request"
         }
+        return e.host + (e.code?.let { " answered $it" } ?: "") + ": " + why
+    }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
     private fun JSONObject.str(k: String) = optString(k).takeUnless { it.isEmpty() || it == "null" }
