@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Joint Launcher · Spotify</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0b0b0d; color: #eee; max-width: 520px; margin: 0 auto; padding: 24px 16px; }
+  a { color: #f39a52; word-break: break-all; }
+  .err { color: #ff8080; }
+</style>
+</head>
+<body>
+<h1>Joint Launcher</h1>
+<p id="msg">Sending your Spotify sign-in back to your TV…</p>
+<script>
+  // Spotify sends the login here (it only accepts https addresses); this page passes it on to the TV on your home
+  // network, whose address came along in "state" (address:port/token/nonce). Nothing is stored or sent anywhere else.
+  const q = new URLSearchParams(location.search);
+  const state = q.get('state') || '';
+  const m = state.match(/^((?:192\.168|10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}):(\d{2,5})\/([A-Za-z0-9_-]+)\/[A-Za-z0-9_-]+$/);
+  const msg = document.getElementById('msg');
+  if (!m) {
+    msg.className = 'err';
+    msg.textContent = "This link didn't come from a Joint Launcher sign-in on your home network. Start again from the TV.";
+  } else {
+    const back = new URLSearchParams();
+    for (const k of ['code', 'error', 'state']) if (q.get(k)) back.set(k, q.get(k));
+    const url = 'http://' + m[1] + ':' + m[2] + '/' + m[3] + '/spotify-back?' + back.toString();
+    msg.innerHTML = 'Sending your Spotify sign-in back to your TV… If nothing happens, <a id="go">tap here</a> (your phone must be on the same Wi-Fi as the TV).';
+    document.getElementById('go').href = url;
+    location.replace(url);
+  }
+</script>
+</body>
+</html>
