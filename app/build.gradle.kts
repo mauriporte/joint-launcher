@@ -27,6 +27,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.recyclerview:recyclerview:1.3.2") // rows: builds only what's near the screen, D-pad focus included
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // real org.json; Android's is stubbed in unit tests
 }
