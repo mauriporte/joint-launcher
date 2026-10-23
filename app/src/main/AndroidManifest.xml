@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!-- Android 11+ package visibility for the apps we launch -->
+    <queries>
+        <package android:name="com.live.geesports" />
+        <package android:name="com.netflix.ninja" />
+        <package android:name="org.smarttube.beta" />
+        <package android:name="com.stremio.one" />
+        <package android:name="org.jellyfin.androidtv" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.disney.disneyplus" />
+        <package android:name="com.hulu.livingroomplus" />
+        <package android:name="com.peacocktv.peacockandroid" />
+        <package android:name="au.com.stan.and" />
+        <package android:name="com.wbd.stream" />
+        <package android:name="com.filmin.androidtv" />
+        <package android:name="com.spotify.tv.android" />
+        <package android:name="org.videolan.vlc" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="stremio" />
+        </intent>
+        <!-- to list every TV app for the "Your apps" row -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:label="Joint Launcher"
+        android:icon="@drawable/icon"
+        android:banner="@drawable/banner"
+        android:usesCleartextTraffic="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <!-- singleTask: pressing Home brings back this one home screen instead of stacking new copies -->
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+            android:stateNotNeeded="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- lets Joint Launcher be chosen as the TV's home screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Home button catcher (Google TV ignores the default-home setting); off until switched on in Accessibility -->
+        <service
+            android:name=".HomeButtonService"
+            android:process=":home"
+            android:exported="true"
+            android:label="@string/home_button_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_button_service" />
+        </service>
+
+        <service
+            android:name=".NowPlayingListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".PlayerActivity"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+    </application>
+</manifest>

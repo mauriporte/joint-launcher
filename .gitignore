@@ -1,0 +1,11 @@
+# build output
+.gradle/
+.kotlin/
+build/
+app/build/
+*.apk
+
+# machine-specific / secrets
+local.properties
+tools/connect.config.json
+.claude/settings.local.json

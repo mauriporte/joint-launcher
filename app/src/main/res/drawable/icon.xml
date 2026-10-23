@@ -1,0 +1,10 @@
+<!-- Square app icon (same motif as the banner): grey tile, grey bars, dark-orange play triangle -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF2E2F33" android:pathData="M0,0h108v108h-108z" />
+    <path android:fillColor="#FF8C8E94" android:pathData="M18,30h16v48h-16z" />
+    <path android:fillColor="#FFB4B6BB" android:pathData="M38,30h16v48h-16z" />
+    <path android:fillColor="#FFDCDDE0" android:pathData="M58,30h16v48h-16z" />
+    <path android:fillColor="#FFE8650A" android:pathData="M78,40l16,14l-16,14z" />
+</vector>

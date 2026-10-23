@@ -1,0 +1,10 @@
+<!-- TV launcher banner: the original three-bars + play motif, grey with a dark-orange accent -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF2E2F33" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FF8C8E94" android:pathData="M40,40h60v100h-60z" />
+    <path android:fillColor="#FFB4B6BB" android:pathData="M110,40h60v100h-60z" />
+    <path android:fillColor="#FFDCDDE0" android:pathData="M180,40h60v100h-60z" />
+    <path android:fillColor="#FFE8650A" android:pathData="M255,60l40,30l-40,30z" />
+</vector>
