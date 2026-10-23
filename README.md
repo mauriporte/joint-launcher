@@ -9,44 +9,85 @@ YouTube (SmartTube), Spotify and GeeSports, with Jellyseerr requests for movies,
 
 Built for Google TV / Android TV 11+ with plain Android Views (no Compose, no Leanback).
 
+> **This is the redesign branch.** It installs as a separate app, "Joint Launcher (redesign)" (`com.mau.hub.redesign`),
+> next to the regular Joint Launcher, so you can try it without losing the one you use.
+
 ## Install
 
 1. Download `joint-launcher.apk` from the [latest release](../../releases/latest).
 2. Install it on the TV: `adb install -r joint-launcher.apk`, or copy it over and open it with a file manager (allow "unknown apps").
-3. Optional: so the remote's Home button opens Joint Launcher instead of Google TV, go to
-   Settings → Accessibility and turn on **Joint Launcher Home button**.
+3. **Install VLC** from the Play Store if you watch Live TV. Channels in MPEG-2 (many DVB/IPTV channels) open in VLC,
+   because some TVs' MPEG-2 decoders can't be used by apps. Everything else plays in Joint Launcher's own player.
+4. Open Joint Launcher → sidebar → Settings → **Connect accounts**, and sign in from your phone (see below).
 
-The release is a **debug** build on purpose: `tools/connect.ps1` uses `adb run-as` to hand over account tokens, and that only works on debuggable apps.
+### Home button
+
+Google TV ignores the "default home app" setting, so Joint Launcher catches the remote's Home button itself:
+Settings → Accessibility → **Joint Launcher (redesign) Home button** → On.
+
+Android switches that off whenever the app is updated. Run this once and Joint Launcher turns it back on by itself
+after every update (it only ever touches its own Home button entry, and only if you had it on):
+
+```bash
+adb shell pm grant com.mau.hub.redesign android.permission.WRITE_SECURE_SETTINGS
+```
+
+### Now Playing tile
+
+Shows what Spotify (or any app) is playing. It needs notification access, which Google TV hides in its menus:
+
+```bash
+adb shell cmd notification allow_listener com.mau.hub.redesign/com.mau.hub.NowPlayingListener
+```
 
 ## Connecting accounts
 
+Settings → **Connect accounts** shows a QR code. Scan it with your phone (on the same Wi-Fi) to open a page served by
+the TV itself, and sign in there. The page only exists while that screen is open; passwords are used once and never stored.
+
 | Service | How |
 |---|---|
-| Jellyfin | "Connect Jellyfin" tile on the TV → approve the code under Profile → Quick Connect (server address in the app's Settings) |
-| Stremio | Settings on the TV → email + password (only the session key is kept) |
-| YouTube | `tools/connect.ps1 -Service youtube` (setup below) |
-| Spotify | `tools/connect.ps1 -Service spotify` (setup below) |
-| Jellyseerr | `tools/connect.ps1 -Service jellyseerr` (address + API key from Settings → General, or your admin login) |
-| Now Playing tile | `tools/connect.ps1 -GrantNowPlaying` (gives Joint Launcher notification access) |
+| Jellyfin | **Connect Jellyfin** on the TV → approve the code under Profile → Quick Connect. The server address can be set on the phone page. |
+| Jellyseerr | Address + your Jellyfin login (a Jellyseerr admin), or its API key (Settings → General) |
+| Stremio | Email + password (only the session is kept) |
+| Spotify | Your Spotify app's Client ID → Sign in with Spotify (setup below) |
+| YouTube | A Google "TV" client's ID + secret → the TV shows a code to enter at google.com/device (setup below) |
 
-Copy `tools/connect.config.example.json` to `tools/connect.config.json` (it's git-ignored) and fill it in:
+**Spotify** (needs Premium on the account that owns the app): developer.spotify.com/dashboard → Create app → API "Web API",
+Redirect URI `https://mauriporte.github.io/joint-launcher/spotify.html`. That page only passes the sign-in back to your TV
+([docs/spotify.html](https://github.com/mauriporte/joint-launcher/blob/main/docs/spotify.html) on `main`).
 
-**Spotify** (needs Premium on the account that owns the app): developer.spotify.com/dashboard → Create app →
-Redirect URI `http://127.0.0.1:8888/callback`, API "Web API" → copy the Client ID into `spotifyClientId`.
-
-**YouTube**: console.cloud.google.com → new project → enable "YouTube Data API v3" →
-OAuth consent screen (External, add yourself as a user, then **Publish app**, otherwise the login expires after 7 days) →
-Credentials → Create OAuth client ID → type **Desktop app** → copy Client ID / Client secret into `googleClientId` / `googleClientSecret`.
+**YouTube**: console.cloud.google.com → new project → enable "YouTube Data API v3" → OAuth consent screen (External, add
+yourself as a test user, then **Publish app**, otherwise the login expires after 7 days) → Credentials → Create OAuth client
+ID → type **TVs and Limited Input devices**.
 
 ## Build
 
-JDK 17 and the Android SDK (platform 35), Gradle 8.9. Optionally put your Jellyfin server in `local.properties`
-(`jellyfin.server=http://your-server:8096`) so your builds point at it out of the box:
+JDK 17, Android SDK (platform 35), Gradle 8.9. Optional settings in `local.properties` (git-ignored):
+
+```properties
+# your Jellyfin server, so your builds point at it out of the box
+jellyfin.server=http://your-server:8096
+# signing key for release builds (without it they stay unsigned)
+release.storeFile=C\:/path/to/release.jks
+release.storePassword=...
+release.keyAlias=...
+release.keyPassword=...
+```
 
 ```bash
-gradle testDebugUnitTest assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+gradle testReleaseUnitTest assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
+
+Keep a backup of the signing key: Android only installs updates signed with the same key.
+
+## Code map
+
+`MainActivity` lays the screen out and handles Back/Home; each part lives in its own file: `TopBar`, `Sidebar`,
+`Rows` (RecyclerView rows, caching, retries), `Cards`, `DetailScreen`, `SearchBar`, `NowPlaying`, `MoveMode`,
+`Catalog` (which rows exist), `Apps`, `Images`, `Meta`, `Actions`, `ConnectScreen` + `PhonePage` + `SignIn` (accounts),
+`PlayerActivity` (Media3), `Sources` (all the APIs), `Hub` (shared settings and threads).
 
 ## Adding a streaming service
 

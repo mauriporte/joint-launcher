@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// machine-specific settings, never committed: your Jellyfin server and the release signing key (see README)
+val local = Properties().apply { rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
+
 android {
     namespace = "com.mau.hub"
     compileSdk = 35
@@ -12,11 +15,29 @@ android {
         applicationId = "com.mau.hub.redesign" // installs next to the running Joint Launcher instead of replacing it
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
-        // your Jellyfin server, from the git-ignored local.properties (jellyfin.server=http://...); example address otherwise
-        val local = Properties().apply { rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
+        versionCode = 6
+        versionName = "2.0"
+        // your Jellyfin server (jellyfin.server=http://... in local.properties); example address otherwise
         buildConfigField("String", "JELLYFIN_SERVER", "\"${local.getProperty("jellyfin.server", "http://jellyfin.example.com:8096")}\"")
+    }
+    signingConfigs {
+        // release.storeFile / storePassword / keyAlias / keyPassword in local.properties; without them, release builds stay unsigned
+        local.getProperty("release.storeFile")?.let { path ->
+            create("release") {
+                storeFile = file(path)
+                storePassword = local.getProperty("release.storePassword")
+                keyAlias = local.getProperty("release.keyAlias")
+                keyPassword = local.getProperty("release.keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = true // drops unused library code: a much smaller download on a 4 GB TV
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.findByName("release")
+        }
     }
     buildFeatures { buildConfig = true }
     compileOptions {
