@@ -1030,7 +1030,8 @@ class MainActivity : Activity() {
 
     private fun jfUser() = userId ?: prefs.getString("uid", null) ?: Sources.jellyfinUser(server, jfKey).also { userId = it }
 
-    private fun jf(path: String): List<Item> = Sources.jellyfin(server, jfKey, path.format(jfUser()))
+    // replace, not format(): search terms arrive URL-encoded ("%20h" would be read as a format specifier)
+    private fun jf(path: String): List<Item> = Sources.jellyfin(server, jfKey, path.replace("%s", jfUser()))
 
     // disabled counts as not installed: TVs ship apps like Prime Video preinstalled but switched off
     private fun installed(pkg: String) = runCatching { packageManager.getApplicationInfo(pkg, 0).enabled }.getOrDefault(false)
