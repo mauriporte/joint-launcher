@@ -33,7 +33,7 @@
     </queries>
 
     <application
-        android:label="Joint Launcher"
+        android:label="Joint Launcher (redesign)"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"

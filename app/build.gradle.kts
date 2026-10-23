@@ -9,7 +9,7 @@ android {
     namespace = "com.mau.hub"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.mau.hub"
+        applicationId = "com.mau.hub.redesign" // installs next to the running Joint Launcher instead of replacing it
         minSdk = 24
         targetSdk = 35
         versionCode = 5
