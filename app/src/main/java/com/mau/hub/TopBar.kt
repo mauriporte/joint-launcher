@@ -40,7 +40,7 @@ class TopBar(private val a: MainActivity) {
 
     val view = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
-        if (a.hub.touch) setPadding(a.dp(10), 0, a.dp(12), 0) else setPadding(a.dp(30), 0, a.dp(36), 0) // matches Home's side margins
+        if (a.hub.touch) setPadding(a.dp(17), 0, a.dp(19), 0) else setPadding(a.dp(30), 0, a.dp(36), 0) // tablet: menu icon and clock line up with the section icons and arrows below
         if (a.hub.touch) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
             // the menu button is Joint Launcher's own icon (in its colours, like the top of the sidebar it opens)
@@ -68,14 +68,17 @@ class TopBar(private val a: MainActivity) {
             }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
             opensApp(weather, "weather", "Weather", listOf("weather", "clima", "tiempo"))
             addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) })
+            // three steps: 0 everything, 1 just the weather and clock (tabs and buttons folded away), 2 nothing
             val folding = (indexOfChild(tabs) until childCount).map(::getChildAt)
+            val keepAtStep1 = setOf<View>(weather, getChildAt(childCount - 1)) // the weather and the flip clock
+            fun step() = a.hub.prefs.getInt("topbar_fold", if (a.hub.prefs.getBoolean("topbar_folded", false)) 2 else 0)
             fun applyFold() {
-                val folded = a.hub.prefs.getBoolean("topbar_folded", false)
-                folding.forEach { it.visibility = if (folded) View.INVISIBLE else View.VISIBLE } // INVISIBLE keeps the bar's height
-                collapse.rotation = if (folded) 0f else 180f // ic_chevron points right: left = "fold", right = "unfold"
-                collapse.contentDescription = if (folded) "Show the top bar" else "Hide the top bar"
+                val s = step()
+                folding.forEach { v -> v.visibility = if (s == 0 || (s == 1 && v in keepAtStep1)) View.VISIBLE else View.INVISIBLE } // INVISIBLE keeps the bar's height
+                collapse.rotation = if (s == 2) 0f else 180f // ic_chevron points right: left = "fold more", right = "unfold"
+                collapse.contentDescription = when (s) { 0 -> "Fold the top bar to the clock"; 1 -> "Hide the top bar"; else -> "Show the top bar" }
             }
-            collapse.setOnClickListener { a.hub.prefs.edit().putBoolean("topbar_folded", !a.hub.prefs.getBoolean("topbar_folded", false)).apply(); applyFold() }
+            collapse.setOnClickListener { a.hub.prefs.edit().putInt("topbar_fold", (step() + 1) % 3).apply(); applyFold() }
             applyFold()
         } else {
             addView(search)
