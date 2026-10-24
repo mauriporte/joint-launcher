@@ -43,7 +43,11 @@ class TopBar(private val a: MainActivity) {
         if (a.hub.touch) setPadding(a.dp(10), 0, a.dp(12), 0) else setPadding(a.dp(30), 0, a.dp(36), 0) // matches Home's side margins
         if (a.hub.touch) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
-            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.bareButton() })
+            // the menu button is Joint Launcher's own icon (in its colours, like the top of the sidebar it opens)
+            addView(a.iconButton(R.drawable.icon_bare, "Menu") { a.sidebar.show() }.apply {
+                touchSize(this); marginEnd(this, 8); background = a.bareButton(); setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
+                clearColorFilter(); onFocusChangeListener = null
+            })
             addView(search.also { touchSize(it) })
             // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
