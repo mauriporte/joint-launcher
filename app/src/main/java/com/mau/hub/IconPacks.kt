@@ -34,43 +34,55 @@ class IconPacks(private val hub: Hub) {
         if (pack == null || name == null) remove("icon_$pkg") else putString("icon_$pkg", "$pack|$name" + if (appColour) "|auto" else "")
     }.apply()
 
-    /** Off the UI thread (parsing a pack takes a moment the first time). Null = no pack icon: use the app's own. */
-    fun iconFor(pkg: String): Drawable? {
-        override(pkg)?.let { o ->
-            drawable(o[0], o[1])?.let { d ->
-                // a hand-picked icon keeps the app's colour (GeeSports' G stays yellow), unless the app's logo has none
-                if (o.getOrNull(2) == "auto") appColour(pkg)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
-                return d
-            }
-        }
+    /**
+     * Which pack icon an app gets, as "pack|name" (the pack's own colours) or "pack|name|auto" (recoloured in the app's
+     * colour): the one you picked; the one another device uses for an app of the same name (copied over, see
+     * [exportPicks] - the TV's apps have other package names than the tablet's, so the pack doesn't know them); the
+     * pack's icon for its package or its phone/TV twin; one whose name matches the app's; the pack's letter icon.
+     * Null without a pack, or when nothing fits. Off the UI thread (parsing a pack takes a moment the first time).
+     */
+    fun pickFor(pkg: String, label: String): String? {
         val pack = active() ?: return null
+        override(pkg)?.let { return it.joinToString("|") }
+        copiedPicks()[plain(label)]?.let { return it }
         val map = map(pack)
         val component = ctx.packageManager.getLaunchIntentForPackage(pkg)?.component
-        val name = component?.let { map["ComponentInfo{${it.packageName}/${it.className}}"] } ?: map[pkg] ?: return null
-        return drawable(pack, name)
-    }
-
-    /**
-     * With a pack on, every icon comes from it (no mixing with the apps' own): the pack's icon for the app or its
-     * phone/TV twin (by package, so it works for apps that aren't installed), else one whose name matches the app's
-     * name, else the pack's letter icon for its first letter. Guessed ones are recoloured in the app's colour when
-     * the app is installed, like hand-picked ones. Null only without a pack.
-     */
-    fun packIcon(pkg: String, label: String, brand: Int? = null): Drawable? {
-        val pack = active() ?: return null
-        iconFor(pkg)?.let { return it }
-        val map = map(pack)
-        (Links.MOBILE[pkg].orEmpty() + Links.canonical(pkg)).firstNotNullOfOrNull { map[it] }?.let { n -> drawable(pack, n)?.let { return it } }
+        (listOfNotNull(component?.let { "ComponentInfo{${it.packageName}/${it.className}}" }) + pkg + Links.MOBILE[pkg].orEmpty() + Links.canonical(pkg))
+            .firstNotNullOfOrNull { map[it] }?.let { return "$pack|$it" }
         val names = allIcons(pack).toHashSet()
         val clean = label.lowercase().replace("+", "_plus").replace(Regex("[^a-z0-9]+"), "_").trim('_')
         val name = listOf(clean, clean.substringBefore('_'), clean.replace("_", "")).firstOrNull { it.isNotEmpty() && it in names }
             ?: clean.firstOrNull()?.let { c -> listOf("alphabets_$c", "letter_$c", "$c").firstOrNull { it in names } }
             ?: return null
-        val d = drawable(pack, name) ?: return null
-        // guessed icons take the app's colour; a service that isn't installed takes its brand colour (Filmin's F in green)
-        (if (hub.installed(pkg)) appColour(pkg) else brand)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
+        return "$pack|$name|auto"
+    }
+
+    /** The pack icon for an app (see [pickFor]); null = use the app's own. brand: the colour for a service that isn't installed. */
+    fun packIcon(pkg: String, label: String, brand: Int? = null): Drawable? {
+        val pick = pickFor(pkg, label)?.split('|') ?: return null
+        val d = drawable(pick[0], pick[1]) ?: return null
+        // hand-picked and guessed icons take the app's colour (GeeSports' G stays yellow); a service that isn't
+        // installed takes its brand colour (Filmin's F in green)
+        if (pick.getOrNull(2) == "auto") (if (hub.installed(pkg)) appColour(pkg) else brand)
+            ?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
         return d
     }
+
+    /** Every app here by name, with the icon it gets: what another device (the TV) copies to show the same icons. */
+    fun exportPicks(): String = org.json.JSONObject().apply {
+        val pm = ctx.packageManager
+        pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).forEach { r ->
+            val label = r.loadLabel(pm).toString()
+            pickFor(r.activityInfo.packageName, label)?.let { put(plain(label), it) }
+        }
+    }.toString()
+
+    /** Picks copied from another device ([exportPicks]), by app name. */
+    private fun copiedPicks(): Map<String, String> = cachedCopies ?: runCatching {
+        val o = org.json.JSONObject(hub.prefs.getString("icon_labels", "{}")!!)
+        o.keys().asSequence().associateWith { o.getString(it) }
+    }.getOrDefault(emptyMap()).also { cachedCopies = it }
+    @Volatile private var cachedCopies: Map<String, String>? = null
 
     /**
      * The main colour of an app's own icon: the most common strong colour (white, black and greys don't count),
@@ -123,6 +135,9 @@ class IconPacks(private val hub: Hub) {
     companion object {
         const val LINEX = "com.jndapp.line.x.iconpack"
         const val NONE = "none" // icon_pack value for "the apps' own icons"
+
+        /** An app name reduced to letters and digits, for matching the same app across devices (TV and tablet). */
+        fun plain(label: String) = label.lowercase().filter(Char::isLetterOrDigit)
 
         /** Most common hue among vivid, opaque pixels (12 hue buckets), averaged and brightened; null if too few. */
         fun dominant(pixels: IntArray): Int? {

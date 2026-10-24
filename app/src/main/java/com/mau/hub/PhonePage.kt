@@ -101,7 +101,8 @@ class PhonePage(
             // the same accounts, for setting up another device (tablet) from this one; same random path, only while the screen is open
             "/export" -> {
                 val form = (ACCOUNT_KEYS.mapNotNull { k -> hub.prefs.getString(k, null)?.let { k to it } } +
-                    IMPORT_SETS.mapNotNull { k -> hub.prefs.getStringSet(k, null)?.let { k to it.joinToString("\n") } })
+                    IMPORT_SETS.mapNotNull { k -> hub.prefs.getStringSet(k, null)?.let { k to it.joinToString("\n") } } +
+                    ("icon_labels" to IconPacks(hub).exportPicks())) // this device's app icons by app name, for the other device
                     .joinToString("&") { (k, v) -> "$k=" + java.net.URLEncoder.encode(v, "UTF-8") }.toByteArray()
                 out.write("HTTP/1.1 200 OK\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: ${form.size}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".toByteArray())
                 out.write(form); out.flush()
@@ -112,7 +113,13 @@ class PhonePage(
                 IMPORT_KEYS.forEach { k -> params[k]?.takeIf { it.isNotEmpty() }?.let { e.putString(k, it) } }
                 IMPORT_SETS.forEach { k -> params[k]?.let { v -> e.putStringSet(k, v.split('\n').filter(String::isNotEmpty).toSet()) } }
                 // app icons picked from an icon pack ("icon_<package>" = "<pack>|<icon>"), the same thing Change icon saves
-                params.filter { (k, v) -> k.startsWith("icon_") && ICON_PICK.matches(v) }.forEach { (k, v) -> e.putString(k, v) }
+                params.filter { (k, v) -> k.startsWith("icon_") && k != "icon_labels" && ICON_PICK.matches(v) }.forEach { (k, v) -> e.putString(k, v) }
+                // the other device's icons by app name (IconPacks.exportPicks): kept only if every entry is a pack|icon pick
+                params["icon_labels"]?.let { v ->
+                    runCatching { org.json.JSONObject(v) }.getOrNull()
+                        ?.takeIf { o -> o.keys().asSequence().all { ICON_PICK.matches(o.optString(it)) } }
+                        ?.let { e.putString("icon_labels", v) }
+                }
                 e.apply()
                 hub.userId = null
                 "Imported ${params.keys.count { it in IMPORT_KEYS || it in IMPORT_SETS || it.startsWith("icon_") }} settings."
