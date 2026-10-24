@@ -45,10 +45,14 @@ class TopBar(private val a: MainActivity) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
             addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.bareButton() })
             addView(search.also { touchSize(it) })
-            addView(android.widget.HorizontalScrollView(a).apply {
+            // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
+            val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
+            addView(collapse)
+            val tabs = android.widget.HorizontalScrollView(a).apply {
                 isHorizontalScrollBarEnabled = false
                 addView(tabStrip)
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
+            }
+            addView(tabs, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
             addView(titlesButton.also { touchSize(it); it.background = a.bareButton(); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
@@ -60,6 +64,15 @@ class TopBar(private val a: MainActivity) {
             }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
             opensApp(weather, "weather", "Weather", listOf("weather", "clima", "tiempo"))
             addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) })
+            val folding = (indexOfChild(tabs) until childCount).map(::getChildAt)
+            fun applyFold() {
+                val folded = a.hub.prefs.getBoolean("topbar_folded", false)
+                folding.forEach { it.visibility = if (folded) View.INVISIBLE else View.VISIBLE } // INVISIBLE keeps the bar's height
+                collapse.rotation = if (folded) 0f else 180f // ic_chevron points right: left = "fold", right = "unfold"
+                collapse.contentDescription = if (folded) "Show the top bar" else "Hide the top bar"
+            }
+            collapse.setOnClickListener { a.hub.prefs.edit().putBoolean("topbar_folded", !a.hub.prefs.getBoolean("topbar_folded", false)).apply(); applyFold() }
+            applyFold()
         } else {
             addView(search)
             addView(tabStrip)
