@@ -73,6 +73,11 @@ class Apps(private val hub: Hub, private val images: Images) {
     fun setHidden(pkg: String, on: Boolean) =
         hub.prefs.edit().putStringSet("hidden_apps", hidden().let { if (on) it + pkg else it - pkg }).apply()
 
+    /** Favorites' own order (you move them while the heart is on); new favorites join at the end. */
+    fun favOrder(): List<String> = hub.prefs.getString("fav_order", null)?.split("\n")?.filter { it.isNotEmpty() } ?: emptyList()
+    fun saveFavOrder(moved: List<String>) =
+        hub.prefs.edit().putString("fav_order", (moved + favOrder().filter { it !in moved }).joinToString("\n")).apply()
+
     var favouritesOnly: Boolean
         get() = hub.prefs.getBoolean("apps_favs_only", false)
         set(v) = hub.prefs.edit().putBoolean("apps_favs_only", v).apply()

@@ -84,6 +84,8 @@ class MainActivity : Activity() {
         detail = DetailScreen(this)
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
+            // the tablet's Apps are A to Z; only Favorites (heart on) keep an order of their own
+            if (hub.touch && container !== sidebar.rail) { apps.saveFavOrder(order); return@MoveMode }
             apps.saveOrder(order)
             if (container === sidebar.rail) rowsDirty = true // Home rows follow the sidebar: reorder them when it closes
             else sidebar.dirty = true // the sidebar picks the new order up next time it opens
@@ -154,9 +156,22 @@ class MainActivity : Activity() {
 
     private lateinit var root: FrameLayout
 
-    // your own background pictures (Settings → Background), one per orientation so a corner logo stays in its corner
+    // your own background pictures (Settings → Background): a gallery to switch between; each can have a portrait
+    // version so a corner logo stays in its corner when the tablet turns
     private val bgImage by lazy { ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP } }
-    fun bgFile(portrait: Boolean) = java.io.File(filesDir, if (portrait) "bg_portrait" else "bg_landscape")
+    private val bgDir get() = java.io.File(filesDir, "backgrounds").apply { mkdirs() }
+    fun bgFile(id: String, portrait: Boolean) = java.io.File(bgDir, if (portrait) "$id.portrait" else id)
+
+    /** The gallery, oldest first (ids are when they were added). */
+    fun backgrounds(): List<String> {
+        // the first version kept one landscape + portrait pair: it becomes the first picture of the gallery
+        java.io.File(filesDir, "bg_landscape").takeIf { it.exists() }?.let { it.renameTo(bgFile("1", false)); java.io.File(filesDir, "bg_portrait").renameTo(bgFile("1", true)) }
+        return bgDir.list().orEmpty().filter { !it.endsWith(".portrait") }.sortedBy { it.toLongOrNull() ?: 0L }
+    }
+
+    fun currentBackground(): String? = hub.prefs.getString("bg_current", null)?.takeIf { bgFile(it, false).exists() } ?: backgrounds().firstOrNull()
+    fun useBackground(id: String) { hub.prefs.edit().putString("bg_current", id).putString("bg_mode", "picture").apply(); applyBackground() }
+    fun removeBackground(id: String) { bgFile(id, false).delete(); bgFile(id, true).delete(); applyBackground() }
 
     /** "black", "wallpaper" (the tablet's) or "picture" (yours); older versions only had the wallpaper switch. */
     fun bgMode(): String = if (!hub.touch) "black"
@@ -170,7 +185,7 @@ class MainActivity : Activity() {
         val mode = bgMode()
         val dim = Color.argb(hub.prefs.getInt("bg_dim", 60).coerceIn(0, 100) * 255 / 100, 5, 5, 5)
         val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-        val pic = if (mode == "picture") (bgFile(portrait).takeIf { it.exists() } ?: bgFile(!portrait).takeIf { it.exists() }) else null
+        val pic = if (mode == "picture") currentBackground()?.let { id -> bgFile(id, true).takeIf { portrait && it.exists() } ?: bgFile(id, false) } else null
         if (pic != null) {
             if (bgImage.parent == null) root.addView(bgImage, 0, FrameLayout.LayoutParams(-1, -1))
             bgImage.setImageBitmap(android.graphics.BitmapFactory.decodeFile(pic.path))
@@ -321,9 +336,11 @@ class MainActivity : Activity() {
         val favs = apps.favourites()
         // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
         val hidden = apps.hidden()
-        val list = if (!hub.touch) all else (if (apps.favouritesOnly) all.filter { it.key in favs } else all)
+        val favsOnly = hub.touch && apps.favouritesOnly
+        val list = if (!hub.touch) all else (if (favsOnly) all.filter { it.key in favs } else all)
             .filter { it.key !in hidden }
             .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
+            .let { az -> if (!favsOnly) az else az.associateBy { it.key }.let { by -> RowOrder.apply(az.map { it.key }, apps.favOrder()).map(by::getValue) } }
         if (list.isEmpty() && all.isNotEmpty()) strip.addView(text(15f, TEXT_MUTED).apply {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
@@ -333,7 +350,7 @@ class MainActivity : Activity() {
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
-                        (if (hub.touch) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // A-Z on the tablet: nothing to move
+                        (if (hub.touch && !favsOnly) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // tablet Apps are A-Z; Favorites can be moved
                         (app.pkg?.takeIf { hub.touch }?.let { pkg ->
                             listOf(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
@@ -390,10 +407,12 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Activity result API needs androidx activity")
-    var onBackgroundPicked: (() -> Unit)? = null // an open Settings panel redraws ("set" instead of "not set")
+    var onBackgroundPicked: (() -> Unit)? = null // an open Settings panel redraws with the new picture
+    private var pickingFor: String? = null
 
-    /** Settings → Background: choose your picture for one orientation (any image the tablet can open). */
-    fun pickBackground(portrait: Boolean) = runCatching {
+    /** Settings → Background: add a picture to the gallery (id null), or give one its portrait version. Any image the tablet can open. */
+    fun pickBackground(id: String?, portrait: Boolean) = runCatching {
+        pickingFor = id ?: System.currentTimeMillis().toString()
         @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"),
             if (portrait) REQ_BG_PORTRAIT else REQ_BG_LANDSCAPE)
     }.onFailure { toast("Couldn't open the picture picker") }
@@ -409,8 +428,9 @@ class MainActivity : Activity() {
         if (requestCode == REQ_BG_LANDSCAPE || requestCode == REQ_BG_PORTRAIT) {
             val uri = data?.data.takeIf { resultCode == RESULT_OK } ?: return
             // a private copy: the picture keeps working even if the original is moved or deleted
-            runCatching { contentResolver.openInputStream(uri)!!.use { i -> bgFile(requestCode == REQ_BG_PORTRAIT).outputStream().use { i.copyTo(it) } } }
-                .onSuccess { hub.prefs.edit().putString("bg_mode", "picture").apply(); applyBackground(); onBackgroundPicked?.invoke(); toast("Background picture set") }
+            val id = pickingFor ?: return
+            runCatching { contentResolver.openInputStream(uri)!!.use { i -> bgFile(id, requestCode == REQ_BG_PORTRAIT).outputStream().use { i.copyTo(it) } } }
+                .onSuccess { useBackground(id); onBackgroundPicked?.invoke(); toast(if (requestCode == REQ_BG_PORTRAIT) "Portrait version set" else "Picture added") }
                 .onFailure { toast("Couldn't use that picture: ${it.message}") }
             return
         }

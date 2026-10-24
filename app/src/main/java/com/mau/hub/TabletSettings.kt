@@ -65,11 +65,7 @@ class TabletSettings(private val a: MainActivity) {
                     p.edit().putString("bg_mode", modes.keys.elementAt(i)).apply(); a.applyBackground(); d.dismiss(); draw()
                 }.show()
         }
-        fun has(portrait: Boolean) = if (a.bgFile(portrait).exists()) "set" else "not set"
-        if (a.bgMode() == "picture") buttons(
-            "Landscape picture (${has(false)})" to { a.pickBackground(false) },
-            "Portrait picture (${has(true)})" to { a.pickBackground(true) },
-        )
+        if (a.bgMode() == "picture") gallery()
         val dimLabel = a.text(15f, TEXT_SOFT)
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
@@ -134,6 +130,38 @@ class TabletSettings(private val a: MainActivity) {
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
 
         list.addView(a.text(13f, TEXT_MUTED).apply { text = a.actions.storageLine(); setPadding(0, a.dp(24), 0, 0) })
+    }
+
+    /** Your pictures side by side: tap one to use it, hold it for its portrait version or to remove it; + adds one. */
+    private fun gallery() {
+        val current = a.currentBackground()
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Tap a picture to use it · hold it for its portrait version or to remove it" },
+            LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(4) })
+        list.addView(android.widget.HorizontalScrollView(a).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(LinearLayout(a).apply {
+                setPadding(0, a.dp(8), 0, a.dp(8))
+                a.backgrounds().forEach { id ->
+                    addView(android.widget.ImageView(a).apply {
+                        scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                        setImageBitmap(android.graphics.BitmapFactory.decodeFile(a.bgFile(id, false).path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 8 }))
+                        setPadding(a.dp(3), a.dp(3), a.dp(3), a.dp(3))
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            cornerRadius = a.dp(10).toFloat(); setColor(Color.TRANSPARENT); if (id == current) setStroke(a.dp(3), ACCENT)
+                        }
+                        contentDescription = if (id == current) "Picture in use" else "Use this picture"
+                        setOnClickListener { a.useBackground(id); draw() }
+                        setOnLongClickListener {
+                            val portrait = if (a.bgFile(id, true).exists()) "Change portrait version" else "Add portrait version"
+                            AlertDialog.Builder(a).setItems(arrayOf(portrait, "Remove")) { _, w ->
+                                if (w == 0) a.pickBackground(id, true) else { a.removeBackground(id); draw() }
+                            }.show(); true
+                        }
+                    }, LinearLayout.LayoutParams(a.dp(176), a.dp(110)).apply { marginEnd = a.dp(10) })
+                }
+                addView(a.button("+ Add") { a.pickBackground(null, false) }, LinearLayout.LayoutParams(-2, a.dp(110)))
+            })
+        })
     }
 
     // ---- pieces ----
