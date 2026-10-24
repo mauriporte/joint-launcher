@@ -9,8 +9,7 @@ YouTube (SmartTube), Spotify and GeeSports, with Jellyseerr requests for movies,
 
 Built for Google TV / Android TV 11+ with plain Android Views (no Compose, no Leanback).
 
-> **This is the redesign branch.** It installs as a separate app, "Joint Launcher (redesign)" (`com.mau.hub.redesign`),
-> next to the regular Joint Launcher, so you can try it without losing the one you use.
+> Its app id is `com.mau.hub.redesign`: it started as a redesign installed next to the first version (`com.mau.hub`).
 
 ## Install
 
@@ -23,7 +22,7 @@ Built for Google TV / Android TV 11+ with plain Android Views (no Compose, no Le
 ### Home button
 
 Google TV ignores the "default home app" setting, so Joint Launcher catches the remote's Home button itself:
-Settings → Accessibility → **Joint Launcher (redesign) Home button** → On.
+Settings → Accessibility → **Joint Launcher Home button** → On.
 
 Android switches that off whenever the app is updated. Run this once and Joint Launcher turns it back on by itself
 after every update (it only ever touches its own Home button entry, and only if you had it on):
