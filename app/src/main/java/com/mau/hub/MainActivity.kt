@@ -199,13 +199,19 @@ class MainActivity : Activity() {
                 catalog.tabRows(tab, gen).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                 if (tab == Tab.APPS) rows.apps()
             }
-            // tablet Home: your apps first, like a launcher, then one button that folds all the video rows away
-            hub.touch -> {
-                rows.widgets()
-                rows.apps()
-                rows.connect(actions.connectEntries())
-                rows.fold()
-                catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
+            // tablet Home: widgets, your apps like a launcher, and To Watch (one button folds all the video rows away),
+            // in the order picked in Settings
+            hub.touch -> TabletSettings.sections(hub).forEach { s ->
+                when (s) {
+                    "widgets" -> rows.widgets()
+                    "apps" -> rows.apps()
+                    "ha" -> if (BuildConfig.HA_LOCAL.isNotEmpty() || BuildConfig.HA_REMOTE.isNotEmpty()) rows.homeAssistant()
+                    else -> {
+                        rows.connect(actions.connectEntries())
+                        rows.fold()
+                        catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
+                    }
+                }
             }
             else -> {
                 rows.connect(actions.connectEntries())

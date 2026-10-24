@@ -7,11 +7,15 @@ import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 
 /** Google TV-style top bar: search, content-type tabs, TV settings gear, then weather and clock on the right. */
 class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
+    // before the bar is built below: flipClock() fills clocks, init starts the weather timer
+    private var clocks: List<android.widget.TextClock> = emptyList()
+    private val weatherTimer = Runnable { refreshWeather() }
     private val weather = a.text(14f, TEXT_SOFT).apply { setPadding(0, 0, a.dp(16), 0) }
     private val search = a.iconButton(R.drawable.ic_search, "Search") { a.searchBar.open() }.apply {
         layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
@@ -83,6 +87,17 @@ class TopBar(private val a: MainActivity) {
         }
         addView(card("HH"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)))
         addView(card("mm"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)).apply { marginStart = a.dp(6) })
+        clocks = (0 until childCount).map { (getChildAt(it) as ViewGroup).getChildAt(0) as android.widget.TextClock }
+        applyClock()
+    }
+
+
+    /** Settings' time format (device / 24 / 12 hour) and timezone (device's unless picked) on the flip clock. */
+    fun applyClock() {
+        val f = a.hub.prefs.getString("clock_format", null)
+        val tz = a.hub.prefs.getString("clock_tz", null)
+        clocks.firstOrNull()?.apply { format24Hour = if (f == "12") "hh" else "HH"; format12Hour = if (f == "24") "HH" else "hh" }
+        clocks.forEach { it.timeZone = tz }
     }
 
     private var pendingTab: Tab? = null
@@ -147,8 +162,9 @@ class TopBar(private val a: MainActivity) {
 
     fun focusTab(t: Tab) { tabStrip.findViewWithTag<View>(t)?.requestFocus() }
 
-    /** Weather in the corner; location found once from the connection, temperature refreshed every 30 minutes. */
-    private fun refreshWeather() {
+
+    /** Weather in the corner: the place set in Settings, else found once from the connection; refreshed every 30 minutes. */
+    fun refreshWeather() {
         val hub = a.hub
         hub.pool.execute {
             val text = runCatching {
@@ -161,6 +177,7 @@ class TopBar(private val a: MainActivity) {
             }.getOrNull()
             hub.main.post { weather.text = if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
         }
-        hub.main.postDelayed({ refreshWeather() }, 30 * 60_000L)
+        hub.main.removeCallbacks(weatherTimer) // Settings refreshes it right away; keep one timer
+        hub.main.postDelayed(weatherTimer, 30 * 60_000L)
     }
 }

@@ -254,6 +254,13 @@ object Sources {
     // ---- Weather for the top bar (no API keys: location from the connection's IP, forecast from Open-Meteo) ----
 
     /** Returns (lat, lon). */
+    /** A town typed in Settings -> (name, lat, lon) from Open-Meteo's geocoder (the weather's own provider); null if unknown. */
+    fun geocode(place: String) = parseGeocode(get("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + URLEncoder.encode(place, "UTF-8")))
+
+    fun parseGeocode(json: String): Triple<String, Double, Double>? = JSONObject(json).optJSONArray("results")?.optJSONObject(0)?.let {
+        Triple(listOf(it.optString("name"), it.optString("country")).filter(String::isNotEmpty).joinToString(", "), it.getDouble("latitude"), it.getDouble("longitude"))
+    }
+
     fun locate(): Pair<Double, Double> {
         val j = JSONObject(get("http://ip-api.com/json/?fields=status,lat,lon"))
         if (j.optString("status") != "success") error("location unavailable")

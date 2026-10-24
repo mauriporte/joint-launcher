@@ -120,6 +120,7 @@ class Apps(private val hub: Hub, private val images: Images) {
 
     /** After you pick a different icon. */
     fun forgetIcon(pkg: String) { iconCache.remove(pkg) }
+    fun forgetIcons() = iconCache.clear() // icon pack changed
 
     /** Catalogue-only services (app not installed): their logo from JustWatch, looked up once. */
     fun logoInto(p: Provider, into: ImageView) {

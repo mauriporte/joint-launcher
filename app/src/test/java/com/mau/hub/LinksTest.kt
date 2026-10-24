@@ -131,6 +131,12 @@ class SourcesTest {
         assertEquals("⛈️", Sources.weatherIcon(95, day = false))
     }
 
+    @Test fun weatherPlaceFromOpenMeteoGeocoder() {
+        val json = """{"results":[{"name":"Valencia","latitude":39.47,"longitude":-0.38,"country":"Spain"}]}"""
+        assertEquals(Triple("Valencia, Spain", 39.47, -0.38), Sources.parseGeocode(json))
+        assertEquals(null, Sources.parseGeocode("""{"generationtime_ms":0.5}""")) // nothing matched
+    }
+
     @Test fun liveChannelShowsCurrentProgram() {
         val json = """{"Items":[{"Id":"ch1","Number":"100","Name":"12tv","UserData":{"IsFavorite":true},
             "CurrentProgram":{"Id":"pr1","Name":"News","Overview":"Daily news","EndDate":"2026-10-23T00:00:00.0000000Z","ImageTags":{"Primary":"x"}}},

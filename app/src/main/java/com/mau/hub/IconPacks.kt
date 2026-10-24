@@ -22,9 +22,10 @@ class IconPacks(private val hub: Hub) {
         .map { it.activityInfo.packageName }.distinct()
         .map { it to runCatching { ctx.packageManager.getApplicationLabel(ctx.packageManager.getApplicationInfo(it, 0)).toString() }.getOrDefault(it) }
 
-    /** The pack app icons come from: your choice, else LineX if it's installed, else none. */
-    fun active(): String? = hub.prefs.getString("icon_pack", null)?.takeIf(hub::installed)
-        ?: LINEX.takeIf(hub::installed)
+    /** The pack app icons come from: your choice (or none, the apps' own icons), else LineX if it's installed. */
+    fun active(): String? = hub.prefs.getString("icon_pack", null).let { p ->
+        if (p == NONE) null else p?.takeIf(hub::installed) ?: LINEX.takeIf(hub::installed)
+    }
 
     /** pack|name[|auto] you picked for this app by hand, if any; "auto" = recoloured in the app's own colour. */
     private fun override(pkg: String) = hub.prefs.getString("icon_$pkg", null)?.split('|')?.takeIf { it.size in 2..3 }
@@ -99,6 +100,7 @@ class IconPacks(private val hub: Hub) {
 
     companion object {
         const val LINEX = "com.jndapp.line.x.iconpack"
+        const val NONE = "none" // icon_pack value for "the apps' own icons"
 
         /** Most common hue among vivid, opaque pixels (12 hue buckets), averaged and brightened; null if too few. */
         fun dominant(pixels: IntArray): Int? {

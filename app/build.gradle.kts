@@ -19,6 +19,9 @@ android {
         versionName = "2.0"
         // your Jellyfin server (jellyfin.server=http://... in local.properties); example address otherwise
         buildConfigField("String", "JELLYFIN_SERVER", "\"${local.getProperty("jellyfin.server", "http://jellyfin.example.com:8096")}\"")
+        // Home Assistant for the tablet's section: ha.local (used when it answers, i.e. at home) and ha.remote in local.properties
+        buildConfigField("String", "HA_LOCAL", "\"${local.getProperty("ha.local", "")}\"")
+        buildConfigField("String", "HA_REMOTE", "\"${local.getProperty("ha.remote", "")}\"")
     }
     signingConfigs {
         // release.storeFile / storePassword / keyAlias / keyPassword in local.properties; without them, release builds stay unsigned

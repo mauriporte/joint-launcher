@@ -34,6 +34,8 @@ class AppsRow(id: Long) : RowModel(id)
 class FoldRow(id: Long) : RowModel(id)
 /** Tablet Home: your widgets, foldable, with add and remove buttons in the header. */
 class WidgetsRow(id: Long) : RowModel(id)
+/** Tablet: your Home Assistant dashboard, foldable like the other sections. */
+class HaRow(id: Long) : RowModel(id)
 
 /**
  * The home screen's rows, on RecyclerView: only rows near the screen are built, and every content row shares one
@@ -168,6 +170,22 @@ class Rows(private val a: MainActivity) {
     fun apps() = add(AppsRow(nextId++))
     fun fold() = add(FoldRow(nextId++))
     fun widgets() = add(WidgetsRow(nextId++))
+    fun homeAssistant() = add(HaRow(nextId++))
+
+    // one dashboard for the whole session: rebinding the section must not reload it (or lose your place in it)
+    @delegate:android.annotation.SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    private val haView by lazy {
+        android.webkit.WebView(a).apply {
+            settings.javaScriptEnabled = true; settings.domStorageEnabled = true // HA's frontend needs both; stays signed in
+            webViewClient = android.webkit.WebViewClient() // links open inside the section
+            setBackgroundColor(Color.TRANSPARENT)
+            background = GradientDrawable().apply { cornerRadius = a.dp(12).toFloat(); setColor(0xFF1C1C1F.toInt()) }
+            clipToOutline = true
+            // a finger on the dashboard scrolls the dashboard, not Home
+            setOnTouchListener { v, e -> if (e.action == android.view.MotionEvent.ACTION_DOWN) v.parent?.requestDisallowInterceptTouchEvent(true); false }
+            a.hub.pool.execute { val url = a.hub.haUrl(); a.hub.main.post { url?.let(::loadUrl) } }
+        }
+    }
 
     /** A widget was added or removed, or edit mode switched: redraw the Widgets section. */
     fun refreshWidgets() { shown.indexOfFirst { it is WidgetsRow }.takeIf { it >= 0 }?.let(adapter::notifyItemChanged) }
@@ -223,7 +241,7 @@ class Rows(private val a: MainActivity) {
         override fun getItemCount() = shown.size
         override fun getItemId(position: Int) = shown[position].id
         override fun getItemViewType(position: Int) = when (shown[position]) {
-            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3; is FoldRow -> 4; is WidgetsRow -> 5
+            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3; is FoldRow -> 4; is WidgetsRow -> 5; is HaRow -> 6
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -306,6 +324,17 @@ class Rows(private val a: MainActivity) {
                     // reading ~25 app names from their packages took 1.6s on the UI thread; do it on the disk thread
                     a.refreshApps = { a.hub.diskPool.execute { val apps = a.apps.all(); a.hub.main.post { a.fillAppsRow(strip, apps) } } }
                     a.refreshApps()
+                }
+                is HaRow -> (holder.itemView as LinearLayout).apply {
+                    removeAllViews()
+                    val folded = a.hub.prefs.getBoolean("ha_folded", false)
+                    addView(foldHeader("Home Assistant", folded) {
+                        a.hub.prefs.edit().putBoolean("ha_folded", !folded).apply()
+                        indexOf(m.id).takeIf { it >= 0 }?.let(adapter::notifyItemChanged)
+                    }, LinearLayout.LayoutParams(-1, -2))
+                    if (folded) return
+                    (haView.parent as? ViewGroup)?.removeView(haView)
+                    addView(haView, LinearLayout.LayoutParams(-1, a.dp(560)).apply { setMargins(a.dp(8), a.dp(4), a.dp(8), a.dp(12)) })
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
