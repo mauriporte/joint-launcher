@@ -135,8 +135,9 @@ class Widgets(private val a: MainActivity) {
     // orientation, so turning the tablet doesn't scramble the landscape layout.
 
     private val orient get() = if (a.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT) "p" else "l"
-    // Home's rows sit inside side margins: the grid's real width (screen minus about 100 dp), for sizing before layout
-    private fun gridWidth() = a.resources.displayMetrics.widthPixels - a.dp(104)
+    // the grid's real width, for sizing before layout: the screen minus Home's side margins (page 20, rows 8 + 12,
+    // the grid's own 8 + 8); must match, or the saved width gets cut a column short
+    private fun gridWidth() = a.resources.displayMetrics.widthPixels - a.dp(if (a.hub.touch) 56 else 104)
     private fun maxCols(width: Int) = maxOf(4, Math.round(width / a.dp(120).toFloat()))
     private fun cellPx(width: Int) = width / maxCols(width)
     private fun ints(key: String) = a.hub.prefs.getString(key, null)?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
