@@ -362,11 +362,12 @@ class Rows(private val a: MainActivity) {
                     val edit = roundButton(if (w.editing) R.drawable.ic_check else R.drawable.ic_edit, if (w.editing) "Done editing widgets" else "Edit widgets") {
                         w.editing = !w.editing; refreshWidgets()
                     }.apply { if (w.editing) setColorFilter(0xFF4CAF50.toInt()) }
-                    addView(foldHeader("widgets", folded, listOfNotNull(add, edit.takeIf { ids.isNotEmpty() })) {
+                    // edit also resizes the grid itself, so it shows even with no widgets
+                    addView(foldHeader("widgets", folded, listOf(add, edit)) {
                         a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
                     }, LinearLayout.LayoutParams(-1, -2))
                     if (folded) return
-                    if (ids.isNotEmpty()) addView(FlowBox(a).apply { ids.forEach { id -> w.viewFor(id)?.let(::addView) } })
+                    addView(w.grid(ids), LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(8), a.dp(4), a.dp(8), 0) }) // a home-page-sized grid
                 }
             }
         }

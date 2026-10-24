@@ -455,6 +455,7 @@ class MainActivity : Activity() {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         applyBackground()
+        if (hub.touch) rows.refreshWidgets() // the widget grid has its own size and spots per orientation
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
