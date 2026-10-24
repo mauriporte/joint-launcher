@@ -20,7 +20,7 @@ class HomeButtonService : AccessibilityService() {
     override fun onDestroy() { running = false; super.onDestroy() }
 
     // the user switched it off (an app update kills the process without calling this, so it stays "wanted")
-    override fun onUnbind(intent: Intent?): Boolean { wanted(this, false); return super.onUnbind(intent) }
+    override fun onUnbind(intent: Intent?): Boolean { if (!restoring) wanted(this, false); return super.onUnbind(intent) }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode != KeyEvent.KEYCODE_HOME) return false
@@ -40,6 +40,7 @@ class HomeButtonService : AccessibilityService() {
     companion object {
         // same process as the app: true while Android has this service running
         @Volatile private var running = false
+        @Volatile private var restoring = false // our own off-and-on below isn't the user switching it off
 
         private fun prefs(c: Context) = c.getSharedPreferences("home_button", Context.MODE_PRIVATE)
         private fun wanted(c: Context, on: Boolean) = prefs(c).edit().putBoolean("wanted", on).commit()
@@ -57,13 +58,17 @@ class HomeButtonService : AccessibilityService() {
             val cr = c.contentResolver
             val enabled = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
                 .split(':').filter { it.isNotEmpty() }
-            runCatching {
-                // listed but not running (Android stops it when the app is force-stopped and marks it crashed): taking it
-                // off the list and putting it back makes Android start it again
-                if (me in enabled) Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled - me).joinToString(":"))
+            // listed but not running (Android stops it when the app is force-stopped and marks it crashed): taking it off the
+            // list and, a moment later, putting it back makes Android start it again (both at once read as no change)
+            fun add() = runCatching {
                 Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, ((enabled - me) + me).joinToString(":"))
                 Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+                restoring = false
             }
+            if (me !in enabled) { add(); return }
+            restoring = true
+            runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled - me).joinToString(":")) }
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ add() }, 800)
         }
     }
 
