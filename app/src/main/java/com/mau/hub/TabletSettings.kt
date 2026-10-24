@@ -59,7 +59,7 @@ class TabletSettings(private val a: MainActivity) {
         buttons("Connect accounts" to { ConnectScreen(a).show() })
 
         heading("Background")
-        val modes = linkedMapOf("black" to "Black", "wallpaper" to "The tablet's wallpaper", "picture" to "My pictures (landscape and portrait)")
+        val modes = linkedMapOf("black" to "Black", "wallpaper" to "The $device's wallpaper", "picture" to "My pictures (landscape and portrait)")
         line("Background", modes.getValue(a.bgMode())) {
             AlertDialog.Builder(a).setTitle("Background")
                 .setSingleChoiceItems(modes.values.toTypedArray(), modes.keys.indexOf(a.bgMode())) { d, i ->
