@@ -230,7 +230,7 @@ class Rows(private val a: MainActivity) {
     private fun roundButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(a).apply {
         setImageResource(icon); setColorFilter(Color.WHITE); contentDescription = label
         setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
-        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+        background = a.outlineCircle()
         isClickable = true; setOnClickListener { onClick() }
     }
 

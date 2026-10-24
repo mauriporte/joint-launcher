@@ -44,7 +44,8 @@ class TabletSettings(private val a: MainActivity) {
             setGravity(Gravity.END)
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         }
-        dialog.setOnDismissListener { saveJellyfin() }
+        a.onBackgroundPicked = { draw() }
+        dialog.setOnDismissListener { saveJellyfin(); a.onBackgroundPicked = null }
         dialog.show()
     }
 
@@ -57,11 +58,18 @@ class TabletSettings(private val a: MainActivity) {
         buttons("Connect accounts" to { ConnectScreen(a).show() })
 
         heading("Background")
-        list.addView(android.widget.Switch(a).apply {
-            text = "Show my wallpaper"; textSize = 16f; setTextColor(Color.WHITE)
-            isChecked = p.getBoolean("bg_wallpaper", false)
-            setOnCheckedChangeListener { _, on -> p.edit().putBoolean("bg_wallpaper", on).apply(); a.applyBackground() }
-        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val modes = linkedMapOf("black" to "Black", "wallpaper" to "The tablet's wallpaper", "picture" to "My pictures (landscape and portrait)")
+        line("Background", modes.getValue(a.bgMode())) {
+            AlertDialog.Builder(a).setTitle("Background")
+                .setSingleChoiceItems(modes.values.toTypedArray(), modes.keys.indexOf(a.bgMode())) { d, i ->
+                    p.edit().putString("bg_mode", modes.keys.elementAt(i)).apply(); a.applyBackground(); d.dismiss(); draw()
+                }.show()
+        }
+        fun has(portrait: Boolean) = if (a.bgFile(portrait).exists()) "set" else "not set"
+        if (a.bgMode() == "picture") buttons(
+            "Landscape picture (${has(false)})" to { a.pickBackground(false) },
+            "Portrait picture (${has(true)})" to { a.pickBackground(true) },
+        )
         val dimLabel = a.text(15f, TEXT_SOFT)
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
@@ -73,7 +81,7 @@ class TabletSettings(private val a: MainActivity) {
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
-        buttons("Change wallpaper" to {
+        if (a.bgMode() == "wallpaper") buttons("Change wallpaper" to {
             runCatching { a.startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choose a wallpaper")) }
                 .onFailure { a.toast("Couldn't open the wallpaper picker") }
         })
@@ -83,6 +91,7 @@ class TabletSettings(private val a: MainActivity) {
         val pack = a.apps.packs.active()
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
         line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
+        line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
 
         heading("Home")
         list.addView(android.widget.Switch(a).apply {
@@ -99,7 +108,7 @@ class TabletSettings(private val a: MainActivity) {
                 addView(android.widget.ImageView(a).apply {
                     setImageDrawable(icon(a, s)); setColorFilter(Color.WHITE); contentDescription = "Change the icon of ${name(hub, s)}"
                     setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
-                    background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+                    background = a.outlineCircle()
                     setOnClickListener { pickIcon(s) }
                 }, LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginEnd = a.dp(12) })
                 addView(a.text(17f, Color.WHITE).apply {
@@ -171,6 +180,19 @@ class TabletSettings(private val a: MainActivity) {
             AlertDialog.Builder(a).setTitle("Favorite apps")
                 .setMultiChoiceItems(apps.map { it.label }.toTypedArray(), apps.map { it.key in favs }.toBooleanArray()) { _, i, on ->
                     a.apps.setFavourite(apps[i].key, on)
+                }
+                .setPositiveButton("Done", null).setOnDismissListener { a.refreshApps(); draw() }.show()
+        }
+    }
+
+    /** Every app with a tick on the hidden ones: untick to bring one back to the Apps section, tick to hide it. */
+    private fun hiddenApps() = hub.diskPool.execute {
+        val apps = a.apps.all().sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
+        hub.main.post {
+            val hidden = a.apps.hidden()
+            AlertDialog.Builder(a).setTitle("Hidden apps (ticked)")
+                .setMultiChoiceItems(apps.map { it.label }.toTypedArray(), apps.map { it.key in hidden }.toBooleanArray()) { _, i, on ->
+                    a.apps.setHidden(apps[i].key, on)
                 }
                 .setPositiveButton("Done", null).setOnDismissListener { a.refreshApps(); draw() }.show()
         }

@@ -111,9 +111,12 @@ class Cards(private val ctx: Context, private val images: Images, private val ap
         val size = ctx.dp(76)
         val icon = ImageView(ctx).apply {
             a.pkg?.let { apps.iconInto(it, this) }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            clipToOutline = true; outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            background = GradientDrawable().apply { cornerRadius = ctx.dp(18).toFloat(); setColor(0xFF2A2B30.toInt()) }
+            if (touch) scaleType = ImageView.ScaleType.FIT_CENTER // tablet: just the icon itself, no tile behind it
+            else {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                clipToOutline = true; outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+                background = GradientDrawable().apply { cornerRadius = ctx.dp(18).toFloat(); setColor(0xFF2A2B30.toInt()) }
+            }
         }
         val label = ctx.text(12f, Color.WHITE).apply {
             text = a.label; gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.END

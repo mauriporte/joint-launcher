@@ -28,6 +28,7 @@ class Apps(private val hub: Hub, private val images: Images) {
     }
 
     @Volatile private var cache: Pair<Long, List<SideApp>>? = null
+    fun forgetList() { cache = null }
 
     /** Every launchable TV app (what Google TV lists under "Your apps"), in your saved order. */
     fun all(): List<SideApp> {
@@ -65,6 +66,12 @@ class Apps(private val hub: Hub, private val images: Images) {
 
     fun setFavourite(pkg: String, on: Boolean) =
         hub.prefs.edit().putStringSet("fav_apps", favourites().let { if (on) it + pkg else it - pkg }).apply()
+
+    /** Tablet: apps you hid from the Apps section (Settings → Hidden apps lists them to bring back). */
+    fun hidden(): Set<String> = hub.prefs.getStringSet("hidden_apps", null) ?: emptySet()
+
+    fun setHidden(pkg: String, on: Boolean) =
+        hub.prefs.edit().putStringSet("hidden_apps", hidden().let { if (on) it + pkg else it - pkg }).apply()
 
     var favouritesOnly: Boolean
         get() = hub.prefs.getBoolean("apps_favs_only", false)

@@ -154,17 +154,38 @@ class MainActivity : Activity() {
 
     private lateinit var root: FrameLayout
 
+    // your own background pictures (Settings → Background), one per orientation so a corner logo stays in its corner
+    private val bgImage by lazy { ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP } }
+    fun bgFile(portrait: Boolean) = java.io.File(filesDir, if (portrait) "bg_portrait" else "bg_landscape")
+
+    /** "black", "wallpaper" (the tablet's) or "picture" (yours); older versions only had the wallpaper switch. */
+    fun bgMode(): String = if (!hub.touch) "black"
+        else hub.prefs.getString("bg_mode", null) ?: if (hub.prefs.getBoolean("bg_wallpaper", false)) "wallpaper" else "black"
+
     /**
-     * Tablet background: black (as on the TV), or your wallpaper showing through a dark layer you can make lighter or
-     * darker (bg_dim 0-100 %). Set in Settings → Background.
+     * Tablet background: black (as on the TV), your wallpaper, or your own picture for the way the tablet is turned,
+     * under a dark layer you can make lighter or darker (bg_dim 0-100 %). Set in Settings → Background.
      */
     fun applyBackground() {
-        val wallpaper = hub.touch && hub.prefs.getBoolean("bg_wallpaper", false)
-        if (wallpaper) {
+        val mode = bgMode()
+        val dim = Color.argb(hub.prefs.getInt("bg_dim", 60).coerceIn(0, 100) * 255 / 100, 5, 5, 5)
+        val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        val pic = if (mode == "picture") (bgFile(portrait).takeIf { it.exists() } ?: bgFile(!portrait).takeIf { it.exists() }) else null
+        if (pic != null) {
+            if (bgImage.parent == null) root.addView(bgImage, 0, FrameLayout.LayoutParams(-1, -1))
+            bgImage.setImageBitmap(android.graphics.BitmapFactory.decodeFile(pic.path))
+            bgImage.foreground = android.graphics.drawable.ColorDrawable(dim)
+            bgImage.visibility = View.VISIBLE
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+            window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(BG))
+            root.setBackgroundColor(Color.TRANSPARENT)
+            return
+        }
+        if (bgImage.parent != null) { bgImage.setImageDrawable(null); bgImage.visibility = View.GONE }
+        if (mode == "wallpaper") {
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
             window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            val dim = hub.prefs.getInt("bg_dim", 60).coerceIn(0, 100)
-            root.setBackgroundColor(Color.argb(dim * 255 / 100, 5, 5, 5))
+            root.setBackgroundColor(dim)
         } else {
             window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
             window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(BG))
@@ -299,7 +320,9 @@ class MainActivity : Activity() {
         strip.removeAllViews()
         val favs = apps.favourites()
         // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
+        val hidden = apps.hidden()
         val list = if (!hub.touch) all else (if (apps.favouritesOnly) all.filter { it.key in favs } else all)
+            .filter { it.key !in hidden }
             .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
         if (list.isEmpty() && all.isNotEmpty()) strip.addView(text(15f, TEXT_MUTED).apply {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
@@ -311,9 +334,15 @@ class MainActivity : Activity() {
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
                         (if (hub.touch) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // A-Z on the tablet: nothing to move
-                        listOfNotNull(app.pkg?.takeIf { hub.touch }?.let { pkg ->
-                            (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() }
-                        }) +
+                        (app.pkg?.takeIf { hub.touch }?.let { pkg ->
+                            listOf(
+                                (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
+                                // back from Settings → Hidden apps
+                                "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
+                                // Android asks you to confirm; the Apps section updates when you come back
+                                "Uninstall" to { runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }.onFailure { toast("Couldn't uninstall ${app.label}") }; Unit },
+                            )
+                        } ?: emptyList()) +
                         ("Change icon" to { IconPicker.forApp(this, app) { sidebar.dirty = true; loadHome() } ?: Unit }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
@@ -361,8 +390,30 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Activity result API needs androidx activity")
+    var onBackgroundPicked: (() -> Unit)? = null // an open Settings panel redraws ("set" instead of "not set")
+
+    /** Settings → Background: choose your picture for one orientation (any image the tablet can open). */
+    fun pickBackground(portrait: Boolean) = runCatching {
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"),
+            if (portrait) REQ_BG_PORTRAIT else REQ_BG_LANDSCAPE)
+    }.onFailure { toast("Couldn't open the picture picker") }
+
+    // the turn itself doesn't rebuild the screen (configChanges); only the background picture follows it
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyBackground()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_BG_LANDSCAPE || requestCode == REQ_BG_PORTRAIT) {
+            val uri = data?.data.takeIf { resultCode == RESULT_OK } ?: return
+            // a private copy: the picture keeps working even if the original is moved or deleted
+            runCatching { contentResolver.openInputStream(uri)!!.use { i -> bgFile(requestCode == REQ_BG_PORTRAIT).outputStream().use { i.copyTo(it) } } }
+                .onSuccess { hub.prefs.edit().putString("bg_mode", "picture").apply(); applyBackground(); onBackgroundPicked?.invoke(); toast("Background picture set") }
+                .onFailure { toast("Couldn't use that picture: ${it.message}") }
+            return
+        }
         if (requestCode == SearchBar.VOICE_REQUEST && resultCode == RESULT_OK) searchBar.onVoiceResult(data)
         else widgets.onResult(requestCode, resultCode == RESULT_OK)
     }
@@ -370,11 +421,17 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
+        if (hub.touch) { apps.forgetList(); refreshApps() } // back from uninstalling (or installing) something
     }
 
     override fun onDestroy() {
         nowPlaying.stop()
         hub.shutdown()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val REQ_BG_LANDSCAPE = 61
+        private const val REQ_BG_PORTRAIT = 62
     }
 }

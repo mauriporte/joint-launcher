@@ -43,14 +43,14 @@ class TopBar(private val a: MainActivity) {
         setPadding(a.dp(30), 0, a.dp(36), 0)
         if (a.hub.touch) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
-            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8) })
+            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.outlineCircle() })
             addView(search.also { touchSize(it) })
             addView(android.widget.HorizontalScrollView(a).apply {
                 isHorizontalScrollBarEnabled = false
                 addView(tabStrip)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
-            addView(titlesButton.also { touchSize(it); applyTitlesButton() })
+            addView(titlesButton.also { touchSize(it); it.background = a.outlineCircle(); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
             // same height and corner radius as the flip clock's cards; temperature first, then a bigger icon
             addView(weather.apply {

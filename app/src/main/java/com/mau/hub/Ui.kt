@@ -63,6 +63,9 @@ internal fun Context.button(label: String, onClick: () -> Unit) = text(15f, Colo
 }
 
 /** Round icon button, same look as [button]: translucent idle, white with a dark icon when focused. */
+/** Tablet buttons: a thin white ring around the icon, no fill (the background shows through). */
+internal fun Context.outlineCircle() = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.TRANSPARENT); setStroke(dp(2), 0x8CFFFFFF.toInt()) }
+
 internal fun Context.iconButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(this).apply {
     setImageResource(icon)
     contentDescription = label // read out by TalkBack
