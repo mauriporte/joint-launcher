@@ -211,7 +211,7 @@ class PhonePage(
             "app_order", "row_order", "app_filter",
         )
         private val IMPORT_SETS = listOf("hidden_rows", "extra_rows")
-        private val ICON_PICK = Regex("[A-Za-z0-9_.]+\\|[A-Za-z0-9_]+") // package|icon name, nothing else
+        private val ICON_PICK = Regex("[A-Za-z0-9_.]+\\|[A-Za-z0-9_]+(\\|auto)?") // package|icon name[|auto], nothing else
         /** What /export hands to another device: the accounts that aren't tied to this device (Jellyfin signs in per device). */
         private val ACCOUNT_KEYS = listOf(
             "stremio", "seerr_url", "seerr_key",

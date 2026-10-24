@@ -27,6 +27,10 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
     private var names: List<String> = emptyList()
     private var filter = ""
     private val cache = object : LruCache<String, Drawable>(300) {}
+    // on: the picked icon is recoloured in the app's own main colour (a yellow logo keeps a yellow icon)
+    private val appColour = android.widget.Switch(a).apply {
+        text = "Use the app's colour"; textSize = 15f; setTextColor(Color.WHITE); isChecked = true
+    }
 
     fun show() {
         val pkg = app.pkg ?: return
@@ -63,7 +67,7 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
                         a.hub.main.post { cache.put("$p|$name", d); if (img.tag == name) img.setImageDrawable(d) }
                     }
                 }
-                box.setOnClickListener { packs.setOverride(pkg, p, name); done(dialog, pkg) }
+                box.setOnClickListener { packs.setOverride(pkg, p, name, appColour.isChecked); done(dialog, pkg) }
             }
         }
         grid.adapter = adapter
@@ -78,7 +82,10 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
             hint = "Search icons (e.g. ${app.label.lowercase().substringBefore(' ')})"; isSingleLine = true; textSize = 16f
             setTextColor(Color.WHITE); setHintTextColor(TEXT_MUTED)
             addTextChangedListener(object : TextWatcher {
-                override fun afterTextChanged(s: Editable?) { filter = s.toString().trim().lowercase().replace(' ', '_'); adapter.notifyDataSetChanged() }
+                override fun afterTextChanged(s: Editable?) {
+                    filter = s.toString().trim().lowercase().replace(' ', '_'); adapter.notifyDataSetChanged()
+                    if (names.isNotEmpty()) count.text = if (filter.isEmpty()) "${names.size} icons" else "${adapter.itemCount} of ${names.size} icons"
+                }
                 override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) = Unit
             })
@@ -90,6 +97,7 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
                 gravity = Gravity.CENTER_VERTICAL; setPadding(0, a.dp(12), 0, a.dp(8))
                 installed.forEach { (p, label) -> addView(a.button(label) { load(p) }) }
                 addView(a.button("App's own icon") { packs.setOverride(pkg, null, null); done(dialog, pkg) })
+                addView(appColour, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8) })
             })
             addView(search, LinearLayout.LayoutParams(-1, a.dp(52)))
             addView(count, LinearLayout.LayoutParams(-2, -2).apply { setMargins(a.dp(4), a.dp(4), 0, a.dp(8)) })

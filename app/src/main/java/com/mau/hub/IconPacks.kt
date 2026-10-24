@@ -26,21 +26,40 @@ class IconPacks(private val hub: Hub) {
     fun active(): String? = hub.prefs.getString("icon_pack", null)?.takeIf(hub::installed)
         ?: LINEX.takeIf(hub::installed)
 
-    /** pack|name you picked for this app by hand, if any. */
-    private fun override(pkg: String) = hub.prefs.getString("icon_$pkg", null)?.split('|')?.takeIf { it.size == 2 }
+    /** pack|name[|auto] you picked for this app by hand, if any; "auto" = recoloured in the app's own colour. */
+    private fun override(pkg: String) = hub.prefs.getString("icon_$pkg", null)?.split('|')?.takeIf { it.size in 2..3 }
 
-    fun setOverride(pkg: String, pack: String?, name: String?) =
-        hub.prefs.edit().apply { if (pack == null || name == null) remove("icon_$pkg") else putString("icon_$pkg", "$pack|$name") }.apply()
+    fun setOverride(pkg: String, pack: String?, name: String?, appColour: Boolean = true) = hub.prefs.edit().apply {
+        if (pack == null || name == null) remove("icon_$pkg") else putString("icon_$pkg", "$pack|$name" + if (appColour) "|auto" else "")
+    }.apply()
 
     /** Off the UI thread (parsing a pack takes a moment the first time). Null = no pack icon: use the app's own. */
     fun iconFor(pkg: String): Drawable? {
-        override(pkg)?.let { (pack, name) -> drawable(pack, name)?.let { return it } }
+        override(pkg)?.let { o ->
+            drawable(o[0], o[1])?.let { d ->
+                // a hand-picked icon keeps the app's colour (GeeSports' G stays yellow), unless the app's logo has none
+                if (o.getOrNull(2) == "auto") appColour(pkg)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
+                return d
+            }
+        }
         val pack = active() ?: return null
         val map = map(pack)
         val component = ctx.packageManager.getLaunchIntentForPackage(pkg)?.component
         val name = component?.let { map["ComponentInfo{${it.packageName}/${it.className}}"] } ?: map[pkg] ?: return null
         return drawable(pack, name)
     }
+
+    /**
+     * The main colour of an app's own icon: the most common strong colour (white, black and greys don't count),
+     * brightened enough to read on a dark tile. Null for black-and-white logos.
+     */
+    fun appColour(pkg: String): Int? = runCatching {
+        val d = ctx.packageManager.getApplicationIcon(pkg)
+        val b = android.graphics.Bitmap.createBitmap(48, 48, android.graphics.Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, 48, 48); d.draw(android.graphics.Canvas(b))
+        val pixels = IntArray(48 * 48).also { b.getPixels(it, 0, 48, 0, 0, 48, 48) }
+        dominant(pixels)
+    }.getOrNull()
 
     fun drawable(pack: String, name: String): Drawable? = runCatching {
         val res = ctx.packageManager.getResourcesForApplication(pack)
@@ -78,5 +97,42 @@ class IconPacks(private val hub: Hub) {
         out as List<String>
     }.getOrDefault(emptyList())
 
-    companion object { const val LINEX = "com.jndapp.line.x.iconpack" }
+    companion object {
+        const val LINEX = "com.jndapp.line.x.iconpack"
+
+        /** Most common hue among vivid, opaque pixels (12 hue buckets), averaged and brightened; null if too few. */
+        fun dominant(pixels: IntArray): Int? {
+            val count = IntArray(12); val sum = Array(12) { FloatArray(3) }
+            val hsv = FloatArray(3)
+            for (p in pixels) {
+                if (p ushr 24 < 128) continue
+                val r = (p shr 16) and 0xFF; val g = (p shr 8) and 0xFF; val bl = p and 0xFF
+                rgbToHsv(r, g, bl, hsv)
+                if (hsv[1] < 0.35f || hsv[2] < 0.3f) continue // greys, white, black
+                val k = (hsv[0] / 30f).toInt().coerceIn(0, 11)
+                count[k]++; sum[k][0] += r.toFloat(); sum[k][1] += g.toFloat(); sum[k][2] += bl.toFloat()
+            }
+            val best = count.indices.maxByOrNull { count[it] } ?: return null
+            if (count[best] < pixels.size / 40) return null // hardly any colour: a black-and-white logo
+            val n = count[best]
+            rgbToHsv((sum[best][0] / n).toInt(), (sum[best][1] / n).toInt(), (sum[best][2] / n).toInt(), hsv)
+            hsv[1] = maxOf(hsv[1], 0.6f); hsv[2] = maxOf(hsv[2], 0.85f) // readable on the dark tile
+            return hsvToRgb(hsv)
+        }
+
+        private fun rgbToHsv(r: Int, g: Int, b: Int, out: FloatArray) {
+            val rf = r / 255f; val gf = g / 255f; val bf = b / 255f
+            val max = maxOf(rf, gf, bf); val min = minOf(rf, gf, bf); val d = max - min
+            out[0] = when { d == 0f -> 0f; max == rf -> 60f * (((gf - bf) / d) % 6f); max == gf -> 60f * ((bf - rf) / d + 2f); else -> 60f * ((rf - gf) / d + 4f) }
+                .let { if (it < 0f) it + 360f else it }
+            out[1] = if (max == 0f) 0f else d / max
+            out[2] = max
+        }
+
+        private fun hsvToRgb(hsv: FloatArray): Int {
+            val c = hsv[2] * hsv[1]; val x = c * (1 - kotlin.math.abs((hsv[0] / 60f) % 2f - 1)); val m = hsv[2] - c
+            val (r, g, b) = when ((hsv[0] / 60f).toInt()) { 0 -> Triple(c, x, 0f); 1 -> Triple(x, c, 0f); 2 -> Triple(0f, c, x); 3 -> Triple(0f, x, c); 4 -> Triple(x, 0f, c); else -> Triple(c, 0f, x) }
+            return (0xFF shl 24) or (((r + m) * 255).toInt() shl 16) or (((g + m) * 255).toInt() shl 8) or ((b + m) * 255).toInt()
+        }
+    }
 }

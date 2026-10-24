@@ -2,6 +2,7 @@ package com.mau.hub
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LinksTest {
@@ -261,6 +262,14 @@ class RowOrderTest {
         assertEquals("jf.local:8096: nothing answered (server off, or the address is wrong)",
             Sources.explain(Sources.FetchError("jf.local:8096", null, java.net.ConnectException("refused"))))
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
+    }
+
+    @Test fun iconColourComesFromTheAppsLogo() {
+        val black = 0xFF000000.toInt(); val yellow = 0xFFFFC400.toInt(); val grey = 0xFF808080.toInt()
+        val geesports = IntArray(48 * 48) { if (it % 3 == 0) yellow else black } // yellow G on a black tile
+        val c = IconPacks.dominant(geesports)!!
+        assertTrue("red ${c shr 16 and 0xFF}", (c shr 16 and 0xFF) > 200); assertTrue((c shr 8 and 0xFF) > 150); assertTrue((c and 0xFF) < 100)
+        assertEquals(null, IconPacks.dominant(IntArray(48 * 48) { if (it % 2 == 0) grey else black })) // no colour to match
     }
 
     @Test fun mobileAppsStandForTheirTvApps() {
