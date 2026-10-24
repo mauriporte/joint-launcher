@@ -15,6 +15,8 @@ class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
     // before the bar is built below: flipClock() fills clocks, init starts the weather timer
     private var clocks: List<android.widget.TextClock> = emptyList()
+    // tablet corner: the built-in clock, or a widget you picked for it (Settings → Clock), e.g. Flip Clock's real flip clock
+    private val corner = android.widget.FrameLayout(a)
     // tablet: shows/hides Home's section titles (icons instead); also a switch in Settings
     private val titlesButton = a.iconButton(R.drawable.ic_text_fields, "Section titles") {
         a.hub.prefs.edit().putBoolean("section_titles", !a.hub.prefs.getBoolean("section_titles", true)).apply()
@@ -73,7 +75,7 @@ class TopBar(private val a: MainActivity) {
                 setPadding(a.dp(16), 0, a.dp(16), 0) // no card behind it: just the text over the background
             }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
             opensApp(weather, "weather", "Weather", listOf("weather", "clima", "tiempo"))
-            addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) })
+            addView(corner.apply { addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) }) })
             // three steps: 0 everything, 1 just the weather and clock (tabs and buttons folded away), 2 nothing
             val folding = (indexOfChild(tabs) until childCount).map(::getChildAt)
             val keepAtStep1 = setOf<View>(weather, getChildAt(childCount - 1)) // the weather and the flip clock
@@ -151,6 +153,16 @@ class TopBar(private val a: MainActivity) {
             if (pkg != null) a.apps.launch(pkg) else choose()
         }
         v.setOnLongClickListener { choose(); true }
+    }
+
+    /** Shows the corner widget instead of the built-in clock when one is set (and its app still exists). */
+    fun applyCornerClock() {
+        if (!a.hub.touch || corner.childCount == 0) return
+        val builtIn = corner.getChildAt(0)
+        while (corner.childCount > 1) corner.removeViewAt(1)
+        val w = a.widgets.cornerView(a.dp(220), a.dp(64))
+        builtIn.visibility = if (w == null) View.VISIBLE else View.GONE
+        w?.let { corner.addView(it, android.widget.FrameLayout.LayoutParams(a.dp(220), a.dp(64))) }
     }
 
     /** Bright while titles show, dimmed while they're off. */

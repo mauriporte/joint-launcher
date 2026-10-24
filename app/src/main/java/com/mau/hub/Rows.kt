@@ -321,7 +321,8 @@ class Rows(private val a: MainActivity) {
                     // tablet: negative side padding cancels the empty space each tile keeps around its icon, so the outer
                     // app icons line up with the section icons on the left and the arrow buttons on the right
                     val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { clipChildren = false; setPadding(-a.dp(6), a.dp(8), -a.dp(2), a.dp(10)) } else strip()
-                    if (a.hub.touch) {
+                    if (a.hub.touch && a.inSearch) addView(header("Apps")) // search results: matching apps, never folded
+                    else if (a.hub.touch) {
                         fun folded() = a.hub.prefs.getBoolean("apps_folded", false)
                         lateinit var head: View
                         fun draw() {

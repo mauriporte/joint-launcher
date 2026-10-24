@@ -140,8 +140,33 @@ class TabletSettings(private val a: MainActivity) {
         barSwitch("Hide the navigation bar (back, home, recents)", "hide_nav_bar")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Hidden bars come back for a moment with a swipe in from the edge" })
 
+        heading("Backup")
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Your layout, icons, names, favorites, hidden apps and settings in one file. Not included: sign-ins, placed widgets, background pictures." })
+        buttons(
+            "Back up to a file" to { a.saveFile("joint-launcher-backup.json", backup(p.all)) },
+            "Restore from a file" to {
+                a.openFile { text ->
+                    runCatching { restore(text) }.onSuccess { values ->
+                        p.edit().apply {
+                            values.forEach { (k, v) ->
+                                @Suppress("UNCHECKED_CAST")
+                                when (v) { is Boolean -> putBoolean(k, v); is Int -> putInt(k, v); is Long -> putLong(k, v); is Float -> putFloat(k, v)
+                                    is String -> putString(k, v); is Set<*> -> putStringSet(k, v as Set<String>) }
+                            }
+                        }.apply()
+                        a.apps.forgetIcons(); a.applyBackground(); a.loadHome(); draw(); a.toast("Restored ${values.size} settings")
+                    }.onFailure { a.toast("Couldn't restore: ${it.message}") }
+                }
+            },
+        )
+
         heading("Clock")
         val format = p.getString("clock_format", null)
+        val cornerSet = p.getInt("corner_widget", -1) >= 0
+        line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
+            val opts = arrayOf("Built-in clock", "Pick a widget (e.g. Flip Clock)")
+            AlertDialog.Builder(a).setTitle("Corner clock").setItems(opts) { _, i -> if (i == 0) a.widgets.clearCorner() else a.widgets.pick(forCorner = true); draw() }.show()
+        }
         line("Time format", when (format) { "24" -> "24-hour (17:30)"; "12" -> "12-hour (05:30)"; else -> "Like the tablet" }) { timeFormat(format) }
         val tz = p.getString("clock_tz", null)
         line("Timezone", tz?.replace('_', ' ') ?: "Like the tablet (${TimeZone.getDefault().id.replace('_', ' ')})") { timezone(tz) }
@@ -328,6 +353,43 @@ class TabletSettings(private val a: MainActivity) {
     }
 
     companion object {
+        // backups leave out sign-ins (secrets don't belong in a file on the tablet's storage) and what only means
+        // something on this install (placed widgets, picture files, the widget being added)
+        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "spotify_refresh", "google_client_secret",
+            "google_refresh", "widgets", "widget_pending", "bg_current")
+        private fun backedUp(k: String) = k !in NOT_BACKED_UP && !k.startsWith("widget_size_") && !k.startsWith("wspan_") &&
+            !k.startsWith("wpos_") && !k.startsWith("logo_")
+
+        /** Settings → Back up: every layout setting as JSON, each value tagged with its type so restore puts it back as it was. */
+        fun backup(all: Map<String, *>): String = org.json.JSONObject().apply {
+            put("joint_launcher_backup", 1)
+            all.filterKeys(::backedUp).forEach { (k, v) ->
+                when (v) {
+                    is Boolean -> put(k, org.json.JSONObject().put("b", v))
+                    is Int -> put(k, org.json.JSONObject().put("i", v))
+                    is Long -> put(k, org.json.JSONObject().put("l", v))
+                    is Float -> put(k, org.json.JSONObject().put("f", v.toDouble()))
+                    is String -> put(k, org.json.JSONObject().put("s", v))
+                    is Set<*> -> put(k, org.json.JSONObject().put("set", org.json.JSONArray(v.map { it.toString() })))
+                }
+            }
+        }.toString(2)
+
+        /** A backup file back into settings values; anything that isn't one of ours (or is left out of backups) is ignored. */
+        fun restore(json: String): Map<String, Any> {
+            val o = org.json.JSONObject(json)
+            require(o.optInt("joint_launcher_backup") == 1) { "not a Joint Launcher backup" }
+            return o.keys().asSequence().filter { it != "joint_launcher_backup" && backedUp(it) }.mapNotNull { k ->
+                val v = o.optJSONObject(k) ?: return@mapNotNull null
+                k to when {
+                    v.has("b") -> v.getBoolean("b"); v.has("i") -> v.getInt("i"); v.has("l") -> v.getLong("l")
+                    v.has("f") -> v.getDouble("f").toFloat(); v.has("s") -> v.getString("s")
+                    v.has("set") -> v.getJSONArray("set").let { a -> (0 until a.length()).map(a::getString).toSet() }
+                    else -> return@mapNotNull null
+                }
+            }.toMap()
+        }
+
         val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "watch" to "To Watch", "ha" to "Home Assistant")
         private val DEFAULT_NAMES = SECTIONS + ("favorites" to "Favorites")
 

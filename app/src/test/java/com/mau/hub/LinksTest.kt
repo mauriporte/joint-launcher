@@ -315,3 +315,34 @@ class RowOrderTest {
         assertEquals(listOf(43, 34, 15), listOf("Music", "Movies", "Series").map { LIVE_CATEGORIES.getValue(it).size })
     }
 }
+
+class BackupTest {
+    @org.junit.Test fun roundTripsLayoutButLeavesOutSecretsAndWidgets() {
+        val prefs = mapOf<String, Any>("apps_favs_only" to true, "bg_dim" to 25, "section_name_ha" to "Casa",
+            "fav_apps" to setOf("a", "b"), "key" to "secret", "widgets" to "3,4", "wpos_l_3" to "0,0")
+        val back = TabletSettings.restore(TabletSettings.backup(prefs))
+        org.junit.Assert.assertEquals(mapOf("apps_favs_only" to true, "bg_dim" to 25, "section_name_ha" to "Casa", "fav_apps" to setOf("a", "b")), back)
+    }
+
+    @org.junit.Test(expected = IllegalArgumentException::class) fun refusesOtherFiles() { TabletSettings.restore("{\"x\":1}") }
+}
+
+class AppSearchTest {
+    private fun app(label: String) = SideApp(label, label, null, label)
+
+    @org.junit.Test fun findsByPartOfTheNameIgnoringAccentsAndCase() {
+        val apps = listOf(app("Cámara"), app("Spotify"), app("Google Calendar"), app("Calendario"))
+        org.junit.Assert.assertEquals(listOf("Calendario", "Google Calendar"), Apps.matches(apps, "CAL").map { it.label }) // starts-with first
+        org.junit.Assert.assertEquals(listOf("Cámara"), Apps.matches(apps, "camara").map { it.label })
+        org.junit.Assert.assertEquals(emptyList<String>(), Apps.matches(apps, "  ").map { it.label })
+    }
+}
+
+class WidgetGridTest {
+    @org.junit.Test fun dropOnAWidgetGoesToTheNearestFreeSpot() {
+        val beeper = intArrayOf(0, 0, 4, 3) // columns 0-3, rows 0-2
+        org.junit.Assert.assertEquals(5 to 1, Widgets.nearestFree(5, 1, 2, 2, 8, 4, listOf(beeper))) // free: stays
+        org.junit.Assert.assertEquals(4 to 1, Widgets.nearestFree(3, 1, 2, 2, 8, 4, listOf(beeper))) // on Beeper: next to it
+        org.junit.Assert.assertEquals(null, Widgets.nearestFree(0, 0, 8, 4, 8, 4, listOf(beeper)))   // no room anywhere
+    }
+}

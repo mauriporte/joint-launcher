@@ -24,7 +24,11 @@ import android.widget.ScrollView
 class Widgets(private val a: MainActivity) {
     private val manager = AppWidgetManager.getInstance(a)
     private val host = AppWidgetHost(a, HOST_ID)
-    private var pending = AppWidgetManager.INVALID_APPWIDGET_ID
+    // the widget being added, saved rather than in memory: Android may close Joint Launcher while the widget's own
+    // setup screen is open, and the widget then got set up but never placed (it "didn't stick")
+    private var pending: Int
+        get() = a.hub.prefs.getInt("widget_pending", AppWidgetManager.INVALID_APPWIDGET_ID)
+        set(v) = a.hub.prefs.edit().putInt("widget_pending", v).apply()
     var editing = false // shows a remove button on each widget
 
     fun ids(): List<Int> = a.hub.prefs.getString("widgets", "").orEmpty().split(',').mapNotNull { it.toIntOrNull() }
@@ -34,7 +38,8 @@ class Widgets(private val a: MainActivity) {
     fun stop() { runCatching { host.stopListening() } }
 
     /** Every widget your apps offer, by app; tapping one starts adding it. */
-    fun pick() {
+    /** forCorner: the widget replaces the top bar's clock (Settings → Clock) instead of going on the grid. */
+    fun pick(forCorner: Boolean = false) {
         val pm = a.packageManager
         val all = manager.installedProviders.sortedWith(compareBy({ it.loadLabel(pm).lowercase() }))
         if (all.isEmpty()) return a.toast("None of your apps offer widgets")
@@ -57,7 +62,7 @@ class Widgets(private val a: MainActivity) {
                 tag = name.lowercase()
                 addView(a.text(16f, Color.WHITE).apply { text = name },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = a.dp(14) })
-                setOnClickListener { dialog.dismiss(); add(p) }
+                setOnClickListener { dialog.dismiss(); a.hub.prefs.edit().putBoolean("widget_pending_corner", forCorner).apply(); add(p) }
             })
         }
         search.addTextChangedListener(object : android.text.TextWatcher {
@@ -96,14 +101,20 @@ class Widgets(private val a: MainActivity) {
     fun onResult(request: Int, ok: Boolean) {
         val id = pending.takeIf { it != AppWidgetManager.INVALID_APPWIDGET_ID } ?: return
         when (request) {
-            REQ_BIND -> if (ok) configure(id) else host.deleteAppWidgetId(id)
-            REQ_CONFIGURE -> if (ok) added(id) else host.deleteAppWidgetId(id)
+            REQ_BIND -> if (ok) configure(id) else { host.deleteAppWidgetId(id); pending = AppWidgetManager.INVALID_APPWIDGET_ID }
+            REQ_CONFIGURE -> if (ok) added(id) else { host.deleteAppWidgetId(id); pending = AppWidgetManager.INVALID_APPWIDGET_ID }
             else -> return
         }
     }
 
     private fun added(id: Int) {
-        pending = AppWidgetManager.INVALID_APPWIDGET_ID; save(ids() + id); a.rows.refreshWidgets()
+        pending = AppWidgetManager.INVALID_APPWIDGET_ID
+        if (a.hub.prefs.getBoolean("widget_pending_corner", false)) {
+            a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId) // the one it replaces
+            a.hub.prefs.edit().putInt("corner_widget", id).putBoolean("widget_pending_corner", false).apply()
+            a.topBar.applyCornerClock(); return
+        }
+        save(ids() + id); a.rows.refreshWidgets()
         askSize(id)
     }
 
@@ -137,6 +148,19 @@ class Widgets(private val a: MainActivity) {
         host.deleteAppWidgetId(id); save(ids() - id)
         a.hub.prefs.edit().remove("widget_size_$id").remove("wspan_$id").remove("wpos_l_$id").remove("wpos_p_$id").apply()
         a.rows.refreshWidgets()
+    }
+
+    /** The top bar's corner widget (e.g. Flip Clock's), w x h px; null if none is set or its app is gone. */
+    fun cornerView(w: Int, h: Int): View? {
+        val id = a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 } ?: return null
+        val info = manager.getAppWidgetInfo(id) ?: return null
+        return host.createView(a, id, info).also { tellSize(it, w, h) }
+    }
+
+    /** Back to the built-in clock. */
+    fun clearCorner() {
+        a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId)
+        a.hub.prefs.edit().remove("corner_widget").apply(); a.topBar.applyCornerClock()
     }
 
     /** Tells the widget its size, so it picks the layout that fits (a chat list rather than one line, say). */
@@ -266,8 +290,10 @@ class Widgets(private val a: MainActivity) {
                         }
                         android.view.MotionEvent.ACTION_MOVE -> { box.translationX = e.rawX - sx; box.translationY = e.rawY - sy }
                         android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                            spot.c = Math.round((spot.c * grid.cell + box.translationX) / grid.cell).coerceIn(0, grid.cols - spot.cw)
-                            spot.r = Math.round((spot.r * grid.cell + box.translationY) / grid.cell).coerceIn(0, grid.rows - spot.ch)
+                            // the cell you dropped it on, or the nearest free one if another widget is there (or stay put)
+                            val wc = Math.round((spot.c * grid.cell + box.translationX) / grid.cell).coerceIn(0, grid.cols - spot.cw)
+                            val wr = Math.round((spot.r * grid.cell + box.translationY) / grid.cell).coerceIn(0, grid.rows - spot.ch)
+                            nearestFree(wc, wr, spot.cw, spot.ch, grid.cols, grid.rows, others(grid, box))?.let { (c, r) -> spot.c = c; spot.r = r }
                             box.translationX = 0f; box.translationY = 0f; box.elevation = 0f
                             a.hub.prefs.edit().putString("wpos_${orient}_$id", "${spot.c},${spot.r}").apply()
                             box.layoutParams = spot
@@ -287,10 +313,18 @@ class Widgets(private val a: MainActivity) {
                 val w = Math.round((w0 * grid.cell + dx) / grid.cell).coerceIn(1, grid.cols - spot.c)
                 val h = Math.round((h0 * grid.cell + dy) / grid.cell).coerceIn(1, grid.rows - spot.r)
                 if (w != spot.cw || h != spot.ch) { spot.cw = w; spot.ch = h; box.layoutParams = spot }
-                if (done) { a.hub.prefs.edit().putString("wspan_$id", "$w,$h").apply(); tellSize(view, w * grid.cell, h * grid.cell) }
+                if (done) {
+                    // growing over another widget isn't allowed: back to the size it had
+                    if (others(grid, box).any { o -> overlaps(spot.c, spot.r, w, h, o) }) { spot.cw = w0; spot.ch = h0; box.layoutParams = spot }
+                    a.hub.prefs.edit().putString("wspan_$id", "${spot.cw},${spot.ch}").apply(); tellSize(view, spot.cw * grid.cell, spot.ch * grid.cell)
+                }
             }, FrameLayout.LayoutParams(a.dp(44), a.dp(44), Gravity.BOTTOM or Gravity.END))
         }
     }
+
+    /** The other widgets' spots on the grid (as c, r, w, h), for keeping them from overlapping. */
+    private fun others(grid: ViewGroup, self: View) = (0 until grid.childCount).map(grid::getChildAt).filter { it !== self }
+        .map { it.layoutParams as Spot }.filter { it.c >= 0 }.map { intArrayOf(it.c, it.r, it.cw, it.ch) }
 
     /** The grid's own corner: drag to make the widget area wider/narrower, taller/shorter (whole cells). */
     private fun gridHandle(grid: Grid): View {
@@ -323,6 +357,14 @@ class Widgets(private val a: MainActivity) {
     }
 
     companion object {
+        fun overlaps(c: Int, r: Int, w: Int, h: Int, o: IntArray) = c < o[0] + o[2] && o[0] < c + w && r < o[1] + o[3] && o[1] < r + h
+
+        /** The free spot (c, r) closest to where a w x h widget was dropped; null when the grid has no room for it. */
+        fun nearestFree(c: Int, r: Int, w: Int, h: Int, cols: Int, rows: Int, others: List<IntArray>): Pair<Int, Int>? =
+            (0..rows - h).flatMap { y -> (0..cols - w).map { x -> x to y } }
+                .filter { (x, y) -> others.none { overlaps(x, y, w, h, it) } }
+                .minByOrNull { (x, y) -> (x - c) * (x - c) + (y - r) * (y - r) }
+
         private const val HOST_ID = 1024
         private const val REQ_BIND = 41
         private const val REQ_CONFIGURE = 42

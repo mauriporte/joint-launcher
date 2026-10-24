@@ -175,6 +175,13 @@ class Apps(private val hub: Hub, private val images: Images) {
     }
 
     companion object {
+        /** Tablet search: apps whose name contains what was typed, accents and case ignored; names starting with it first. */
+        fun matches(apps: List<SideApp>, query: String): List<SideApp> {
+            fun plain(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD).replace(Regex("""\p{M}+"""), "").lowercase()
+            val q = plain(query.trim()).takeIf { it.isNotEmpty() } ?: return emptyList()
+            return apps.filter { plain(it.label).contains(q) }.sortedWith(compareBy({ !plain(it.label).startsWith(q) }, { plain(it.label) }))
+        }
+
         /** Your Google TV "Your apps" order, read from its screen on 2026-10-23; the starting order until you reorder. */
         private val GOOGLE_TV_ORDER = listOf(
             "com.spotify.tv.android", "ch.protonvpn.android", "com.stremio.one", "com.live.geesports", "org.smarttube.beta",

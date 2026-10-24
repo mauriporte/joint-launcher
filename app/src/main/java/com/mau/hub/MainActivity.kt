@@ -38,6 +38,7 @@ class MainActivity : Activity() {
 
     var gen = 0 // bumps on reload/search so stale async rows are dropped
     var inSearch = false
+    var searchQuery = "" // search results start with the apps whose names match (a launcher's first job)
     var tab = Tab.HOME
     private var lastContentFocus: View? = null
     private var rowsDirty = false // the sidebar's app order changed: reorder the Home rows when it closes
@@ -139,7 +140,7 @@ class MainActivity : Activity() {
     val widgets by lazy { Widgets(this) }
 
     // widgets only update while the screen is showing
-    override fun onStart() { super.onStart(); if (hub.touch) widgets.start() }
+    override fun onStart() { super.onStart(); if (hub.touch) { widgets.start(); topBar.applyCornerClock() } }
     override fun onStop() { super.onStop(); if (hub.touch) widgets.stop() }
 
     /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
@@ -268,8 +269,9 @@ class MainActivity : Activity() {
     }
 
     fun search(q: String) {
-        gen++; inSearch = true
+        gen++; inSearch = true; searchQuery = q
         rows.clear()
+        if (hub.touch) rows.apps() // tablet: matching apps first; the row shows nothing when none match
         sidebar.dirty = true
         topBar.tabs(catalog.tabs(), null) // no tab is lit while showing results
         if (hub.jfKey.isNotEmpty() && hub.installed(Links.JELLYFIN)) rows.content("In your library", listOf {
@@ -346,12 +348,17 @@ class MainActivity : Activity() {
         val favs = apps.favourites()
         // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
         val hidden = apps.hidden()
-        val favsOnly = hub.touch && apps.favouritesOnly
-        val list = if (!hub.touch) all else (if (favsOnly) all.filter { it.key in favs } else all)
-            .filter { it.key !in hidden }
-            .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
-            .let { az -> if (!favsOnly) az else az.associateBy { it.key }.let { by -> RowOrder.apply(az.map { it.key }, apps.favOrder()).map(by::getValue) } }
-        if (list.isEmpty() && all.isNotEmpty()) strip.addView(text(15f, TEXT_MUTED).apply {
+        val searching = hub.touch && inSearch
+        val favsOnly = hub.touch && apps.favouritesOnly && !searching
+        val list = when {
+            searching -> Apps.matches(all.filter { it.key !in hidden }, searchQuery) // nothing when none match
+            !hub.touch -> all
+            else -> (if (favsOnly) all.filter { it.key in favs } else all)
+                .filter { it.key !in hidden }
+                .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
+                .let { az -> if (!favsOnly) az else az.associateBy { it.key }.let { by -> RowOrder.apply(az.map { it.key }, apps.favOrder()).map(by::getValue) } }
+        }
+        if (list.isEmpty() && all.isNotEmpty() && !searching) strip.addView(text(15f, TEXT_MUTED).apply {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
         })
@@ -458,6 +465,23 @@ class MainActivity : Activity() {
     /** Tablet desktop lock (padlock next to search): sections can't be folded, moved or edited, and their headers go. */
     fun desktopLocked() = hub.touch && hub.prefs.getBoolean("desktop_locked", false)
 
+    private var fileToSave: String? = null
+    private var fileOpened: ((String) -> Unit)? = null
+
+    /** Settings → Back up: you choose where the file goes (Downloads, Drive...). */
+    fun saveFile(name: String, text: String) = runCatching {
+        fileToSave = text
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/json").putExtra(Intent.EXTRA_TITLE, name), REQ_SAVE_FILE)
+    }.onFailure { toast("Couldn't open the file picker") }
+
+    /** Settings → Restore: pick a backup file; onText gets its contents. */
+    fun openFile(onText: (String) -> Unit) = runCatching {
+        fileOpened = onText
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*"), REQ_OPEN_FILE)
+    }.onFailure { toast("Couldn't open the file picker") }
+
     var onBackgroundPicked: (() -> Unit)? = null // an open Settings panel redraws with the new picture
     private var pickingFor: String? = null
 
@@ -502,6 +526,14 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_SAVE_FILE || requestCode == REQ_OPEN_FILE) {
+            val uri = data?.data.takeIf { resultCode == RESULT_OK } ?: return
+            if (requestCode == REQ_SAVE_FILE) runCatching { contentResolver.openOutputStream(uri, "wt")!!.use { it.write(fileToSave!!.toByteArray()) } }
+                .onSuccess { toast("Backup saved") }.onFailure { toast("Couldn't save: ${it.message}") }
+            else runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) } }
+                .onSuccess { fileOpened?.invoke(it) }.onFailure { toast("Couldn't read that file: ${it.message}") }
+            return
+        }
         if (requestCode == REQ_BG_LANDSCAPE || requestCode == REQ_BG_PORTRAIT) {
             if (resultCode != RESULT_OK || data == null) return
             val first = pickingFor ?: return
@@ -539,5 +571,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQ_BG_LANDSCAPE = 61
         private const val REQ_BG_PORTRAIT = 62
+        private const val REQ_SAVE_FILE = 63
+        private const val REQ_OPEN_FILE = 64
     }
 }
