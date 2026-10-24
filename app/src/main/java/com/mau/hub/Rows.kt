@@ -54,7 +54,8 @@ class Rows(private val a: MainActivity) {
         adapter = RowsAdapter()
         itemAnimator = null // rows update in place; animations would rebuild them and drop focus
         clipChildren = false; clipToPadding = false
-        setPadding(a.dp(28), 0, a.dp(36), a.dp(40))
+        // TV keeps its safe margins; the tablet has no overscan, so less space at the sides
+        if (a.hub.touch) setPadding(a.dp(8), 0, a.dp(12), a.dp(40)) else setPadding(a.dp(28), 0, a.dp(36), a.dp(40))
         isVerticalScrollBarEnabled = false
     }
 
@@ -313,7 +314,9 @@ class Rows(private val a: MainActivity) {
                     removeAllViews()
                     // TV: one sideways row like Google TV's; tablet: a launcher-style grid that wraps to the screen width,
                     // under a foldable "Apps" header like To Watch's (remembered)
-                    val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { setPadding(a.dp(4), a.dp(8), a.dp(4), a.dp(10)) } else strip()
+                    // tablet: negative side padding cancels the empty space each tile keeps around its icon, so the outer
+                    // app icons line up with the section icons on the left and the arrow buttons on the right
+                    val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { clipChildren = false; setPadding(-a.dp(6), a.dp(8), -a.dp(2), a.dp(10)) } else strip()
                     if (a.hub.touch) {
                         fun folded() = a.hub.prefs.getBoolean("apps_folded", false)
                         lateinit var head: View

@@ -354,12 +354,13 @@ class MainActivity : Activity() {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
         })
+        if (favsOnly) dragToReorder(strip) else strip.setOnDragListener(null)
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
-            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
+            fun menu() =
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
-                        (if (hub.touch && !favsOnly) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // tablet Apps are A-Z; Favorites can be moved
+                        (if (hub.touch) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // tablet: A-Z, Favorites move by dragging
                         (app.pkg?.takeIf { hub.touch }?.let { pkg ->
                             listOf(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
@@ -373,11 +374,46 @@ class MainActivity : Activity() {
                         ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshApps() } }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
+            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
+                // Favorites: hold and drag to put it somewhere else; hold and let go without moving for the menu
+                if (favsOnly) { draggedMenu = ::menu; tile.startDragAndDrop(null, View.DragShadowBuilder(tile), tile, 0); tile.alpha = 0.3f } else menu()
             }
             tile.setOnKeyListener { v, code, e ->
                 if (code == KeyEvent.KEYCODE_DPAD_LEFT && e.action == KeyEvent.ACTION_DOWN && strip.indexOfChild(v) == 0) { sidebar.focus(); true } else false
             }
             strip.addView(tile)
+        }
+    }
+
+    private var draggedMenu: (() -> Unit)? = null
+    private var dragStart = -1
+
+    /**
+     * Favorites drag and drop: the dragged app slides into the spot under your finger as you go (the others make room),
+     * and the new order is saved when you let go. A drag that never left its own spot opens the app's menu instead.
+     */
+    private fun dragToReorder(strip: ViewGroup) = strip.setOnDragListener { _, e ->
+        val tile = e.localState as? View ?: return@setOnDragListener false
+        when (e.action) {
+            android.view.DragEvent.ACTION_DRAG_STARTED -> { dragStart = strip.indexOfChild(tile); true }
+            android.view.DragEvent.ACTION_DRAG_LOCATION -> {
+                val target = (0 until strip.childCount).firstOrNull { i ->
+                    val c = strip.getChildAt(i); e.x >= c.left && e.x < c.right && e.y >= c.top && e.y < c.bottom
+                }
+                val from = strip.indexOfChild(tile)
+                if (target != null && target != from) { strip.removeView(tile); strip.addView(tile, target) }
+                true
+            }
+            android.view.DragEvent.ACTION_DROP -> true
+            android.view.DragEvent.ACTION_DRAG_ENDED -> {
+                tile.alpha = 1f
+                val moved = strip.indexOfChild(tile) != dragStart
+                if (moved) apps.saveFavOrder((0 until strip.childCount).mapNotNull { strip.getChildAt(it).tag as? String })
+                else draggedMenu?.invoke()
+                draggedMenu = null
+                true
+            }
+            else -> true
         }
     }
 

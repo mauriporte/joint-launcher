@@ -40,7 +40,7 @@ class TopBar(private val a: MainActivity) {
 
     val view = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(a.dp(30), 0, a.dp(36), 0)
+        if (a.hub.touch) setPadding(a.dp(10), 0, a.dp(12), 0) else setPadding(a.dp(30), 0, a.dp(36), 0) // matches Home's side margins
         if (a.hub.touch) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
             addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.bareButton() })
