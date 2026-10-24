@@ -70,8 +70,10 @@
 
         <!-- singleTask: pressing Home brings back this one home screen instead of stacking new copies -->
         <!-- configChanges: turning a tablet keeps the screen as it is instead of rebuilding it -->
+        <!-- resizeableActivity false: the home screen is always full screen, so no split-screen / floating-window
+             handle (Xiaomi's "•••" bar) on it -->
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
-            android:stateNotNeeded="true"
+            android:stateNotNeeded="true" android:resizeableActivity="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
