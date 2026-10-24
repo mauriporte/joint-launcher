@@ -59,7 +59,8 @@ class ConnectScreen(private val a: MainActivity) {
             addView(LinearLayout(a).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
                 addView(ImageView(a).apply { setImageBitmap(qr(page.url, 480)) }, LinearLayout.LayoutParams(a.dp(220), a.dp(220)))
-                addView(a.text(15f, TEXT_SOFT).apply { text = page.url; gravity = Gravity.CENTER; setPadding(0, a.dp(12), 0, 0) })
+                // wider than the QR code: wrap_content so the column grows instead of cutting the link's code off
+                addView(a.text(15f, TEXT_SOFT).apply { text = page.url; isSingleLine = true; setPadding(0, a.dp(12), 0, 0) }, LinearLayout.LayoutParams(-2, -2))
             })
             addView(LinearLayout(a).apply {
                 orientation = LinearLayout.VERTICAL; setPadding(a.dp(56), 0, 0, 0)

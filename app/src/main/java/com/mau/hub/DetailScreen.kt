@@ -47,7 +47,10 @@ class DetailScreen(private val a: MainActivity) {
 
         val actions = LinearLayout(a).apply { setPadding(0, a.dp(22), 0, 0) }
         when (val p = item.play) {
-            is Play.Jelly -> if (p.folder) actions.addView(a.button("Open in Jellyfin") { a.actions.open(p) }) else {
+            is Play.Jelly -> if (p.folder) {
+                actions.addView(a.button("▶  Play") { a.actions.playSeries(p.id) })
+                actions.addView(a.button("Open in Jellyfin") { a.actions.open(p) })
+            } else {
                 actions.addView(a.button(if (p.posMs > 0) "▶  Resume" else "▶  Play") { a.actions.open(p) })
                 if (p.posMs > 0) actions.addView(a.button("From start") { a.actions.open(p.copy(posMs = 0)) })
             }

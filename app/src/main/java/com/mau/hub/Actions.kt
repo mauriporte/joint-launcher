@@ -57,6 +57,20 @@ class Actions(private val a: MainActivity) {
         }
     }
 
+    /** A series' Play: your next episode (Jellyfin's "Next up"), or the first one if you haven't started it. */
+    fun playSeries(seriesId: String) {
+        hub.pool.execute {
+            val ep = runCatching {
+                hub.jf("/Shows/NextUp?userId=%s&seriesId=$seriesId&limit=1").firstOrNull()
+                    ?: hub.jf("/Shows/$seriesId/Episodes?userId=%s&limit=1").firstOrNull()
+            }
+            hub.main.post {
+                ep.onSuccess { it?.let { e -> open(e.play) } ?: a.toast("No episodes found") }
+                    .onFailure { a.toast("Couldn't find the next episode: ${Sources.explain(it)}") }
+            }
+        }
+    }
+
     /** "Connect" tiles on Home for services that are installed but not signed in yet. */
     fun connectEntries(): List<Pair<Item, () -> Unit>> = buildList {
         fun tile(source: Source, pkg: String) = Item(source, "Connect ${source.label}", Play.App(pkg), wide = true,
