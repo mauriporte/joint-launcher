@@ -317,14 +317,14 @@ class TabletSettings(private val a: MainActivity) {
     }
 
     companion object {
-        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "ha" to "Home Assistant", "watch" to "To Watch")
+        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "watch" to "To Watch", "ha" to "Home Assistant")
         private val DEFAULT_NAMES = SECTIONS + ("favorites" to "Favorites")
 
         /** A section's title on Home: your name for it, else the default. */
         fun name(hub: Hub, key: String) = hub.prefs.getString("section_name_$key", null) ?: DEFAULT_NAMES.getValue(key)
 
         // each section's icon in the icon pack (LineX names; most packs follow them), and a built-in one if the pack lacks it
-        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "asus_minimovie")
+        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "mymovies") // a clapperboard: the reel read as a wheel
         private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie)
 
         /** The icon a section shows when titles are off: the one you picked, else the selected pack's, else a built-in one. */
