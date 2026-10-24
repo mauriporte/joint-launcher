@@ -139,7 +139,8 @@ class Catalog(private val hub: Hub, private val apps: Apps) {
             if (jellyfin) add { hub.jf("/Shows/NextUp?userId=%s&limit=20&$jfFields") }
             if (hub.stremioKey.isNotEmpty()) add { Sources.stremioContinue(hub.stremioKey) }
         }
-        if (cw.isNotEmpty()) add(RowDef("Continue watching", true, cw))
+        // one tile per show: an episode you're partway through is on Jellyfin's Resume and Next up lists both (Resume comes first and wins)
+        if (cw.isNotEmpty()) add(RowDef("Continue watching", true, listOf { Catalog.oneEach(cw.map { runCatching(it) }) }))
         if (jellyfin) {
             opt("Live TV favourites · Jellyfin", Links.JELLYFIN) { Sources.jellyfinLive(hub.server, hub.jfKey, hub.jfUser(), 50, favouritesOnly = true) }
             opt("Live TV · Jellyfin", Links.JELLYFIN) { Sources.jellyfinLive(hub.server, hub.jfKey, hub.jfUser(), 40) }
@@ -199,6 +200,14 @@ class Catalog(private val hub: Hub, private val apps: Apps) {
         val set = hub.prefs.getStringSet(key, emptySet())!!.toMutableSet()
         if (r.installed != on) set += r.title else set -= r.title // hidden_rows lists "off" rows, extra_rows lists "on" rows
         hub.prefs.edit().putStringSet(key, set).apply()
+    }
+
+    companion object {
+        /** Several lists as one row without repeats (episodes carry their show's name as title); fails only if every list failed. */
+        fun oneEach(results: List<Result<List<Item>>>): List<Item> {
+            if (results.isNotEmpty() && results.all { it.isFailure }) throw results.first().exceptionOrNull()!!
+            return results.flatMap { it.getOrDefault(emptyList()) }.distinctBy { it.source to it.title }
+        }
     }
 
     /** List of rows in Home order; pick one to show/hide or move it. onDone reloads Home (Done or Back). */

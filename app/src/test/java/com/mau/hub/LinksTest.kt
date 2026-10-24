@@ -263,6 +263,17 @@ class RowOrderTest {
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
     }
 
+    @Test fun continueWatchingOneTilePerShow() {
+        fun ep(n: Int, pos: Long) = Item(Source.JELLYFIN, "Pluribus", Play.Jelly("e$n", pos, false))
+        val resume = Result.success(listOf(ep(1, 1_800_000)))
+        val nextUp = Result.success(listOf(ep(1, 0), Item(Source.JELLYFIN, "Slow Horses", Play.Jelly("s1", 0, false))))
+        val row = Catalog.oneEach(listOf(resume, nextUp))
+        assertEquals(listOf("Pluribus", "Slow Horses"), row.map { it.title })
+        assertEquals(1_800_000L, (row.first().play as Play.Jelly).posMs) // the one you're partway through
+        assertEquals(listOf("Pluribus"), Catalog.oneEach(listOf(Result.failure(RuntimeException("503")), resume)).map { it.title })
+        assertEquals("503", runCatching { Catalog.oneEach(listOf(Result.failure(RuntimeException("503")))) }.exceptionOrNull()?.message)
+    }
+
     @Test fun subtitleFilesOnlyTextAndExternal() {
         val json = """{"MediaSources":[{"Id":"src1","MediaStreams":[
             {"Type":"Video","Index":0},
