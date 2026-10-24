@@ -298,7 +298,9 @@ class MainActivity : Activity() {
     fun fillAppsRow(strip: ViewGroup, all: List<SideApp>) {
         strip.removeAllViews()
         val favs = apps.favourites()
-        val list = if (hub.touch && apps.favouritesOnly) all.filter { it.key in favs } else all
+        // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
+        val list = if (!hub.touch) all else (if (apps.favouritesOnly) all.filter { it.key in favs } else all)
+            .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
         if (list.isEmpty() && all.isNotEmpty()) strip.addView(text(15f, TEXT_MUTED).apply {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
@@ -308,7 +310,7 @@ class MainActivity : Activity() {
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
-                        moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout) +
+                        (if (hub.touch) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // A-Z on the tablet: nothing to move
                         listOfNotNull(app.pkg?.takeIf { hub.touch }?.let { pkg ->
                             (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() }
                         }) +
