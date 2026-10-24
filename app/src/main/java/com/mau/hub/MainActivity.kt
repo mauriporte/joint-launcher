@@ -549,6 +549,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
+        if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
         if (hub.touch) {
             apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
             if (backgrounds().isNotEmpty()) applyBackground() // takes in pictures dropped in the inbox
