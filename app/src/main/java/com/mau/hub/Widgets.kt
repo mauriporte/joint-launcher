@@ -40,6 +40,12 @@ class Widgets(private val a: MainActivity) {
         if (all.isEmpty()) return a.toast("None of your apps offer widgets")
         lateinit var dialog: AlertDialog
         val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(16), a.dp(8), a.dp(16), a.dp(8)) }
+        // there are hundreds: type part of the widget's or the app's name to narrow the list
+        val search = android.widget.EditText(a).apply {
+            hint = "Search widgets or apps"; isSingleLine = true; textSize = 16f
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_search, 0, 0, 0); compoundDrawablePadding = a.dp(10)
+            compoundDrawablesRelative[0]?.setTint(TEXT_MUTED)
+        }
         all.forEach { p ->
             list.addView(LinearLayout(a).apply {
                 gravity = Gravity.CENTER_VERTICAL; setPadding(a.dp(8), a.dp(10), a.dp(8), a.dp(10))
@@ -47,12 +53,26 @@ class Widgets(private val a: MainActivity) {
                 background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null, null)
                 addView(ImageView(a).apply { setImageDrawable(runCatching { p.loadIcon(a, 0) }.getOrNull()) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
                 val app = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(p.provider.packageName, 0)).toString() }.getOrDefault("")
-                addView(a.text(16f, Color.WHITE).apply { text = "${p.loadLabel(pm)}" + if (app.isNotEmpty()) "  ·  $app" else "" },
+                val name = "${p.loadLabel(pm)}" + if (app.isNotEmpty()) "  ·  $app" else ""
+                tag = name.lowercase()
+                addView(a.text(16f, Color.WHITE).apply { text = name },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = a.dp(14) })
                 setOnClickListener { dialog.dismiss(); add(p) }
             })
         }
-        dialog = AlertDialog.Builder(a).setTitle("Add a widget").setView(ScrollView(a).apply { addView(list) })
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(t: android.text.Editable?) {
+                val q = t.toString().trim().lowercase()
+                for (i in 0 until list.childCount) list.getChildAt(i).let { it.visibility = if (q.isEmpty() || (it.tag as String).contains(q)) View.VISIBLE else View.GONE }
+            }
+            override fun beforeTextChanged(t: CharSequence?, s: Int, c: Int, a: Int) = Unit
+            override fun onTextChanged(t: CharSequence?, s: Int, b: Int, c: Int) = Unit
+        })
+        dialog = AlertDialog.Builder(a).setTitle("Add a widget").setView(LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(search, LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(24), a.dp(8), a.dp(24), 0) })
+            addView(ScrollView(a).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        })
             .setNegativeButton("Cancel", null).show()
     }
 
