@@ -16,19 +16,19 @@ import android.widget.LinearLayout
  * shadow), the others dim, and thin white chevrons sit just outside the icon on the sides it can move to.
  * onDrop(container, order) saves the new order.
  */
-class MoveMode(private val a: Activity, private val touch: Boolean, private val onDrop: (LinearLayout, List<String>) -> Unit) {
+class MoveMode(private val a: Activity, private val touch: Boolean, private val onDrop: (ViewGroup, List<String>) -> Unit) {
     /** The app being moved, the list it lives in, its axis, and the arrow views drawn on it. */
-    private class State(val view: View, val container: LinearLayout, val horizontal: Boolean, val arrows: Map<Int, View>) {
+    private class State(val view: View, val container: ViewGroup, val horizontal: Boolean, val arrows: Map<Int, View>) {
         var armed = false // the OK release that ends the long-press must not also drop the app
     }
     private var moving: State? = null
     val active get() = moving != null
 
     /** App entries are the children tagged with an app key (the sidebar also holds home, search, rows, settings). */
-    private fun appChildren(c: LinearLayout) = (0 until c.childCount).map(c::getChildAt).filter { (it.tag as? String)?.startsWith("rail:") == false }
+    private fun appChildren(c: ViewGroup) = (0 until c.childCount).map(c::getChildAt).filter { (it.tag as? String)?.startsWith("rail:") == false }
 
     /** host = the FrameLayout the arrows are drawn on. armed = started from the hold menu (no key still held down). */
-    fun start(v: View, container: LinearLayout, horizontal: Boolean, host: FrameLayout, armed: Boolean = true) {
+    fun start(v: View, container: ViewGroup, horizontal: Boolean, host: FrameLayout, armed: Boolean = true) {
         if (moving != null) return
         val reach = (if (horizontal) host.width else host.height) / 2f + a.dp(12)
         fun chevron(dir: Int, rotation: Float) = ImageView(a).apply {
@@ -47,11 +47,11 @@ class MoveMode(private val a: Activity, private val touch: Boolean, private val 
      * The hold menu's move entries: "Move" (then the remote's arrows) on a TV; on touchscreens, which have no arrow keys,
      * "Move earlier" / "Move later", one step per tap.
      */
-    fun options(v: View, container: LinearLayout, horizontal: Boolean, host: FrameLayout): List<Pair<String, () -> Unit>> =
+    fun options(v: View, container: ViewGroup, horizontal: Boolean, host: FrameLayout): List<Pair<String, () -> Unit>> =
         if (!touch) listOf("Move" to { start(v, container, horizontal, host) })
         else listOf("Move earlier" to { step(v, container, -1) }, "Move later" to { step(v, container, 1) })
 
-    private fun step(v: View, container: LinearLayout, d: Int) {
+    private fun step(v: View, container: ViewGroup, d: Int) {
         val apps = appChildren(container)
         val target = apps.getOrNull(apps.indexOf(v) + d) ?: return
         val to = container.indexOfChild(target)

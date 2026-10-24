@@ -45,10 +45,13 @@ class Sidebar(private val a: MainActivity) {
         // the app's own icon at the top IS the Home button (everything view), then Search, then the apps
         item(a.getDrawable(R.drawable.icon), "Home", HOME, selected = current == null && !a.inSearch) { a.pickApp(null) }
         item(a.getDrawable(R.drawable.ic_search), "Search", SEARCH, tint = true) { a.searchBar.open() }
+        // tablets: your app icons are the top of Home; this jumps there, the way a provider's icon shows its content
+        if (a.hub.touch) item(a.getDrawable(R.drawable.ic_apps), "Apps", "$HOME:apps", tint = true) { a.showApps() }
         apps.forEach { app ->
             lateinit var v: FrameLayout
             v = item(null, app.label, app.key, selected = app.filter == current, onLongClick = {
-                MoveMode.holdMenu(a, v, beside = true, listOf("Open" to { a.pickApp(app.filter) }) + a.moveMode.options(v, rail, horizontal = false, host = v))
+                MoveMode.holdMenu(a, v, beside = true, listOf("Open" to { a.pickApp(app.filter) }) + a.moveMode.options(v, rail, horizontal = false, host = v) +
+                    listOfNotNull(app.pkg?.let { "Change icon" to { IconPicker(a, app) { dirty = true; a.loadHome() }.show() } }))
             }) { a.pickApp(app.filter) }
             val icon = v.getChildAt(1) as ImageView
             app.logo?.let { a.apps.logoInto(it, icon) }

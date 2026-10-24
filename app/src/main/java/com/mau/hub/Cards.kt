@@ -117,7 +117,7 @@ class Cards(private val ctx: Context, private val images: Images, private val ap
         }
         val label = ctx.text(12f, Color.WHITE).apply {
             text = a.label; gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-            visibility = View.INVISIBLE
+            visibility = if (touch) View.VISIBLE else View.INVISIBLE // touchscreens: always named, like any launcher
         }
         val box = FrameLayout(ctx).apply {
             clipChildren = false
@@ -131,7 +131,7 @@ class Cards(private val ctx: Context, private val images: Images, private val ap
             addView(label, LinearLayout.LayoutParams(size + ctx.dp(30), -2).apply { topMargin = ctx.dp(4) })
             setOnFocusChangeListener { v, f ->
                 box.animate().scaleX(if (f) 1.1f else 1f).scaleY(if (f) 1.1f else 1f).setDuration(150).start() // same focus look as cards
-                label.visibility = if (f) View.VISIBLE else View.INVISIBLE
+                label.visibility = if (f || touch) View.VISIBLE else View.INVISIBLE
                 if (f) onFocus(v)
             }
             setOnClickListener { onClick() }

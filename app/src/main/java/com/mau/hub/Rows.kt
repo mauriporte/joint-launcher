@@ -26,6 +26,8 @@ class ContentRow(id: Long, val title: String, val top10: Boolean, val cap: Int) 
 class NowRow(id: Long, val label: String, val item: Item, val onClick: () -> Unit) : RowModel(id)
 class ConnectRow(id: Long, val entries: List<Pair<Item, () -> Unit>>) : RowModel(id)
 class AppsRow(id: Long) : RowModel(id)
+/** Tablet Home: the one button that folds all the video rows below it away. */
+class FoldRow(id: Long) : RowModel(id)
 
 /**
  * The home screen's rows, on RecyclerView: only rows near the screen are built, and every content row shares one
@@ -49,14 +51,35 @@ class Rows(private val a: MainActivity) {
     }
 
     private val adapter get() = view.adapter as RowsAdapter
-    private fun indexOf(id: Long) = models.indexOfFirst { it.id == id }
+
+    // What's on screen: every row, or without the video rows while they're folded away (tablet Home). Folded rows keep
+    // loading in the background, so unfolding is instant. Positions below are positions in this list.
+    private var shown: List<RowModel> = emptyList()
+    private val folded get() = models.any { it is FoldRow } && a.hub.prefs.getBoolean("videos_folded", false)
+    private fun sync() { shown = if (folded) models.filter { it !is ContentRow } else models.toList() }
+    private fun indexOf(id: Long) = shown.indexOfFirst { it.id == id }
 
     fun clear() {
-        models.clear(); failed.clear()
+        models.clear(); failed.clear(); sync()
         adapter.notifyDataSetChanged()
     }
 
-    private fun add(m: RowModel, at: Int = models.size) { models.add(at, m); adapter.notifyItemInserted(at) }
+    private fun add(m: RowModel, at: Int = models.size) {
+        models.add(at, m); sync()
+        indexOf(m.id).takeIf { it >= 0 }?.let(adapter::notifyItemInserted)
+    }
+
+    private fun remove(m: RowModel) {
+        val i = indexOf(m.id)
+        models.remove(m); sync()
+        if (i >= 0) adapter.notifyItemRemoved(i)
+    }
+
+    /** Fold or unfold all the video rows (remembered). */
+    private fun toggleFold() {
+        a.hub.prefs.edit().putBoolean("videos_folded", !folded).apply()
+        sync(); adapter.notifyDataSetChanged()
+    }
 
     /** Rows showing "couldn't load" try again now (the app came back to the front, or Home was pressed). */
     fun retryFailed() = failed.values.toList().forEach { a.hub.main.removeCallbacks(it); it.run() }
@@ -81,17 +104,16 @@ class Rows(private val a: MainActivity) {
         val myGen = a.gen
         val hub = a.hub
         val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + ".json") }
-        var shown: String? = null // the JSON on screen; only touched on the UI thread
+        var cached: String? = null // the JSON on screen; only touched on the UI thread
         fun show(items: List<Item>) {
-            val i = indexOf(row.id).takeIf { it >= 0 } ?: return
             row.items = items.take(row.cap); row.error = null
-            adapter.notifyItemChanged(i)
+            indexOf(row.id).takeIf { it >= 0 }?.let(adapter::notifyItemChanged) // folded away: just keep the data
         }
         // saved results: read + decoded on the disk thread (doing ~25 of these on the UI thread cost ~1.5s at startup)
         if (cacheFile != null) hub.diskPool.execute {
             val json = runCatching { cacheFile.takeIf { it.exists() }?.readText() }.getOrNull() ?: return@execute
             val items = runCatching { ItemJson.decode(json) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return@execute
-            hub.main.post { if (myGen == a.gen && shown == null) { shown = json; show(items) } }
+            hub.main.post { if (myGen == a.gen && cached == null) { cached = json; show(items) } }
         }
         var loading = false
         var attempt = 0
@@ -106,16 +128,15 @@ class Rows(private val a: MainActivity) {
                 if (items.isNotEmpty() && cacheFile != null) runCatching { cacheFile.parentFile?.mkdirs(); cacheFile.writeText(fresh) }
                 hub.main.post {
                     loading = false
-                    if (myGen != a.gen) return@post
-                    val i = indexOf(row.id).takeIf { it >= 0 } ?: return@post
-                    if (items.isNotEmpty()) { failed.remove(row.id); if (fresh != shown) { shown = fresh; show(items) } }
-                    else if (shown == null) { // nothing cached and nothing fetched: hide the row, or say why
-                        if (errors.isEmpty()) { failed.remove(row.id); models.removeAt(i); adapter.notifyItemRemoved(i); return@post }
+                    if (myGen != a.gen || row !in models) return@post
+                    if (items.isNotEmpty()) { failed.remove(row.id); if (fresh != cached) { cached = fresh; show(items) } }
+                    else if (cached == null) { // nothing cached and nothing fetched: hide the row, or say why
+                        if (errors.isEmpty()) { failed.remove(row.id); remove(row); return@post }
                         // e.g. Jellyfin answers 503 for minutes while it starts: retry with backoff, and on every return to Home
                         val wait = 15_000L shl attempt++.coerceAtMost(4) // 15s, 30s, 1m, 2m, then every 4m
                         val again = if (wait < 60_000) "${wait / 1000}s" else "${wait / 60_000} min"
                         row.error = errors.map(Sources::explain).distinct().joinToString("\n") { "$it. Trying again in $again." }
-                        adapter.notifyItemChanged(i)
+                        indexOf(row.id).takeIf { it >= 0 }?.let(adapter::notifyItemChanged)
                         failed[row.id] = retry
                         hub.main.removeCallbacks(retry)
                         hub.main.postDelayed(retry, wait)
@@ -123,22 +144,23 @@ class Rows(private val a: MainActivity) {
                 }
             }
         }
-        retry = Runnable { if (myGen == a.gen && shown == null && !loading) load() }
+        retry = Runnable { if (myGen == a.gen && cached == null && !loading) load() }
         load()
     }
 
     /** "Now playing" sits on top while some app is playing; null removes it. */
     fun nowPlaying(row: NowRow?) {
-        val i = models.indexOfFirst { it is NowRow }
+        val old = models.firstOrNull { it is NowRow }
         when {
-            row == null && i >= 0 -> { models.removeAt(i); adapter.notifyItemRemoved(i) }
-            row != null && i >= 0 -> { models[i] = row; adapter.notifyItemChanged(i) }
+            row == null && old != null -> remove(old)
+            row != null && old != null -> { models[models.indexOf(old)] = row; sync(); adapter.notifyItemChanged(indexOf(row.id)) }
             row != null -> add(row, 0)
         }
     }
 
     fun connect(entries: List<Pair<Item, () -> Unit>>) { if (entries.isNotEmpty()) add(ConnectRow(nextId++, entries)) }
     fun apps() = add(AppsRow(nextId++))
+    fun fold() = add(FoldRow(nextId++))
 
     // ---- views ----
 
@@ -163,10 +185,10 @@ class Rows(private val a: MainActivity) {
 
     private inner class RowsAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         init { setHasStableIds(true) }
-        override fun getItemCount() = models.size
-        override fun getItemId(position: Int) = models[position].id
-        override fun getItemViewType(position: Int) = when (models[position]) {
-            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3
+        override fun getItemCount() = shown.size
+        override fun getItemId(position: Int) = shown[position].id
+        override fun getItemViewType(position: Int) = when (shown[position]) {
+            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3; is FoldRow -> 4
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -193,7 +215,7 @@ class Rows(private val a: MainActivity) {
         }
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            when (val m = models[position]) {
+            when (val m = shown[position]) {
                 is ContentRow -> bindContent(holder as ContentHolder, m)
                 is NowRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
@@ -225,12 +247,20 @@ class Rows(private val a: MainActivity) {
                     tag = m.id
                     removeAllViews()
                     addView(header("Your apps"))
-                    val strip = strip()
-                    addView(HorizontalScrollView(a).apply {
+                    // TV: one sideways row like Google TV's; tablet: a launcher-style grid that wraps to the screen width
+                    val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { setPadding(a.dp(4), a.dp(8), a.dp(4), a.dp(10)) } else strip()
+                    if (a.hub.touch) addView(strip) else addView(HorizontalScrollView(a).apply {
                         isHorizontalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(strip)
                     })
                     // reading ~25 app names from their packages took 1.6s on the UI thread; do it on the disk thread
                     a.hub.diskPool.execute { val apps = a.apps.all(); a.hub.main.post { a.fillAppsRow(strip, apps) } }
+                }
+                is FoldRow -> (holder.itemView as LinearLayout).apply {
+                    removeAllViews()
+                    // one big touch-friendly button for all the video rows, like a Home Assistant collapsible card
+                    addView(a.button((if (folded) "▸  Show videos" else "▾  Hide videos")) { toggleFold() }.apply {
+                        layoutParams = LinearLayout.LayoutParams(-2, a.dp(48)).apply { setMargins(a.dp(8), a.dp(12), 0, a.dp(12)) }
+                    })
                 }
             }
         }

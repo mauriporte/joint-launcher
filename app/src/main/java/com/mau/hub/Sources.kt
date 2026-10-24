@@ -683,7 +683,11 @@ object Sources {
 
     /** One GeeSports row per entry: row name -> ESPN league paths. No NFL / MLB on purpose. */
     val SPORT_ROWS = listOf(
-        "Football" to listOf("soccer/arg.1", "soccer/esp.1", "soccer/ita.1"), // Liga Argentina, LaLiga, Serie A
+        "Football" to listOf(
+            "soccer/arg.1", "soccer/esp.1", "soccer/ita.1", "soccer/eng.1", // Liga Argentina, LaLiga, Serie A, Premier League
+            "soccer/fra.1", "soccer/ger.1", "soccer/uefa.champions", "soccer/conmebol.libertadores", // Ligue 1, Bundesliga, Champions, Libertadores
+            "soccer/uefa.europa", "soccer/uefa.euro", "soccer/uefa.euroq", // Europa League, the Euros and their qualifiers (only when on)
+        ),
         "Basketball" to listOf("basketball/nba"),
         "Rugby" to listOf(
             "rugby/267979", "rugby/270559", "rugby/270557", "rugby/180659", // Premiership, Top 14, URC, Six Nations

@@ -36,6 +36,13 @@
         <package android:name="com.amazon.avod.thirdpartyclient" />
         <package android:name="com.hulu.plus" />
         <package android:name="es.filmin.app" />
+        <!-- icon packs (ADW / Nova format), for app icons -->
+        <intent>
+            <action android:name="org.adw.launcher.THEMES" />
+        </intent>
+        <intent>
+            <action android:name="com.novalauncher.THEME" />
+        </intent>
         <!-- every app on a phone/tablet, for the "Your apps" row -->
         <intent>
             <action android:name="android.intent.action.MAIN" />

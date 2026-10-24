@@ -10,6 +10,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -112,6 +113,8 @@ class MainActivity : Activity() {
                 insets
             }
             addView(page, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(20) })
+            // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen)
+            if (touch) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(RAIL_DP + 8), -1))
             addView(detail.view)
@@ -125,6 +128,19 @@ class MainActivity : Activity() {
         runCatching { android.net.http.HttpResponseCache.install(java.io.File(cacheDir, "http"), 40L * 1024 * 1024) }
         loadHome()
         nowPlaying.start()
+    }
+
+    /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
+    private fun edgeOpensSidebar(): View.OnTouchListener {
+        var downX = 0f
+        return View.OnTouchListener { v, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { downX = e.rawX; true }
+                android.view.MotionEvent.ACTION_MOVE -> { if (e.rawX - downX > dp(16)) { sidebar.show(); v.cancelLongPress() }; true }
+                android.view.MotionEvent.ACTION_UP -> { if (!sidebar.isOpen) sidebar.show(); v.performClick(); true }
+                else -> true
+            }
+        }
     }
 
     private fun isInside(v: View, parent: View): Boolean {
@@ -154,9 +170,15 @@ class MainActivity : Activity() {
                 catalog.tabRows(tab, gen).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                 if (tab == Tab.APPS) rows.apps()
             }
+            // tablet Home: your apps first, like a launcher, then one button that folds all the video rows away
+            hub.touch -> {
+                rows.apps()
+                rows.connect(actions.connectEntries())
+                rows.fold()
+                catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
+            }
             else -> {
-                val connect = actions.connectEntries()
-                rows.connect(connect)
+                rows.connect(actions.connectEntries())
                 catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                 rows.apps()
             }
@@ -198,6 +220,12 @@ class MainActivity : Activity() {
 
     fun chooseRows() = catalog.pick(this, gen, ::loadHome)
 
+    /** Tablet sidebar's Apps icon: back to Home, scrolled to the top where your app icons are. */
+    fun showApps() {
+        sidebar.hide()
+        if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
+    }
+
     /** Back from the sidebar to where you were in the rows. */
     fun backToContent() {
         sidebar.hide()
@@ -228,7 +256,7 @@ class MainActivity : Activity() {
     }
 
     /** "Your apps": every installed TV app, laid out like Google TV's apps row. OK opens, a long press offers Move. */
-    fun fillAppsRow(strip: LinearLayout, list: List<SideApp>) {
+    fun fillAppsRow(strip: ViewGroup, list: List<SideApp>) {
         strip.removeAllViews()
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
@@ -236,6 +264,7 @@ class MainActivity : Activity() {
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
                         moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout) +
+                        ("Change icon" to { IconPicker(this, app) { sidebar.dirty = true; loadHome() }.show() }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
             }

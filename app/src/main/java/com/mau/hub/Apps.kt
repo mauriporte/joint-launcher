@@ -93,16 +93,23 @@ class Apps(private val hub: Hub, private val images: Images) {
         return android.graphics.drawable.BitmapDrawable(hub.ctx.resources, b)
     }
 
-    /** Other apps' icons come from their APKs, which is slow on this TV; load them off the UI thread, once. */
+    val packs = IconPacks(hub)
+
+    /**
+     * An app's icon: the one you picked, else the icon pack's (LineX on the tablet), else our own for a few apps, else
+     * the app's. Icons come from APKs, which is slow on this TV; loaded off the UI thread, once.
+     */
     fun iconInto(pkg: String, into: ImageView) {
-        customIcon(pkg)?.let { into.setImageDrawable(it); return }
         iconCache[pkg]?.let { into.setImageDrawable(it); return }
         into.tag = "icon:$pkg"
         hub.imagePool.execute {
-            val d = runCatching { pm.getApplicationIcon(pkg) }.getOrNull() ?: return@execute
+            val d = packs.iconFor(pkg) ?: customIcon(pkg) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull() ?: return@execute
             hub.main.post { iconCache[pkg] = d; if (into.tag == "icon:$pkg") into.setImageDrawable(d) }
         }
     }
+
+    /** After you pick a different icon. */
+    fun forgetIcon(pkg: String) { iconCache.remove(pkg) }
 
     /** Catalogue-only services (app not installed): their logo from JustWatch, looked up once. */
     fun logoInto(p: Provider, into: ImageView) {
