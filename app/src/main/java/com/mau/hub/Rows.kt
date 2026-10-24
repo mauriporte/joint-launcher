@@ -1,11 +1,15 @@
 package com.mau.hub
 
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Parcelable
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
@@ -257,10 +261,24 @@ class Rows(private val a: MainActivity) {
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
-                    // one big touch-friendly button for all the video rows, like a Home Assistant collapsible card
-                    addView(a.button((if (folded) "▸  Show videos" else "▾  Hide videos")) { toggleFold() }.apply {
-                        layoutParams = LinearLayout.LayoutParams(-2, a.dp(48)).apply { setMargins(a.dp(8), a.dp(12), 0, a.dp(12)) }
-                    })
+                    // "To Watch" section header with a dropdown arrow on the right, like a Home Assistant collapsible card;
+                    // the whole header is the tap target, the arrow points down when folded (open it) and up when open
+                    addView(LinearLayout(a).apply {
+                        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                        setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
+                        isClickable = true; setOnClickListener { toggleFold() }
+                        contentDescription = if (folded) "Show To Watch" else "Hide To Watch"
+                        addView(a.text(22f, Color.WHITE).apply {
+                            text = "To Watch"; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        }, LinearLayout.LayoutParams(0, -2, 1f))
+                        addView(ImageView(a).apply {
+                            setImageResource(R.drawable.ic_chevron); setColorFilter(Color.WHITE)
+                            rotation = if (folded) 90f else 270f // ic_chevron points right
+                            setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
+                            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+                            isClickable = true; setOnClickListener { toggleFold() }
+                        }, LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
+                    }, LinearLayout.LayoutParams(-1, -2))
                 }
             }
         }
