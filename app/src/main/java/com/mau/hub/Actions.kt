@@ -110,7 +110,7 @@ class Actions(private val a: MainActivity) {
         val s = android.os.StatFs(android.os.Environment.getDataDirectory().path)
         fun size(b: Long) = if (b >= 1L shl 30) "%.1f GB".format(b / (1L shl 30).toDouble()) else "${b shr 20} MB"
         val ours = a.cacheDir.walkTopDown().sumOf { it.length() } + a.filesDir.walkTopDown().sumOf { it.length() }
-        return "TV storage: ${size(s.availableBytes)} free of ${size(s.totalBytes)} · Joint Launcher uses ${size(ours)}"
+        return (if (hub.touch) "Storage" else "TV storage") + ": ${size(s.availableBytes)} free of ${size(s.totalBytes)} · Joint Launcher uses ${size(ours)}"
     }
 
     /** Tablet background: your wallpaper behind Joint Launcher (or plain black), darkened as much as you like. Applies live. */

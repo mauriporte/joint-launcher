@@ -111,9 +111,11 @@ class PhonePage(
                 val e = hub.prefs.edit()
                 IMPORT_KEYS.forEach { k -> params[k]?.takeIf { it.isNotEmpty() }?.let { e.putString(k, it) } }
                 IMPORT_SETS.forEach { k -> params[k]?.let { v -> e.putStringSet(k, v.split('\n').filter(String::isNotEmpty).toSet()) } }
+                // app icons picked from an icon pack ("icon_<package>" = "<pack>|<icon>"), the same thing Change icon saves
+                params.filter { (k, v) -> k.startsWith("icon_") && ICON_PICK.matches(v) }.forEach { (k, v) -> e.putString(k, v) }
                 e.apply()
                 hub.userId = null
-                "Imported ${params.keys.count { it in IMPORT_KEYS || it in IMPORT_SETS }} settings."
+                "Imported ${params.keys.count { it in IMPORT_KEYS || it in IMPORT_SETS || it.startsWith("icon_") }} settings."
             })
             else -> send(out, 404, page("Not found", ""))
         }
@@ -209,6 +211,7 @@ class PhonePage(
             "app_order", "row_order", "app_filter",
         )
         private val IMPORT_SETS = listOf("hidden_rows", "extra_rows")
+        private val ICON_PICK = Regex("[A-Za-z0-9_.]+\\|[A-Za-z0-9_]+") // package|icon name, nothing else
         /** What /export hands to another device: the accounts that aren't tied to this device (Jellyfin signs in per device). */
         private val ACCOUNT_KEYS = listOf(
             "stremio", "seerr_url", "seerr_key",
