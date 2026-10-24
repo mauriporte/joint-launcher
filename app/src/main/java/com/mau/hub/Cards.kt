@@ -20,7 +20,7 @@ enum class CardKind { POSTER, WIDE, SQUARE }
 fun kindOf(item: Item) = when { item.wide -> CardKind.WIDE; item.square -> CardKind.SQUARE; else -> CardKind.POSTER }
 
 /** Builds tiles once (create) and fills them with a title (bind), so rows can recycle them as you scroll. */
-class Cards(private val ctx: Context, private val images: Images, private val apps: Apps) {
+class Cards(private val ctx: Context, private val images: Images, private val apps: Apps, private val touch: Boolean) {
     class Card(val root: FrameLayout, val img: ImageView, val caption: TextView, val dot: View)
 
     // drawable templates shared by every card; each card takes a cheap copy via newDrawable()
@@ -56,8 +56,11 @@ class Cards(private val ctx: Context, private val images: Images, private val ap
             addView(img, FrameLayout.LayoutParams(-1, -1))
             addView(caption, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
             addView(dot, FrameLayout.LayoutParams(ctx.dp(8), ctx.dp(8)).apply { setMargins(ctx.dp(6), ctx.dp(6), 0, 0) })
-            // dim overlay when unfocused (view-wide alpha forced an offscreen redraw per card)
-            foreground = cardForeground.newDrawable(); clipToOutline = true
+            // dim overlay when unfocused (view-wide alpha forced an offscreen redraw per card); touchscreens never focus, so no dimming
+            foreground = if (!touch) cardForeground.newDrawable()
+            else android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null,
+                android.graphics.drawable.ColorDrawable(Color.WHITE)) // a tap shows, since nothing is focused
+            clipToOutline = true
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             background = cardBg.newDrawable()
             isFocusable = true; isClickable = true

@@ -31,7 +31,7 @@ class DetailScreen(private val a: MainActivity) {
             !appInstalled && alt != null -> "Play in Stremio" to alt
             item.source == Source.LIVE -> "Watch on GeeSports" to p
             p is Play.JellyLive -> "Watch live" to p
-            item.source == Source.YOUTUBE -> "Play in SmartTube" to p
+            item.source == Source.YOUTUBE -> (if (a.hub.touch) "Play in YouTube" else "Play in SmartTube") to p
             else -> "Play on ${item.source.label}" to p
         }
     }
@@ -120,6 +120,8 @@ class DetailScreen(private val a: MainActivity) {
         }, FrameLayout.LayoutParams(-1, -1))
         view.visibility = View.VISIBLE
         actions.getChildAt(0).requestFocus()
+        // touchscreens: no focus to light up Play, so mark it as the main action instead
+        if (hub.touch) (actions.getChildAt(0) as? TextView)?.apply { isSelected = true; setTextColor(Color.BLACK) }
         a.page.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS // the rows behind stay focusable otherwise, and D-pad wanders onto them
 
         // the extended info comes from Stremio's catalogue, by IMDb id

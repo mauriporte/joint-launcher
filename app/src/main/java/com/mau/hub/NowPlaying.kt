@@ -49,7 +49,7 @@ class NowPlaying(private val a: MainActivity, private val onChange: (NowRow?) ->
         val md = c!!.metadata
         val art = md?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: md?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: md?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-        val source = when (c.packageName) {
+        val source = when (Links.canonical(c.packageName)) {
             Links.SPOTIFY -> Source.SPOTIFY; Links.NETFLIX -> Source.NETFLIX; Links.SMARTTUBE -> Source.YOUTUBE
             Links.JELLYFIN -> Source.JELLYFIN; Links.STREMIO -> Source.STREMIO; else -> Source.APP
         }

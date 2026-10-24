@@ -16,7 +16,7 @@ import android.widget.LinearLayout
  * shadow), the others dim, and thin white chevrons sit just outside the icon on the sides it can move to.
  * onDrop(container, order) saves the new order.
  */
-class MoveMode(private val a: Activity, private val onDrop: (LinearLayout, List<String>) -> Unit) {
+class MoveMode(private val a: Activity, private val touch: Boolean, private val onDrop: (LinearLayout, List<String>) -> Unit) {
     /** The app being moved, the list it lives in, its axis, and the arrow views drawn on it. */
     private class State(val view: View, val container: LinearLayout, val horizontal: Boolean, val arrows: Map<Int, View>) {
         var armed = false // the OK release that ends the long-press must not also drop the app
@@ -41,6 +41,23 @@ class MoveMode(private val a: Activity, private val onDrop: (LinearLayout, List<
         v.elevation = a.dp(16).toFloat()
         moving = State(v, container, horizontal, arrows).also { it.armed = armed }
         updateArrows()
+    }
+
+    /**
+     * The hold menu's move entries: "Move" (then the remote's arrows) on a TV; on touchscreens, which have no arrow keys,
+     * "Move earlier" / "Move later", one step per tap.
+     */
+    fun options(v: View, container: LinearLayout, horizontal: Boolean, host: FrameLayout): List<Pair<String, () -> Unit>> =
+        if (!touch) listOf("Move" to { start(v, container, horizontal, host) })
+        else listOf("Move earlier" to { step(v, container, -1) }, "Move later" to { step(v, container, 1) })
+
+    private fun step(v: View, container: LinearLayout, d: Int) {
+        val apps = appChildren(container)
+        val target = apps.getOrNull(apps.indexOf(v) + d) ?: return
+        val to = container.indexOfChild(target)
+        container.removeView(v)
+        container.addView(v, to)
+        onDrop(container, appChildren(container).mapNotNull { it.tag as? String })
     }
 
     /** Arrows only on sides the app can still move to. */

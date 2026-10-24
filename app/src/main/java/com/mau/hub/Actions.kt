@@ -29,7 +29,7 @@ class Actions(private val a: MainActivity) {
                 val i = if (p.uri.startsWith("intent:")) Intent.parseUri(p.uri, Intent.URI_INTENT_SCHEME).apply {
                     component = null; selector = null // remote data: only ever let it reach the target app
                 } else Intent(Intent.ACTION_VIEW, Uri.parse(p.uri))
-                a.startActivity(i.setPackage(p.pkg))
+                a.startActivity(i.setPackage(hub.pkgFor(p.pkg) ?: p.pkg)) // the TV or phone/tablet version, whichever is installed
             } catch (_: ActivityNotFoundException) { a.apps.launch(p.pkg) }
             is Play.JellyLive -> {
                 a.toast("Tuning in…")
@@ -39,8 +39,9 @@ class Actions(private val a: MainActivity) {
                         s.onSuccess {
                             a.startActivity(Intent(a, PlayerActivity::class.java).putExtra("url", it.url).putExtra("key", hub.jfKey)
                                 .putExtra("server", hub.server).putExtra("liveStreamId", it.id)
-                                // this TV's MPEG-2 hardware decoder is unusable (MediaCodec can't create it): VLC decodes those in software
-                                .putExtra("vlc", it.videoCodec in setOf("mpeg2video", "mpeg1video")))
+                                // this TV's MPEG-2 hardware decoder is unusable (MediaCodec can't create it): VLC decodes those in software.
+                                // Phones and tablets have Android's own software MPEG-2 decoder, so they keep our player (VLC if it errors).
+                                .putExtra("vlc", !hub.touch && it.videoCodec in setOf("mpeg2video", "mpeg1video")))
                         }.onFailure { a.toast("Couldn't start this channel: ${it.message}") }
                     }
                 }
@@ -75,7 +76,7 @@ class Actions(private val a: MainActivity) {
     /** "Connect" tiles on Home for services that are installed but not signed in yet. */
     fun connectEntries(): List<Pair<Item, () -> Unit>> = buildList {
         fun tile(source: Source, pkg: String) = Item(source, "Connect ${source.label}", Play.App(pkg), wide = true,
-            icon = runCatching { a.packageManager.getApplicationBanner(pkg) ?: a.packageManager.getApplicationIcon(pkg) }.getOrNull())
+            icon = runCatching { (hub.pkgFor(pkg) ?: pkg).let { a.packageManager.getApplicationBanner(it) ?: a.packageManager.getApplicationIcon(it) } }.getOrNull())
         if (hub.jfKey.isEmpty() && hub.installed(Links.JELLYFIN)) add(tile(Source.JELLYFIN, Links.JELLYFIN) to ::quickConnect)
         if (!hub.connected("google") && hub.installed(Links.SMARTTUBE)) add(tile(Source.YOUTUBE, Links.SMARTTUBE) to { ConnectScreen(a).show() })
         if (!hub.connected("spotify") && hub.installed(Links.SPOTIFY)) add(tile(Source.SPOTIFY, Links.SPOTIFY) to { ConnectScreen(a).show() })

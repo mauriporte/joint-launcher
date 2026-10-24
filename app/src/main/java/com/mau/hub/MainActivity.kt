@@ -24,7 +24,7 @@ class MainActivity : Activity() {
     val apps by lazy { Apps(hub, images) }
     val catalog by lazy { Catalog(hub, apps) }
     val meta by lazy { Meta(hub) }
-    val cards by lazy { Cards(this, images, apps) }
+    val cards by lazy { Cards(this, images, apps, hub.touch) }
     val actions by lazy { Actions(this) }
     lateinit var rows: Rows
     lateinit var sidebar: Sidebar
@@ -82,7 +82,7 @@ class MainActivity : Activity() {
         topBar = TopBar(this)
         detail = DetailScreen(this)
         rows = Rows(this)
-        moveMode = MoveMode(this) { container, order ->
+        moveMode = MoveMode(this, hub.touch) { container, order ->
             apps.saveOrder(order)
             if (container === sidebar.rail) rowsDirty = true // Home rows follow the sidebar: reorder them when it closes
             else sidebar.dirty = true // the sidebar picks the new order up next time it opens
@@ -90,17 +90,27 @@ class MainActivity : Activity() {
         nowPlaying = NowPlaying(this) { rows.nowPlaying(it) }
 
         // Layout budget (960x540dp): 46dp top bar + 136dp header + two ~178dp rows still fit without scrolling.
+        // Touchscreens: no header (it follows the remote's focus, and a tap opens the title straight away), so more rows fit.
+        val touch = hub.touch
         page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(topBar.view, LinearLayout.LayoutParams(-1, dp(36)).apply { topMargin = dp(10) })
-            addView(heroText, LinearLayout.LayoutParams(-1, dp(136)))
+            addView(topBar.view, LinearLayout.LayoutParams(-1, dp(if (touch) 52 else 36)).apply { topMargin = dp(if (touch) 6 else 10) })
+            if (!touch) addView(heroText, LinearLayout.LayoutParams(-1, dp(136)))
             addView(rows.view, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(BG)
-            addView(heroImg, FrameLayout.LayoutParams(-1, dp(320), Gravity.END).apply { leftMargin = dp(300) })
-            addView(View(this@MainActivity).apply { background = fade() }, FrameLayout.LayoutParams(-1, -1))
-            addView(View(this@MainActivity).apply { background = fadeDown() }, FrameLayout.LayoutParams(-1, dp(320)))
+            if (!touch) {
+                addView(heroImg, FrameLayout.LayoutParams(-1, dp(320), Gravity.END).apply { leftMargin = dp(300) })
+                addView(View(this@MainActivity).apply { background = fade() }, FrameLayout.LayoutParams(-1, -1))
+                addView(View(this@MainActivity).apply { background = fadeDown() }, FrameLayout.LayoutParams(-1, dp(320)))
+            }
+            // Android 15 draws apps under the status and navigation bars (tablets, phones); keep clear of them. TVs have none.
+            if (android.os.Build.VERSION.SDK_INT >= 30) setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
             addView(page, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(20) })
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(RAIL_DP + 8), -1))
@@ -223,11 +233,11 @@ class MainActivity : Activity() {
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
-                MoveMode.holdMenu(this, tile, beside = false, listOf(
-                    "Open" to { app.pkg?.let(apps::launch) ?: Unit },
-                    "Move" to { moveMode.start(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout) },
-                    "App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit },
-                ))
+                MoveMode.holdMenu(this, tile, beside = false,
+                    listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
+                        moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout) +
+                        ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
+                )
             }
             tile.setOnKeyListener { v, code, e ->
                 if (code == KeyEvent.KEYCODE_DPAD_LEFT && e.action == KeyEvent.ACTION_DOWN && strip.indexOfChild(v) == 0) { sidebar.focus(); true } else false

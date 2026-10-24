@@ -51,11 +51,13 @@ internal fun Context.button(label: String, onClick: () -> Unit) = text(15f, Colo
     text = label; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); gravity = Gravity.CENTER
     setPadding(dp(24), dp(10), dp(24), dp(10))
     background = StateListDrawable().apply {
+        // selected = the main action on touchscreens, where nothing has focus to light it up
         addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.WHITE) })
+        addState(intArrayOf(android.R.attr.state_selected), GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.WHITE) })
         addState(intArrayOf(), GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(0x26FFFFFF) })
     }
     isFocusable = true; isClickable = true
-    setOnFocusChangeListener { _, f -> setTextColor(if (f) Color.BLACK else Color.WHITE) }
+    setOnFocusChangeListener { _, f -> setTextColor(if (f || isSelected) Color.BLACK else Color.WHITE) }
     setOnClickListener { onClick() }
     layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(12) }
 }

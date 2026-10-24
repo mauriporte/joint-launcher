@@ -98,6 +98,14 @@ class PhonePage(
                     "Now open <a href=\"https://${d.url.removePrefix("https://")}\">${d.url.removePrefix("https://")}</a> and enter <b style=\"font-size:1.6em\">${d.userCode}</b><br>(it's on the TV too). Come back here or look at the TV once you've approved."
                 })
             }
+            // the same accounts, for setting up another device (tablet) from this one; same random path, only while the screen is open
+            "/export" -> {
+                val form = (ACCOUNT_KEYS.mapNotNull { k -> hub.prefs.getString(k, null)?.let { k to it } } +
+                    IMPORT_SETS.mapNotNull { k -> hub.prefs.getStringSet(k, null)?.let { k to it.joinToString("\n") } })
+                    .joinToString("&") { (k, v) -> "$k=" + java.net.URLEncoder.encode(v, "UTF-8") }.toByteArray()
+                out.write("HTTP/1.1 200 OK\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: ${form.size}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".toByteArray())
+                out.write(form); out.flush()
+            }
             "/import" -> send(out, 200, result {
                 // moving from the old Joint Launcher: its logins and orders, sent once from the PC (README); only these keys
                 val e = hub.prefs.edit()
@@ -201,5 +209,10 @@ class PhonePage(
             "app_order", "row_order", "app_filter",
         )
         private val IMPORT_SETS = listOf("hidden_rows", "extra_rows")
+        /** What /export hands to another device: the accounts that aren't tied to this device (Jellyfin signs in per device). */
+        private val ACCOUNT_KEYS = listOf(
+            "stremio", "seerr_url", "seerr_key",
+            "spotify_client_id", "spotify_refresh", "google_client_id", "google_client_secret", "google_refresh",
+        )
     }
 }

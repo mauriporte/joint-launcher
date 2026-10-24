@@ -35,10 +35,20 @@ class TopBar(private val a: MainActivity) {
     val view = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(30), 0, a.dp(36), 0)
-        addView(search)
-        addView(tabStrip)
-        addView(gear)
-        addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+        if (a.hub.touch) {
+            // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
+            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8) })
+            addView(search.also { touchSize(it) })
+            addView(android.widget.HorizontalScrollView(a).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL; addView(tabStrip); addView(gear.also { touchSize(it) }) })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
+        } else {
+            addView(search)
+            addView(tabStrip)
+            addView(gear)
+            addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+        }
         addView(weather)
         addView(android.widget.TextClock(a).apply {
             format24Hour = "HH:mm"; format12Hour = "h:mm"
@@ -50,6 +60,14 @@ class TopBar(private val a: MainActivity) {
     private val tabSwitch = Runnable { pendingTab?.let(a::selectTab) }
 
     init { refreshWeather() }
+
+    /** Fingers need bigger targets than a remote's focus: 44dp buttons, 10dp inset icon. */
+    private fun touchSize(v: View) {
+        v.layoutParams = LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginEnd = a.dp(4) }
+        v.setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
+    }
+
+    private fun marginEnd(v: View, d: Int) { (v.layoutParams as LinearLayout.LayoutParams).marginEnd = a.dp(d) }
 
     /** Top-bar icons: nothing behind them at rest, a white circle when focused (same as the tabs' pill). */
     private fun iconBackground() = StateListDrawable().apply {
@@ -64,7 +82,8 @@ class TopBar(private val a: MainActivity) {
             tabStrip.addView(a.text(14f, if (isSel) Color.WHITE else TEXT_MUTED).apply {
                 text = t.label
                 typeface = Typeface.create(if (isSel) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
-                setPadding(a.dp(12), a.dp(5), a.dp(12), a.dp(5))
+                val pv = a.dp(if (a.hub.touch) 12 else 5) // taller tap target on touchscreens
+                setPadding(a.dp(12), pv, a.dp(12), pv)
                 background = StateListDrawable().apply {
                     addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply { cornerRadius = a.dp(16).toFloat(); setColor(Color.WHITE) })
                 }

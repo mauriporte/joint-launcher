@@ -29,7 +29,10 @@ class Sidebar(private val a: MainActivity) {
         setBackgroundColor(0xF2050505.toInt()) // solid panel; the content behind is dimmed while it is open
         addView(rail)
     }
-    val dim = View(a).apply { setBackgroundColor(0xB3000000.toInt()); visibility = View.GONE }
+    val dim = View(a).apply {
+        setBackgroundColor(0xB3000000.toInt()); visibility = View.GONE
+        setOnClickListener { hide() } // touchscreens: tap outside the panel to close it
+    }
 
     /** Rebuilt on first open after each home load (installed apps / connections may have changed). */
     var dirty = true
@@ -45,7 +48,7 @@ class Sidebar(private val a: MainActivity) {
         apps.forEach { app ->
             lateinit var v: FrameLayout
             v = item(null, app.label, app.key, selected = app.filter == current, onLongClick = {
-                MoveMode.holdMenu(a, v, beside = true, listOf("Open" to { a.pickApp(app.filter) }, "Move" to { a.moveMode.start(v, rail, horizontal = false, host = v) }))
+                MoveMode.holdMenu(a, v, beside = true, listOf("Open" to { a.pickApp(app.filter) }) + a.moveMode.options(v, rail, horizontal = false, host = v))
             }) { a.pickApp(app.filter) }
             val icon = v.getChildAt(1) as ImageView
             app.logo?.let { a.apps.logoInto(it, icon) }

@@ -393,9 +393,12 @@ object Sources {
 
     // ---- Streaming providers via JustWatch (see PROVIDERS) ----
 
-    private const val JW_QUERY = "query P(\$c:Country!,\$l:Language!,\$f:TitleFilter,\$s:PopularTitlesSorting!){popularTitles(country:\$c,first:40,filter:\$f,sortBy:\$s){edges{node{objectType " +
+    /** Which app version JustWatch's links should open: "ANDROID_TV", or "ANDROID" on phones and tablets (set by Hub). */
+    @Volatile var jwPlatform = "ANDROID_TV"
+
+    private val JW_QUERY get() ="query P(\$c:Country!,\$l:Language!,\$f:TitleFilter,\$s:PopularTitlesSorting!){popularTitles(country:\$c,first:40,filter:\$f,sortBy:\$s){edges{node{objectType " +
         "content(country:\$c,language:\$l){title shortDescription originalReleaseYear posterUrl backdrops{backdropUrl} externalIds{imdbId tmdbId} scoring{imdbScore tomatoMeter}}" +
-        "offers(country:\$c,platform:WEB){package{technicalName} deeplinkURL(platform:ANDROID_TV) standardWebURL}}}}}"
+        "offers(country:\$c,platform:WEB){package{technicalName} deeplinkURL(platform:$jwPlatform) standardWebURL}}}}}"
 
     /** objectType "MOVIE"/"SHOW" narrows it; sortBy "POPULAR" or "IMDB_SCORE"; minYear keeps only recent releases. */
     fun streaming(

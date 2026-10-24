@@ -18,13 +18,13 @@ class Apps(private val hub: Hub, private val images: Images) {
     private val pm get() = hub.ctx.packageManager
 
     /** Which single-app view an installed app maps to (null = no content here, just launch it). */
-    fun filterFor(pkg: String): String? = when (pkg) {
+    fun filterFor(pkg: String): String? = when (Links.canonical(pkg)) {
         Links.JELLYFIN -> "jellyfin".takeIf { hub.jfKey.isNotEmpty() }
         Links.STREMIO -> "stremio"
         Links.SMARTTUBE -> "youtube".takeIf { hub.connected("google") }
         Links.SPOTIFY -> "spotify".takeIf { hub.connected("spotify") }
         Links.GEESPORTS -> "geesports"
-        else -> PROVIDERS.firstOrNull { it.pkg == pkg }?.source?.name
+        else -> PROVIDERS.firstOrNull { it.pkg == Links.canonical(pkg) }?.source?.name
     }
 
     @Volatile private var cache: Pair<Long, List<SideApp>>? = null
@@ -33,7 +33,7 @@ class Apps(private val hub: Hub, private val images: Images) {
     fun all(): List<SideApp> {
         // scanning packages and reading ~25 labels is the slow part; reuse it for 30s (rail, rows and focus all ask)
         val apps = cache?.takeIf { System.currentTimeMillis() - it.first < 30_000 }?.second
-            ?: pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
+            ?: pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(if (hub.touch) Intent.CATEGORY_LAUNCHER else Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
                 .map { it.activityInfo.packageName }.distinct().filter { it != hub.ctx.packageName && hub.installed(it) }
                 .map { pkg ->
                     val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
@@ -60,8 +60,10 @@ class Apps(private val hub: Hub, private val images: Images) {
     fun saveOrder(moved: List<String>) =
         hub.prefs.edit().putString("app_order", (moved + savedOrder().filter { it !in moved }).joinToString("\n")).apply()
 
+    /** Opens the app (its TV or phone/tablet version, whichever is installed). */
     fun launch(pkg: String) {
-        val i = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
+        val p = hub.pkgFor(pkg) ?: pkg
+        val i = (if (hub.touch) null else pm.getLeanbackLaunchIntentForPackage(p)) ?: pm.getLaunchIntentForPackage(p)
         if (i != null) hub.ctx.startActivity(i) else hub.ctx.toast("$pkg is not installed")
     }
 
@@ -70,7 +72,7 @@ class Apps(private val hub: Hub, private val images: Images) {
     private val iconCache = HashMap<String, Drawable>() // UI thread only
 
     /** Our own icons for a few apps whose TV icons are banners or hard to read at sidebar size. */
-    private fun customIcon(pkg: String?): Drawable? = when (pkg) {
+    private fun customIcon(pkg: String?): Drawable? = when (pkg?.let(Links::canonical)) {
         Links.NETFLIX -> hub.ctx.getDrawable(R.drawable.ic_netflix)
         Links.SMARTTUBE -> hub.ctx.getDrawable(R.drawable.ic_youtube)
         PROVIDERS.first { it.source == Source.PRIME }.pkg -> primeIcon()

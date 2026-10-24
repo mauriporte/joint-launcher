@@ -39,6 +39,17 @@ Shows what Spotify (or any app) is playing. It needs notification access, which 
 adb shell cmd notification allow_listener com.mau.hub.redesign/com.mau.hub.NowPlayingListener
 ```
 
+### Tablets and phones
+
+The same app works on touchscreens and adapts by itself: a ☰ button opens the sidebar (tap outside to close it), no
+focus header, tabs scroll in portrait, both orientations, and long-press → Move earlier / later to reorder apps. It
+opens the phone/tablet versions of the apps (Netflix, Prime Video, Spotify, Jellyfin, and ReVanced or YouTube instead
+of SmartTube), and MPEG-2 channels play in its own player (Android's software decoder) with VLC only as a fallback.
+To make it the home screen: Settings → Apps → Default apps → Home app. No Home-button service needed there.
+
+To copy accounts from the TV: open Connect accounts on both, then GET the TV page's address + `/export` and POST
+that to the tablet page's address + `/import`.
+
 ## Connecting accounts
 
 Settings → **Connect accounts** shows a QR code. Scan it with your phone (on the same Wi-Fi) to open a page served by

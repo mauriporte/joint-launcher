@@ -263,6 +263,13 @@ class RowOrderTest {
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
     }
 
+    @Test fun mobileAppsStandForTheirTvApps() {
+        assertEquals(Links.SPOTIFY, Links.canonical("com.spotify.music"))
+        assertEquals(Links.SMARTTUBE, Links.canonical("com.android.youtube.premium")) // ReVanced counts as YouTube
+        assertEquals("com.stremio.one", Links.canonical("com.stremio.one")) // same package everywhere
+        assertEquals("com.android.youtube.premium", Links.MOBILE.getValue(Links.SMARTTUBE).first()) // ReVanced preferred
+    }
+
     @Test fun continueWatchingOneTilePerShow() {
         fun ep(n: Int, pos: Long) = Item(Source.JELLYFIN, "Pluribus", Play.Jelly("e$n", pos, false))
         val resume = Result.success(listOf(ep(1, 1_800_000)))

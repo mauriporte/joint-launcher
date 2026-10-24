@@ -73,6 +73,11 @@ class ConnectScreen(private val a: MainActivity) {
                 addView(googleCode, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(12) })
                 addView(LinearLayout(a).apply {
                     setPadding(0, a.dp(24), 0, 0)
+                    // on a tablet or phone, the page can open right here in the browser (it's served by this same device)
+                    if (hub.touch) addView(a.button("Open here") {
+                        runCatching { a.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(page.url))) }
+                            .onFailure { a.toast("No browser to open it with") }
+                    })
                     addView(a.button(if (hub.jfKey.isEmpty()) "Connect Jellyfin" else "Reconnect Jellyfin") { a.actions.quickConnect() })
                     addView(a.button("Done") { dialog.dismiss() })
                 })

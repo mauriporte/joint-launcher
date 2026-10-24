@@ -26,8 +26,18 @@ class Hub(val ctx: Context) {
     // replace, not format(): search terms arrive URL-encoded ("%20h" would be read as a format specifier)
     fun jf(path: String): List<Item> = Sources.jellyfin(server, jfKey, path.replace("%s", jfUser()))
 
+    /** Phone or tablet (touchscreen, no TV remote UI): different app versions, links and layout. */
+    val touch = !ctx.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+
+    init { Sources.jwPlatform = if (touch) "ANDROID" else "ANDROID_TV" } // catalogue links that open the right app version
+
     // disabled counts as not installed: TVs ship apps like Prime Video preinstalled but switched off
-    fun installed(pkg: String) = runCatching { ctx.packageManager.getApplicationInfo(pkg, 0).enabled }.getOrDefault(false)
+    private fun enabled(pkg: String) = runCatching { ctx.packageManager.getApplicationInfo(pkg, 0).enabled }.getOrDefault(false)
+
+    /** The installed version of an app: the TV package, or its phone/tablet version ([Links.MOBILE]); null if none. */
+    fun pkgFor(pkg: String) = (listOf(pkg) + Links.MOBILE[pkg].orEmpty()).firstOrNull(::enabled)
+
+    fun installed(pkg: String) = pkgFor(pkg) != null
 
     fun providers() = PROVIDERS.filter { installed(it.pkg) }
 

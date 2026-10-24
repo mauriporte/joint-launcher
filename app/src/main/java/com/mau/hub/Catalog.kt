@@ -180,7 +180,7 @@ class Catalog(private val hub: Hub, private val apps: Apps) {
     /** Home rows grouped by app in the sidebar's order (Continue watching and Live TV stay on top); the saved order applies within an app. */
     fun homeRows(gen: Int): List<RowDef> {
         val rows = available(gen).associateBy { it.title }
-        val side = apps.sidebar().map { it.pkg ?: it.logo?.pkg }
+        val side = apps.sidebar().map { (it.pkg ?: it.logo?.pkg)?.let(Links::canonical) } // rows name TV packages
         fun rank(r: RowDef) = if (r.pkg == null || r.title.startsWith("Live TV")) -1 else side.indexOf(r.pkg).let { if (it < 0) side.size else it }
         return RowOrder.apply(rows.keys.toList(), savedOrder()).map(rows::getValue).sortedBy(::rank)
     }
