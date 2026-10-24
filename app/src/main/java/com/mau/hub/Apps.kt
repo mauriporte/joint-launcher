@@ -42,8 +42,23 @@ class Apps(private val hub: Hub, private val images: Images) {
                 }
                 .sortedWith(compareBy({ it.filter == null }, { it.label.lowercase() })) // default before any saved/Google TV order
                 .also { cache = System.currentTimeMillis() to it }
-        val byKey = apps.associateBy { it.key }
+        // your own display names (Rename in the hold menu) replace the apps' labels everywhere
+        val byKey = apps.associateBy { it.key }.mapValues { (k, app) -> displayName(k)?.let { SideApp(app.key, it, app.filter, app.pkg, app.logo) } ?: app }
         return RowOrder.apply(apps.map { it.key }, savedOrder()).map(byKey::getValue)
+    }
+
+    fun displayName(key: String): String? = hub.prefs.getString("label_$key", null)
+    fun setDisplayName(key: String, name: String?) =
+        hub.prefs.edit().apply { if (name.isNullOrBlank()) remove("label_$key") else putString("label_$key", name.trim()) }.apply()
+
+    /** Hold menu → Rename: your name for the app on screen (empty, or "Original name", goes back to the app's own). */
+    fun rename(a: MainActivity, app: SideApp, onDone: () -> Unit) {
+        val input = android.widget.EditText(a).apply { setText(app.label); isSingleLine = true; selectAll() }
+        android.app.AlertDialog.Builder(a).setTitle("Rename")
+            .setView(android.widget.LinearLayout(a).apply { setPadding(a.dp(24), a.dp(8), a.dp(24), 0); addView(input, android.widget.LinearLayout.LayoutParams(-1, -2)) })
+            .setPositiveButton("Save") { _, _ -> setDisplayName(app.key, input.text.toString()); onDone() }
+            .setNeutralButton("Original name") { _, _ -> setDisplayName(app.key, null); onDone() }
+            .setNegativeButton("Cancel", null).show()
     }
 
     /** Sidebar: apps with content here (they filter the home screen) plus every streaming service's catalogue, installed or not. */

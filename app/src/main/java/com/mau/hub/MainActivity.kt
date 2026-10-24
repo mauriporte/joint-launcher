@@ -370,6 +370,7 @@ class MainActivity : Activity() {
                             )
                         } ?: emptyList()) +
                         ("Change icon" to { IconPicker.forApp(this, app) { sidebar.dirty = true; loadHome() } ?: Unit }) +
+                        ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshApps() } }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
             }

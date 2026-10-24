@@ -51,7 +51,8 @@ class Sidebar(private val a: MainActivity) {
             lateinit var v: FrameLayout
             v = item(null, app.label, app.key, selected = app.filter == current, onLongClick = {
                 MoveMode.holdMenu(a, v, beside = true, listOf("Open" to { a.pickApp(app.filter) }) + a.moveMode.options(v, rail, horizontal = false, host = v) +
-                    listOfNotNull(app.pkg?.let { "Change icon" to { IconPicker.forApp(a, app) { dirty = true; a.loadHome() } ?: Unit } }))
+                    listOfNotNull(app.pkg?.let { "Change icon" to { IconPicker.forApp(a, app) { dirty = true; a.loadHome() } ?: Unit } },
+                        app.pkg?.let { "Rename" to { a.apps.rename(a, app) { dirty = true; a.refreshApps() } } }))
             }) { a.pickApp(app.filter) }
             val icon = v.getChildAt(1) as ImageView
             app.logo?.let { a.apps.logoInto(it, icon) }
