@@ -312,7 +312,7 @@ class MainActivity : Activity() {
                         listOfNotNull(app.pkg?.takeIf { hub.touch }?.let { pkg ->
                             (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() }
                         }) +
-                        ("Change icon" to { IconPicker(this, app) { sidebar.dirty = true; loadHome() }.show() }) +
+                        ("Change icon" to { IconPicker.forApp(this, app) { sidebar.dirty = true; loadHome() } ?: Unit }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
             }

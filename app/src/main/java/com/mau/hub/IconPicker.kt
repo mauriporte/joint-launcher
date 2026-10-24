@@ -18,10 +18,14 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 /**
- * Pick an app's icon from any installed icon pack: a searchable grid of the pack's icons, a button per pack, and
- * "App's own icon" to undo. onDone runs after a choice so the screen can show it.
+ * Pick an icon from any installed icon pack: a searchable grid of the pack's icons, a button per pack, and a reset
+ * button (the app's own icon, or a Home section's default). onPick gets (pack, icon) or (null, null) for the reset,
+ * plus whether to recolour it in the app's colour (apps only).
  */
-class IconPicker(private val a: MainActivity, private val app: SideApp, private val onDone: () -> Unit) {
+class IconPicker(
+    private val a: MainActivity, private val title: String, private val hint: String, private val resetLabel: String,
+    private val forApp: Boolean, private val onPick: (String?, String?, Boolean) -> Unit,
+) {
     private val packs = a.apps.packs
     private var pack: String? = null
     private var names: List<String> = emptyList()
@@ -33,7 +37,6 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
     }
 
     fun show() {
-        val pkg = app.pkg ?: return
         val installed = packs.installed()
         if (installed.isEmpty()) return a.toast("No icon packs installed")
         val dialog = Dialog(a, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
@@ -67,7 +70,7 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
                         a.hub.main.post { cache.put("$p|$name", d); if (img.tag == name) img.setImageDrawable(d) }
                     }
                 }
-                box.setOnClickListener { packs.setOverride(pkg, p, name, appColour.isChecked); done(dialog, pkg) }
+                box.setOnClickListener { dialog.dismiss(); onPick(p, name, appColour.isChecked) }
             }
         }
         grid.adapter = adapter
@@ -79,7 +82,7 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
             }
         }
         val search = EditText(a).apply {
-            hint = "Search icons (e.g. ${app.label.lowercase().substringBefore(' ')})"; isSingleLine = true; textSize = 16f
+            hint = "Search icons (e.g. $hint)"; isSingleLine = true; textSize = 16f
             setTextColor(Color.WHITE); setHintTextColor(TEXT_MUTED)
             addTextChangedListener(object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
@@ -92,12 +95,12 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
         }
         dialog.setContentView(LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL; setBackgroundColor(BG); setPadding(a.dp(16), a.dp(16), a.dp(16), 0)
-            addView(a.text(24f, Color.WHITE).apply { text = "Icon for ${app.label}"; typeface = Typeface.create("sans-serif", Typeface.BOLD) })
+            addView(a.text(24f, Color.WHITE).apply { text = title; typeface = Typeface.create("sans-serif", Typeface.BOLD) })
             addView(LinearLayout(a).apply {
                 gravity = Gravity.CENTER_VERTICAL; setPadding(0, a.dp(12), 0, a.dp(8))
                 installed.forEach { (p, label) -> addView(a.button(label) { load(p) }) }
-                addView(a.button("App's own icon") { packs.setOverride(pkg, null, null); done(dialog, pkg) })
-                addView(appColour, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8) })
+                addView(a.button(resetLabel) { dialog.dismiss(); onPick(null, null, false) })
+                if (forApp) addView(appColour, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8) })
             })
             addView(search, LinearLayout.LayoutParams(-1, a.dp(52)))
             addView(count, LinearLayout.LayoutParams(-2, -2).apply { setMargins(a.dp(4), a.dp(4), 0, a.dp(8)) })
@@ -107,8 +110,12 @@ class IconPicker(private val a: MainActivity, private val app: SideApp, private 
         load(packs.active()?.takeIf { p -> installed.any { it.first == p } } ?: installed.first().first)
     }
 
-    private fun done(d: Dialog, pkg: String) {
-        a.apps.forgetIcon(pkg)
-        d.dismiss(); onDone()
+    companion object {
+        /** An app's icon: saved as its override (see IconPacks), then onDone redraws the screen. */
+        fun forApp(a: MainActivity, app: SideApp, onDone: () -> Unit) = app.pkg?.let { pkg ->
+            IconPicker(a, "Icon for ${app.label}", app.label.lowercase().substringBefore(' '), "App's own icon", true) { pack, name, colour ->
+                a.apps.packs.setOverride(pkg, pack, name, colour); a.apps.forgetIcon(pkg); onDone()
+            }.show()
+        }
     }
 }

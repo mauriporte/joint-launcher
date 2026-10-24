@@ -198,19 +198,28 @@ class Rows(private val a: MainActivity) {
     }
 
     /**
-     * Tablet section header (Apps, To Watch...): title (unless hidden) on the left, a round dropdown arrow on the right, like a Home
-     * Assistant collapsible card. The whole header is the tap target; the arrow points down when folded, up when open.
+     * Tablet section header (Apps, To Watch...): its name (yours, see Settings) on the left, or its icon when titles are
+     * off, and a round dropdown arrow on the right, like a Home Assistant collapsible card. The whole header is the tap
+     * target; the arrow points down when folded, up when open.
      */
-    private fun foldHeader(title: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit) = LinearLayout(a).apply {
+    private fun foldHeader(key: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit) = LinearLayout(a).apply {
+        val title = TabletSettings.name(a.hub, key)
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
         isClickable = true; setOnClickListener { toggle() }
         contentDescription = (if (folded) "Show " else "Hide ") + title
-        // the titles can be switched off from the top bar's text button; the buttons stay on the right either way
+        // titles switch off from the top bar's text button (or Settings): the section's icon, styled like the buttons, instead
         if (a.hub.prefs.getBoolean("section_titles", true)) addView(a.text(22f, Color.WHITE).apply {
             text = title; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        else addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+        else {
+            addView(roundButton(0, title) { toggle() }.apply {
+                setImageDrawable(TabletSettings.icon(a, key)); setColorFilter(Color.WHITE)
+                setPadding(a.dp(5), a.dp(5), a.dp(5), a.dp(5)) // pack icons carry their own margin
+            },
+                LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
+            addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+        }
         extra.forEach { addView(it, LinearLayout.LayoutParams(a.dp(48), a.dp(48)).apply { marginEnd = a.dp(10) }) }
         addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { toggle() }.apply {
             rotation = if (folded) 90f else 270f // ic_chevron points right
@@ -316,7 +325,7 @@ class Rows(private val a: MainActivity) {
                             val heart = roundButton(if (favsOnly) R.drawable.ic_favorite else R.drawable.ic_favorite_border,
                                 if (favsOnly) "Show all apps" else "Show favorite apps") { a.apps.favouritesOnly = !favsOnly; draw(); a.refreshApps() }
                                 .apply { if (favsOnly) setColorFilter(0xFFE53935.toInt()) }
-                            head = foldHeader(if (favsOnly) "Favorites" else "Apps", folded(), listOf(heart)) { a.hub.prefs.edit().putBoolean("apps_folded", !folded()).apply(); draw() }
+                            head = foldHeader(if (favsOnly) "favorites" else "apps", folded(), listOf(heart)) { a.hub.prefs.edit().putBoolean("apps_folded", !folded()).apply(); draw() }
                             addView(head, i, LinearLayout.LayoutParams(-1, -2))
                         }
                         head = View(a); addView(head); draw()
@@ -331,7 +340,7 @@ class Rows(private val a: MainActivity) {
                 is HaRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
                     val folded = a.hub.prefs.getBoolean("ha_folded", false)
-                    addView(foldHeader("Home Assistant", folded) {
+                    addView(foldHeader("ha", folded) {
                         a.hub.prefs.edit().putBoolean("ha_folded", !folded).apply()
                         indexOf(m.id).takeIf { it >= 0 }?.let(adapter::notifyItemChanged)
                     }, LinearLayout.LayoutParams(-1, -2))
@@ -341,7 +350,7 @@ class Rows(private val a: MainActivity) {
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
-                    addView(foldHeader("To Watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
+                    addView(foldHeader("watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
                 }
                 is WidgetsRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
@@ -349,9 +358,11 @@ class Rows(private val a: MainActivity) {
                     val ids = w.ids()
                     val folded = a.hub.prefs.getBoolean("widgets_folded", false)
                     val add = roundButton(R.drawable.ic_add, "Add widget") { w.pick() }
-                    val edit = roundButton(R.drawable.ic_edit, if (w.editing) "Done removing" else "Remove widgets") { w.editing = !w.editing; refreshWidgets() }
-                        .apply { if (w.editing) (background as GradientDrawable).setColor(ACCENT) }
-                    addView(foldHeader("Widgets", folded, listOfNotNull(add, edit.takeIf { ids.isNotEmpty() })) {
+                    // while editing it's a green tick, so it reads as "done", not as another pencil
+                    val edit = roundButton(if (w.editing) R.drawable.ic_check else R.drawable.ic_edit, if (w.editing) "Done editing widgets" else "Edit widgets") {
+                        w.editing = !w.editing; refreshWidgets()
+                    }.apply { if (w.editing) (background as GradientDrawable).setColor(0xFF2E7D32.toInt()) }
+                    addView(foldHeader("widgets", folded, listOfNotNull(add, edit.takeIf { ids.isNotEmpty() })) {
                         a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
                     }, LinearLayout.LayoutParams(-1, -2))
                     if (folded) return

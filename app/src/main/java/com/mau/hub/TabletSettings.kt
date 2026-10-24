@@ -85,19 +85,35 @@ class TabletSettings(private val a: MainActivity) {
         line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
 
         heading("Home")
-        list.addView(a.text(15f, TEXT_SOFT).apply { text = "Order of the sections" })
+        list.addView(android.widget.Switch(a).apply {
+            text = "Show section titles (off: their icons instead)"; textSize = 16f; setTextColor(Color.WHITE)
+            isChecked = p.getBoolean("section_titles", true)
+            setOnCheckedChangeListener { _, on -> p.edit().putBoolean("section_titles", on).apply(); a.topBar.applyTitlesButton(); a.loadHome() }
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        list.addView(a.text(15f, TEXT_SOFT).apply { text = "Sections: tap the icon to change it, the name to rename it, arrows to reorder" },
+            LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
         val order = sections(hub)
         order.forEachIndexed { i, s ->
             list.addView(LinearLayout(a).apply {
                 gravity = Gravity.CENTER_VERTICAL; setPadding(0, a.dp(4), 0, a.dp(4))
-                addView(a.text(17f, Color.WHITE).apply { text = SECTIONS.getValue(s) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(android.widget.ImageView(a).apply {
+                    setImageDrawable(icon(a, s)); setColorFilter(Color.WHITE); contentDescription = "Change the icon of ${name(hub, s)}"
+                    setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
+                    background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+                    setOnClickListener { pickIcon(s) }
+                }, LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginEnd = a.dp(12) })
+                addView(a.text(17f, Color.WHITE).apply {
+                    text = name(hub, s) + "  ✎"; setPadding(0, a.dp(10), 0, a.dp(10)); isClickable = true; setOnClickListener { rename(s) }
+                }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(a.button("↑") { moveSection(order, i, RowOrder.UP) }.apply { isEnabled = i > 0; alpha = if (i > 0) 1f else 0.3f })
                 addView(a.button("↓") { moveSection(order, i, RowOrder.DOWN) }.apply {
                     isEnabled = i < order.size - 1; alpha = if (i < order.size - 1) 1f else 0.3f
                 }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8) })
             })
         }
-        line("To Watch", "Order and show/hide its rows") { a.chooseRows() }
+        // the Apps section's other name, shown while its heart is on
+        line("Favorites section name", name(hub, "favorites")) { rename("favorites") }
+        line(name(hub, "watch"), "Order and show/hide its rows") { a.chooseRows() }
 
         heading("Clock")
         val format = p.getString("clock_format", null)
@@ -165,6 +181,29 @@ class TabletSettings(private val a: MainActivity) {
         a.loadHome(); draw()
     }
 
+    /** Any icon from any installed pack for a Home section; "Default icon" goes back to the selected pack's. */
+    private fun pickIcon(key: String) {
+        if (a.apps.packs.installed().isEmpty()) return a.toast("No icon packs installed")
+        IconPicker(a, "Icon for ${name(hub, key)}", PACK_ICONS.getValue(key).substringBefore('_'), "Default icon", false) { pack, icon, _ ->
+            p.edit().apply { if (pack == null || icon == null) remove("section_icon_$key") else putString("section_icon_$key", "$pack|$icon") }.apply()
+            a.loadHome(); draw()
+        }.show()
+    }
+
+    /** Your own name for a Home section; empty goes back to the default. */
+    private fun rename(key: String) {
+        val input = EditText(a).apply { hint = DEFAULT_NAMES.getValue(key); isSingleLine = true; setText(p.getString("section_name_$key", "")) }
+        AlertDialog.Builder(a).setTitle("Rename “${name(hub, key)}”")
+            .setView(LinearLayout(a).apply { setPadding(a.dp(24), a.dp(8), a.dp(24), 0); addView(input, LinearLayout.LayoutParams(-1, -2)) })
+            .setPositiveButton("Save") { _, _ ->
+                val n = input.text.toString().trim()
+                p.edit().apply { if (n.isEmpty()) remove("section_name_$key") else putString("section_name_$key", n) }.apply()
+                a.loadHome(); draw()
+            }
+            .setNeutralButton("Default") { _, _ -> p.edit().remove("section_name_$key").apply(); a.loadHome(); draw() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
     private fun timeFormat(current: String?) {
         val values = listOf(null, "24", "12")
         AlertDialog.Builder(a).setTitle("Time format")
@@ -220,6 +259,23 @@ class TabletSettings(private val a: MainActivity) {
 
     companion object {
         val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "ha" to "Home Assistant", "watch" to "To Watch")
+        private val DEFAULT_NAMES = SECTIONS + ("favorites" to "Favorites")
+
+        /** A section's title on Home: your name for it, else the default. */
+        fun name(hub: Hub, key: String) = hub.prefs.getString("section_name_$key", null) ?: DEFAULT_NAMES.getValue(key)
+
+        // each section's icon in the icon pack (LineX names; most packs follow them), and a built-in one if the pack lacks it
+        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "asus_minimovie")
+        private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie)
+
+        /** The icon a section shows when titles are off: the one you picked, else the selected pack's, else a built-in one. */
+        fun icon(a: MainActivity, key: String): android.graphics.drawable.Drawable? {
+            val k = if (key == "favorites") "apps" else key // the Apps section keeps its icon while showing favorites
+            val packs = a.apps.packs
+            return a.hub.prefs.getString("section_icon_$k", null)?.split('|')?.takeIf { it.size == 2 }?.let { packs.drawable(it[0], it[1]) }
+                ?: packs.active()?.let { packs.drawable(it, PACK_ICONS.getValue(k)) }
+                ?: a.getDrawable(OWN_ICONS.getValue(k))
+        }
 
         /** Tablet Home's sections in your order (new ones join at the end). */
         fun sections(hub: Hub) = RowOrder.apply(SECTIONS.keys.toList(), hub.prefs.getString("home_sections", "")!!.split(",").filter(String::isNotEmpty))

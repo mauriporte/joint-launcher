@@ -15,6 +15,11 @@ class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
     // before the bar is built below: flipClock() fills clocks, init starts the weather timer
     private var clocks: List<android.widget.TextClock> = emptyList()
+    // tablet: shows/hides Home's section titles (icons instead); also a switch in Settings
+    private val titlesButton = a.iconButton(R.drawable.ic_text_fields, "Section titles") {
+        a.hub.prefs.edit().putBoolean("section_titles", !a.hub.prefs.getBoolean("section_titles", true)).apply()
+        applyTitlesButton(); a.loadHome()
+    }
     private val weatherTimer = Runnable { refreshWeather() }
     private val weather = a.text(14f, TEXT_SOFT).apply { setPadding(0, 0, a.dp(16), 0) }
     private val search = a.iconButton(R.drawable.ic_search, "Search") { a.searchBar.open() }.apply {
@@ -45,14 +50,7 @@ class TopBar(private val a: MainActivity) {
                 addView(tabStrip)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
-            addView(a.iconButton(R.drawable.ic_text_fields, "Section titles") {}.apply {
-                touchSize(this)
-                fun look() = a.hub.prefs.getBoolean("section_titles", true).also { on ->
-                    alpha = if (on) 1f else 0.4f; contentDescription = if (on) "Hide section titles" else "Show section titles"
-                }
-                look()
-                setOnClickListener { a.hub.prefs.edit().putBoolean("section_titles", !look()).apply(); look(); a.loadHome() }
-            })
+            addView(titlesButton.also { touchSize(it); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
             // same height and corner radius as the flip clock's cards; temperature first, then a bigger icon
             addView(weather.apply {
@@ -99,6 +97,13 @@ class TopBar(private val a: MainActivity) {
         applyClock()
     }
 
+
+    /** Bright while titles show, dimmed while they're off. */
+    fun applyTitlesButton() {
+        val on = a.hub.prefs.getBoolean("section_titles", true)
+        titlesButton.alpha = if (on) 1f else 0.4f
+        titlesButton.contentDescription = if (on) "Hide section titles" else "Show section titles"
+    }
 
     /** Settings' time format (device / 24 / 12 hour) and timezone (device's unless picked) on the flip clock. */
     fun applyClock() {
