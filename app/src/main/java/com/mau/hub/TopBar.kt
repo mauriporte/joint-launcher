@@ -45,11 +45,14 @@ class TopBar(private val a: MainActivity) {
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
             // the corner, right to left: flip clock, weather, settings gear
             addView(gear.also { touchSize(it) })
+            // same height and corner radius as the flip clock's cards; temperature first, then a bigger icon
             addView(weather.apply {
-                textSize = 22f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                setPadding(a.dp(14), a.dp(6), a.dp(14), a.dp(6))
-                background = GradientDrawable().apply { cornerRadius = a.dp(14).toFloat(); setColor(0x1FFFFFFF) }
-            }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
+                textSize = 26f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                gravity = Gravity.CENTER_VERTICAL; includeFontPadding = false
+                setPadding(a.dp(16), 0, a.dp(16), 0)
+                background = GradientDrawable().apply { cornerRadius = a.dp(8).toFloat(); setColor(0xFF1C1C1F.toInt()) }
+                elevation = a.dp(4).toFloat()
+            }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
             addView(flipClock())
         } else {
             addView(search)
@@ -89,6 +92,15 @@ class TopBar(private val a: MainActivity) {
     private val tabSwitch = Runnable { pendingTab?.let(a::selectTab) }
 
     init { refreshWeather() }
+
+    /** "⛅  17°" -> "17°  ⛅" with the icon larger, for the tablet corner card. */
+    private fun tabletWeather(text: String?): CharSequence {
+        val icon = text?.substringBefore("  ")?.takeIf { "  " in text } ?: return text.orEmpty()
+        val temp = text.substringAfter("  ")
+        return android.text.SpannableString("$temp  $icon").apply {
+            setSpan(android.text.style.RelativeSizeSpan(1.35f), length - icon.length, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
 
     /** Fingers need bigger targets than a remote's focus: 44dp buttons, 10dp inset icon. */
     private fun touchSize(v: View) {
@@ -150,7 +162,7 @@ class TopBar(private val a: MainActivity) {
                 }
                 Sources.weather(la, lo)
             }.getOrNull()
-            hub.main.post { weather.text = text.orEmpty() }
+            hub.main.post { weather.text = if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
         }
         hub.main.postDelayed({ refreshWeather() }, 30 * 60_000L)
     }
