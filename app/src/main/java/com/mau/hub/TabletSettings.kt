@@ -21,6 +21,7 @@ import java.util.TimeZone
 class TabletSettings(private val a: MainActivity) {
     private val hub get() = a.hub
     private val p get() = hub.prefs
+    private val device get() = if (hub.touch) "tablet" else "TV" // "Like the tablet" / "Like the TV"
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), 0, a.dp(24), a.dp(24)) }
     // made once so a redraw keeps what you've typed
     private val url = field("Jellyfin URL", hub.server)
@@ -117,9 +118,11 @@ class TabletSettings(private val a: MainActivity) {
                     setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
                     background = a.bareButton()
                     setOnClickListener { pickIcon(s) }
+                    if (!hub.touch) tvFocus(22)
                 }, LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginEnd = a.dp(12) })
                 addView(a.text(17f, Color.WHITE).apply {
                     text = name(hub, s) + "  ✎"; setPadding(0, a.dp(10), 0, a.dp(10)); isClickable = true; setOnClickListener { rename(s) }
+                    if (!hub.touch) tvFocus(8)
                 }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(a.button("↑") { moveSection(order, i, RowOrder.UP) }.apply { isEnabled = i > 0; alpha = if (i > 0) 1f else 0.3f })
                 addView(a.button("↓") { moveSection(order, i, RowOrder.DOWN) }.apply {
@@ -131,6 +134,7 @@ class TabletSettings(private val a: MainActivity) {
         line("Favorites section name", name(hub, "favorites")) { rename("favorites") }
         line(name(hub, "watch"), "Order and show/hide its rows") { a.chooseRows() }
 
+        if (hub.touch) {
         heading("Screen")
         fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
             text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)
@@ -139,6 +143,7 @@ class TabletSettings(private val a: MainActivity) {
         barSwitch("Hide the status bar (clock, Wi-Fi, battery)", "hide_status_bar")
         barSwitch("Hide the navigation bar (back, home, recents)", "hide_nav_bar")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Hidden bars come back for a moment with a swipe in from the edge" })
+        }
 
         heading("Backup")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Your layout, icons, names, favorites, hidden apps and settings in one file. Not included: sign-ins, placed widgets, background pictures." })
@@ -163,13 +168,13 @@ class TabletSettings(private val a: MainActivity) {
         heading("Clock")
         val format = p.getString("clock_format", null)
         val cornerSet = p.getInt("corner_widget", -1) >= 0
-        line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
+        if (hub.touch) line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
             val opts = arrayOf("Built-in clock", "Pick a widget (e.g. Flip Clock)")
             AlertDialog.Builder(a).setTitle("Corner clock").setItems(opts) { _, i -> if (i == 0) a.widgets.clearCorner() else a.widgets.pick(forCorner = true); draw() }.show()
         }
-        line("Time format", when (format) { "24" -> "24-hour (17:30)"; "12" -> "12-hour (05:30)"; else -> "Like the tablet" }) { timeFormat(format) }
+        line("Time format", when (format) { "24" -> "24-hour (17:30)"; "12" -> "12-hour (05:30)"; else -> "Like the $device" }) { timeFormat(format) }
         val tz = p.getString("clock_tz", null)
-        line("Timezone", tz?.replace('_', ' ') ?: "Like the tablet (${TimeZone.getDefault().id.replace('_', ' ')})") { timezone(tz) }
+        line("Timezone", tz?.replace('_', ' ') ?: "Like the $device (${TimeZone.getDefault().id.replace('_', ' ')})") { timezone(tz) }
 
         heading("Weather")
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
@@ -196,6 +201,7 @@ class TabletSettings(private val a: MainActivity) {
                         }
                         contentDescription = if (id == current) "Picture in use" else "Use this picture"
                         setOnClickListener { a.useBackground(id); draw() }
+                        if (!hub.touch) tvFocus(10)
                         setOnLongClickListener {
                             val portrait = if (a.bgFile(id, true).exists()) "Change portrait version" else "Add portrait version"
                             AlertDialog.Builder(a).setItems(arrayOf(portrait, "Remove")) { _, w ->
@@ -226,7 +232,8 @@ class TabletSettings(private val a: MainActivity) {
     /** "Label / current value" on the left, "Change" on the right; the whole line is the button. */
     private fun line(label: String, value: String, change: () -> Unit) = list.addView(LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL; setPadding(0, a.dp(6), 0, a.dp(6))
-        isClickable = true; setOnClickListener { change() }
+        // TV: the Change button takes focus, not the whole line
+        isClickable = hub.touch; if (hub.touch) setOnClickListener { change() }
         addView(LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
             addView(a.text(17f, Color.WHITE).apply { text = label })
@@ -302,7 +309,7 @@ class TabletSettings(private val a: MainActivity) {
     private fun timeFormat(current: String?) {
         val values = listOf(null, "24", "12")
         AlertDialog.Builder(a).setTitle("Time format")
-            .setSingleChoiceItems(arrayOf("Like the tablet", "24-hour (17:30)", "12-hour (05:30)"), values.indexOf(current)) { d, i ->
+            .setSingleChoiceItems(arrayOf("Like the $device", "24-hour (17:30)", "12-hour (05:30)"), values.indexOf(current)) { d, i ->
                 p.edit().putString("clock_format", values[i]).apply(); a.topBar.applyClock(); d.dismiss(); draw()
             }.show()
     }
@@ -312,7 +319,7 @@ class TabletSettings(private val a: MainActivity) {
         val zones = TimeZone.getAvailableIDs().filter { '/' in it && !it.startsWith("Etc/") && !it.startsWith("SystemV/") }.sorted()
         val values = listOf(null) + zones
         AlertDialog.Builder(a).setTitle("Timezone")
-            .setSingleChoiceItems((listOf("Like the tablet") + zones.map { it.replace('_', ' ') }).toTypedArray(), values.indexOf(current)) { d, i ->
+            .setSingleChoiceItems((listOf("Like the $device") + zones.map { it.replace('_', ' ') }).toTypedArray(), values.indexOf(current)) { d, i ->
                 p.edit().putString("clock_tz", values[i]).apply(); a.topBar.applyClock(); d.dismiss(); draw()
             }.show()
             .listView.setSelection(maxOf(0, values.indexOf(current) - 3))
@@ -411,5 +418,6 @@ class TabletSettings(private val a: MainActivity) {
 
         /** Tablet Home's sections in your order (new ones join at the end). */
         fun sections(hub: Hub) = RowOrder.apply(SECTIONS.keys.toList(), hub.prefs.getString("home_sections", "")!!.split(",").filter(String::isNotEmpty))
+            .filter { hub.touch || it == "apps" || it == "watch" } // the TV: just your apps and the video rows
     }
 }

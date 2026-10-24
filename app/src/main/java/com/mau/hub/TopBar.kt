@@ -15,6 +15,7 @@ class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
     // before the bar is built below: flipClock() fills clocks, init starts the weather timer
     private var clocks: List<android.widget.TextClock> = emptyList()
+    private val tvClock = android.widget.TextClock(a) // the TV's clock; Settings' format and timezone apply to it too
     // tablet corner: the built-in clock, or a widget you picked for it (Settings → Clock), e.g. Flip Clock's real flip clock
     private val corner = android.widget.FrameLayout(a)
     // tablet: shows/hides Home's section titles (icons instead); also a switch in Settings
@@ -98,12 +99,34 @@ class TopBar(private val a: MainActivity) {
             lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); a.loadHome() }
             applyLock()
         } else {
+            // TV, left to right: Joint Launcher's icon (opens the sidebar), the padlock, search (the sidebar, on its Search entry)
+            val menu = a.iconButton(R.drawable.icon_bare, "Menu") { a.sidebar.focus() }.apply {
+                layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
+                setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4)); background = iconBackground()
+                clearColorFilter(); onFocusChangeListener = null // keeps its own colours; the white circle shows focus
+                setOnKeyListener { _, code, e -> if (code == KeyEvent.KEYCODE_DPAD_LEFT && e.action == KeyEvent.ACTION_DOWN) { a.sidebar.focus(); true } else false }
+            }
+            addView(menu)
+            val lock = a.iconButton(R.drawable.ic_lock_open, "Lock the desktop") {}.apply {
+                layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
+                setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8)); background = iconBackground()
+            }
+            fun applyLock() {
+                val locked = a.desktopLocked()
+                lock.setImageResource(if (locked) R.drawable.ic_lock else R.drawable.ic_lock_open)
+                lock.contentDescription = if (locked) "Unlock the desktop" else "Lock the desktop"
+            }
+            lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); a.loadHome() }
+            applyLock()
+            addView(lock)
+            search.setOnKeyListener(null) // Left now goes to the padlock and the icon
+            search.setOnClickListener { a.sidebar.focus(Sidebar.SEARCH) }
             addView(search)
             addView(tabStrip)
             addView(gear)
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
             addView(weather)
-            addView(android.widget.TextClock(a).apply {
+            addView(tvClock.apply {
                 format24Hour = "HH:mm"; format12Hour = "h:mm"
                 textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             })
@@ -178,12 +201,15 @@ class TopBar(private val a: MainActivity) {
         val tz = a.hub.prefs.getString("clock_tz", null)
         clocks.firstOrNull()?.apply { format24Hour = if (f == "12") "hh" else "HH"; format12Hour = if (f == "24") "HH" else "hh" }
         clocks.forEach { it.timeZone = tz }
+        if (!a.hub.touch) tvClock.apply {
+            format24Hour = if (f == "12") "h:mm a" else "HH:mm"; format12Hour = if (f == "24") "HH:mm" else "h:mm a"; timeZone = tz
+        }
     }
 
     private var pendingTab: Tab? = null
     private val tabSwitch = Runnable { pendingTab?.let(a::selectTab) }
 
-    init { refreshWeather() }
+    init { refreshWeather(); if (!a.hub.touch) applyClock() }
 
     /** "⛅  17°" -> "17°  ⛅" with the icon larger, for the tablet corner card. */
     private fun tabletWeather(text: String?): CharSequence {

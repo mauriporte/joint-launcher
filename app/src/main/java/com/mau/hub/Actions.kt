@@ -5,9 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
-import android.text.InputType
-import android.widget.EditText
-import android.widget.LinearLayout
 
 /** What pressing things does: open a title in its app or our player, connect Jellyfin, the Settings dialog. */
 class Actions(private val a: MainActivity) {
@@ -117,28 +114,6 @@ class Actions(private val a: MainActivity) {
         runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }.onFailure { a.toast("Couldn't open Settings") }
     }
 
-    fun settings() {
-        if (hub.touch) return TabletSettings(a).show() // the tablet has room for everything on one screen
-        fun field(hint: String, value: String, password: Boolean = false) = EditText(a).apply {
-            this.hint = hint; setText(value); isSingleLine = true
-            if (password) inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        val url = field("Jellyfin URL", hub.server)
-        val key = field("Jellyfin API key (Dashboard → API Keys)", hub.jfKey)
-        val box = LinearLayout(a).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(8), a.dp(24), 0)
-            listOf(url, key).forEach(::addView)
-            addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
-        }
-        AlertDialog.Builder(a).setTitle("Settings").setView(box)
-            .setPositiveButton("Save") { _, _ ->
-                if (key.text.toString().trim() != hub.jfKey) hub.prefs.edit().remove("uid").apply() // manual key: look the user up again
-                hub.prefs.edit().putString("server", url.text.toString().trim()).putString("key", key.text.toString().trim()).apply()
-                hub.userId = null
-                a.loadHome()
-            }
-            // Jellyseerr, Stremio, Spotify and YouTube: signed in from your phone (QR code), nothing to type here
-            .setNeutralButton("Connect accounts") { _, _ -> ConnectScreen(a).show() }
-            .setNegativeButton("Cancel", null).show()
-    }
+    /** Settings: one panel with everything (TabletSettings), on the TV too. */
+    fun settings() = TabletSettings(a).show()
 }

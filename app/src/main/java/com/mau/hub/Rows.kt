@@ -211,7 +211,8 @@ class Rows(private val a: MainActivity) {
         val title = TabletSettings.name(a.hub, key)
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
-        isClickable = true; setOnClickListener { toggle() }
+        // TV: only the header's buttons take focus, the row itself is no target
+        isClickable = a.hub.touch; if (a.hub.touch) setOnClickListener { toggle() }
         contentDescription = (if (folded) "Show " else "Hide ") + title
         // titles switch off from the top bar's text button (or Settings): the section's icon, styled like the buttons, instead
         if (a.hub.prefs.getBoolean("section_titles", true)) addView(a.text(22f, Color.WHITE).apply {
@@ -226,17 +227,30 @@ class Rows(private val a: MainActivity) {
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
         }
         extra.forEach { addView(it, LinearLayout.LayoutParams(a.dp(48), a.dp(48)).apply { marginEnd = a.dp(10) }) }
-        addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { toggle() }.apply {
+        addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { refocus = key; toggle() }.apply {
             rotation = if (folded) 90f else 270f // ic_chevron points right
+            // TV: the section is rebuilt when it folds; the remote's focus stays on its arrow instead of jumping to the top
+            if (!a.hub.touch && refocus == key) { refocus = null; post { requestFocus() } }
         }, LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
     }
+
+    private var refocus: String? = null // the section whose fold arrow was just pressed
 
     /** Round 48 dp icon button, the touch target used in the tablet's section headers. */
     private fun roundButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(a).apply {
         setImageResource(icon); setColorFilter(Color.WHITE); contentDescription = label
         setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
-        background = a.bareButton()
         isClickable = true; setOnClickListener { onClick() }
+        if (a.hub.touch) background = a.bareButton()
+        else {
+            // TV: reachable with the remote; white circle and a dark icon while focused, its own colour back after
+            isFocusable = true
+            background = android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) })
+            }
+            var rest: android.graphics.ColorFilter? = null
+            setOnFocusChangeListener { _, f -> if (f) { rest = colorFilter; setColorFilter(Color.BLACK) } else colorFilter = rest }
+        }
     }
 
     private fun strip() = LinearLayout(a).apply { clipChildren = false; setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(10)) }
@@ -320,9 +334,9 @@ class Rows(private val a: MainActivity) {
                     // under a foldable "Apps" header like To Watch's (remembered)
                     // tablet: negative side padding cancels the empty space each tile keeps around its icon, so the outer
                     // app icons line up with the section icons on the left and the arrow buttons on the right
-                    val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { clipChildren = false; setPadding(-a.dp(6), a.dp(8), -a.dp(2), a.dp(10)) } else strip()
-                    if (a.hub.touch && a.inSearch) addView(header("Apps")) // search results: matching apps, never folded
-                    else if (a.hub.touch) {
+                    val strip: ViewGroup = FlowBox(a).apply { clipChildren = false; setPadding(-a.dp(6), a.dp(8), -a.dp(2), a.dp(10)) }
+                    if (a.inSearch) addView(header("Apps")) // search results: matching apps, never folded
+                    else {
                         fun folded() = a.hub.prefs.getBoolean("apps_folded", false)
                         lateinit var head: View
                         fun draw() {
@@ -337,10 +351,8 @@ class Rows(private val a: MainActivity) {
                             addView(head, i, LinearLayout.LayoutParams(-1, -2))
                         }
                         head = View(a); addView(head); draw()
-                    } else addView(header("Your apps"))
-                    if (a.hub.touch) addView(strip) else addView(HorizontalScrollView(a).apply {
-                        isHorizontalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(strip)
-                    })
+                    }
+                    addView(strip)
                     // reading ~25 app names from their packages took 1.6s on the UI thread; do it on the disk thread
                     a.refreshApps = { a.hub.diskPool.execute { val apps = a.apps.all(); a.hub.main.post { a.fillAppsRow(strip, apps) } } }
                     a.refreshApps()

@@ -46,7 +46,7 @@ class Sidebar(private val a: MainActivity) {
         item(a.getDrawable(if (a.hub.touch) R.drawable.icon_bare else R.drawable.icon), "Home", HOME, selected = current == null && !a.inSearch) { a.pickApp(null) }
         item(a.getDrawable(R.drawable.ic_search), "Search", SEARCH, tint = true) { a.searchBar.open() }
         // tablets: your app icons are the top of Home; this jumps there, the way a provider's icon shows its content
-        if (a.hub.touch) item(a.getDrawable(R.drawable.ic_apps), "Apps", "$HOME:apps", tint = true) { a.showApps() }
+        item(a.getDrawable(R.drawable.ic_apps), "Apps", "$HOME:apps", tint = true) { a.showApps() }
         apps.forEach { app ->
             lateinit var v: FrameLayout
             v = item(null, app.label, app.key, selected = app.filter == current, onLongClick = {
@@ -67,7 +67,7 @@ class Sidebar(private val a: MainActivity) {
     fun show() {
         if (dirty) { build(); dirty = false }
         // tablet: Settings → Background sets how solid the panel is (solid by default)
-        if (a.hub.touch) panel.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("sidebar_opacity", 100) * 255 / 100, 5, 5, 5))
+        panel.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("sidebar_opacity", 100) * 255 / 100, 5, 5, 5))
         if (isOpen) return
         panel.visibility = View.VISIBLE
         dim.visibility = View.VISIBLE
@@ -104,7 +104,7 @@ class Sidebar(private val a: MainActivity) {
             if (tint) setColorFilter(if (selected) Color.WHITE else 0xFFB3B3B3.toInt())
             clipToOutline = true; outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             // pack icons and Joint Launcher's own on the tablet stand alone (like the Apps grid); app icons keep Google TV's rounded tile
-            background = if (tint || (a.hub.touch && (key == HOME || a.apps.packs.active() != null))) null else GradientDrawable().apply { cornerRadius = a.dp(12).toFloat(); setColor(0xFF2A2B30.toInt()) }
+            background = if (tint || ((a.hub.touch && key == HOME) || a.apps.packs.active() != null)) null else GradientDrawable().apply { cornerRadius = a.dp(12).toFloat(); setColor(0xFF2A2B30.toInt()) }
             alpha = if (selected) 1f else 0.75f
         }
         val item = FrameLayout(a).apply {

@@ -86,7 +86,7 @@ class MainActivity : Activity() {
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
             // the tablet's Apps are A to Z; only Favorites (heart on) keep an order of their own
-            if (hub.touch && container !== sidebar.rail) { apps.saveFavOrder(order); return@MoveMode }
+            if (container !== sidebar.rail && apps.favouritesOnly) { apps.saveFavOrder(order); return@MoveMode } // Apps is A to Z; Favorites keep their order
             apps.saveOrder(order)
             if (container === sidebar.rail) rowsDirty = true // Home rows follow the sidebar: reorder them when it closes
             else sidebar.dirty = true // the sidebar picks the new order up next time it opens
@@ -185,8 +185,7 @@ class MainActivity : Activity() {
     fun removeBackground(id: String) { bgFile(id, false).delete(); bgFile(id, true).delete(); applyBackground() }
 
     /** "black", "wallpaper" (the tablet's) or "picture" (yours); older versions only had the wallpaper switch. */
-    fun bgMode(): String = if (!hub.touch) "black"
-        else hub.prefs.getString("bg_mode", null) ?: if (hub.prefs.getBoolean("bg_wallpaper", false)) "wallpaper" else "black"
+    fun bgMode(): String = hub.prefs.getString("bg_mode", null) ?: if (hub.prefs.getBoolean("bg_wallpaper", false)) "wallpaper" else "black"
 
     /**
      * Tablet background: black (as on the TV), your wallpaper, or your own picture for the way the tablet is turned,
@@ -246,9 +245,9 @@ class MainActivity : Activity() {
                 catalog.tabRows(tab, gen).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                 if (tab == Tab.APPS) rows.apps()
             }
-            // tablet Home: widgets, your apps like a launcher, and To Watch (one button folds all the video rows away),
-            // in the order picked in Settings
-            hub.touch -> TabletSettings.sections(hub).forEach { s ->
+            // Home, in the order picked in Settings: the tablet has widgets, your apps, To Watch (one button folds all the
+            // video rows away) and Home Assistant; the TV has just your apps and To Watch (see TabletSettings.sections)
+            else -> TabletSettings.sections(hub).forEach { s ->
                 when (s) {
                     "widgets" -> rows.widgets()
                     "apps" -> rows.apps()
@@ -260,18 +259,13 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            else -> {
-                rows.connect(actions.connectEntries())
-                catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
-                rows.apps()
-            }
         }
     }
 
     fun search(q: String) {
         gen++; inSearch = true; searchQuery = q
         rows.clear()
-        if (hub.touch) rows.apps() // tablet: matching apps first; the row shows nothing when none match
+        rows.apps() // matching apps first; the row shows nothing when none match
         sidebar.dirty = true
         topBar.tabs(catalog.tabs(), null) // no tab is lit while showing results
         if (hub.jfKey.isNotEmpty() && hub.installed(Links.JELLYFIN)) rows.content("In your library", listOf {
@@ -348,11 +342,10 @@ class MainActivity : Activity() {
         val favs = apps.favourites()
         // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
         val hidden = apps.hidden()
-        val searching = hub.touch && inSearch
-        val favsOnly = hub.touch && apps.favouritesOnly && !searching
+        val searching = inSearch
+        val favsOnly = apps.favouritesOnly && !searching
         val list = when {
             searching -> Apps.matches(all.filter { it.key !in hidden }, searchQuery) // nothing when none match
-            !hub.touch -> all
             else -> (if (favsOnly) all.filter { it.key in favs } else all)
                 .filter { it.key !in hidden }
                 .sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
@@ -362,15 +355,15 @@ class MainActivity : Activity() {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
         })
-        val canDrag = favsOnly && !desktopLocked()
+        val canDrag = hub.touch && favsOnly && !desktopLocked() // the TV moves favorites with Move and the remote's arrows
         if (canDrag) dragToReorder(strip) else strip.setOnDragListener(null)
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
             fun menu() =
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
-                        (if (hub.touch) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // tablet: A-Z, Favorites move by dragging
-                        (app.pkg?.takeIf { hub.touch }?.let { pkg ->
+                        (if (hub.touch || !favsOnly || desktopLocked()) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // Apps is A to Z; TV favorites: Move
+                        (app.pkg?.let { pkg ->
                             listOf(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
                                 // back from Settings → Hidden apps
@@ -463,7 +456,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Activity result API needs androidx activity")
     /** Tablet desktop lock (padlock next to search): sections can't be folded, moved or edited, and their headers go. */
-    fun desktopLocked() = hub.touch && hub.prefs.getBoolean("desktop_locked", false)
+    fun desktopLocked() = hub.prefs.getBoolean("desktop_locked", false)
 
     private var fileToSave: String? = null
     private var fileOpened: ((String) -> Unit)? = null

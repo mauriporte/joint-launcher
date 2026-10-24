@@ -111,7 +111,7 @@ class Cards(private val ctx: Context, private val images: Images, private val ap
         val size = ctx.dp(76)
         val icon = ImageView(ctx).apply {
             a.pkg?.let { apps.iconInto(it, this) }
-            if (touch) scaleType = ImageView.ScaleType.FIT_CENTER // tablet: just the icon itself, no tile behind it
+            if (touch || apps.packs.active() != null) scaleType = ImageView.ScaleType.FIT_CENTER // pack icons (and the tablet): just the icon, no tile
             else {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 clipToOutline = true; outlineProvider = android.view.ViewOutlineProvider.BACKGROUND

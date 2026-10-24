@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
+import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -63,6 +64,16 @@ internal fun Context.button(label: String, onClick: () -> Unit) = text(15f, Colo
 }
 
 /** Round icon button, same look as [button]: translucent idle, white with a dark icon when focused. */
+/** TV: a white rounded outline while the view has focus (the remote has to see where it is); nothing at rest. */
+internal fun View.tvFocus(radiusDp: Int = 10) {
+    isFocusable = true
+    foreground = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+            cornerRadius = context.dp(radiusDp).toFloat(); setColor(Color.TRANSPARENT); setStroke(context.dp(3), Color.WHITE)
+        })
+    }
+}
+
 /** Tablet buttons: just the icon's lines, nothing around them; a soft round ripple shows the touch. */
 internal fun Context.bareButton() = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null, null)
 
