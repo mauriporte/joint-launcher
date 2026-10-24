@@ -63,8 +63,8 @@ internal fun Context.button(label: String, onClick: () -> Unit) = text(15f, Colo
 }
 
 /** Round icon button, same look as [button]: translucent idle, white with a dark icon when focused. */
-/** Tablet buttons: a thin white ring around the icon, no fill (the background shows through). */
-internal fun Context.outlineCircle() = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.TRANSPARENT); setStroke(dp(2), 0x8CFFFFFF.toInt()) }
+/** Tablet buttons: just the icon's lines, nothing around them; a soft round ripple shows the touch. */
+internal fun Context.bareButton() = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null, null)
 
 internal fun Context.iconButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(this).apply {
     setImageResource(icon)

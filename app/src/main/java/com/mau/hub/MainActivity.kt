@@ -166,6 +166,15 @@ class MainActivity : Activity() {
     fun backgrounds(): List<String> {
         // the first version kept one landscape + portrait pair: it becomes the first picture of the gallery
         java.io.File(filesDir, "bg_landscape").takeIf { it.exists() }?.let { it.renameTo(bgFile("1", false)); java.io.File(filesDir, "bg_portrait").renameTo(bgFile("1", true)) }
+        // inbox (Android/data/<app>/files/inbox, reachable over USB/adb without any permission): pictures dropped there
+        // join the gallery; "name.portrait.png" becomes the portrait version of "name.png"
+        getExternalFilesDir("inbox")?.listFiles()?.filter { it.isFile }?.sortedBy { it.name }?.takeIf { it.isNotEmpty() }?.let { files ->
+            var next = System.currentTimeMillis()
+            val ids = HashMap<String, String>()
+            val (portraits, mains) = files.partition { it.nameWithoutExtension.endsWith(".portrait") }
+            mains.forEach { f -> val id = (next++).toString(); if (runCatching { f.copyTo(bgFile(id, false), true) }.isSuccess) ids[f.nameWithoutExtension] = id; f.delete() }
+            portraits.forEach { f -> ids[f.nameWithoutExtension.removeSuffix(".portrait")]?.let { runCatching { f.copyTo(bgFile(it, true), true) } }; f.delete() }
+        }
         return bgDir.list().orEmpty().filter { !it.endsWith(".portrait") }.sortedBy { it.toLongOrNull() ?: 0L }
     }
 
@@ -413,9 +422,34 @@ class MainActivity : Activity() {
     /** Settings → Background: add a picture to the gallery (id null), or give one its portrait version. Any image the tablet can open. */
     fun pickBackground(id: String?, portrait: Boolean) = runCatching {
         pickingFor = id ?: System.currentTimeMillis().toString()
-        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"),
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, id == null), // adding: pick several at once
             if (portrait) REQ_BG_PORTRAIT else REQ_BG_LANDSCAPE)
     }.onFailure { toast("Couldn't open the picture picker") }
+
+    // tablet: Android's status bar (clock, Wi-Fi, battery) and navigation bar (back, home, recents) stay hidden while
+    // Joint Launcher is on screen; a swipe in from the top or bottom edge shows them for a moment. Re-applied on focus
+    // because dialogs and other apps bring them back.
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applySystemBars()
+    }
+
+    /** Which bars are hidden comes from Settings (both by default). */
+    fun applySystemBars() {
+        if (!hub.touch) return
+        val status = hub.prefs.getBoolean("hide_status_bar", true)
+        val nav = hub.prefs.getBoolean("hide_nav_bar", true)
+        if (android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
+            val s = android.view.WindowInsets.Type.statusBars(); val n = android.view.WindowInsets.Type.navigationBars()
+            if (status) hide(s) else show(s)
+            if (nav) hide(n) else show(n)
+            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else @Suppress("DEPRECATION") {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                (if (status) View.SYSTEM_UI_FLAG_FULLSCREEN else 0) or (if (nav) View.SYSTEM_UI_FLAG_HIDE_NAVIGATION else 0)
+        }
+    }
 
     // the turn itself doesn't rebuild the screen (configChanges); only the background picture follows it
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -426,12 +460,18 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQ_BG_LANDSCAPE || requestCode == REQ_BG_PORTRAIT) {
-            val uri = data?.data.takeIf { resultCode == RESULT_OK } ?: return
-            // a private copy: the picture keeps working even if the original is moved or deleted
-            val id = pickingFor ?: return
-            runCatching { contentResolver.openInputStream(uri)!!.use { i -> bgFile(id, requestCode == REQ_BG_PORTRAIT).outputStream().use { i.copyTo(it) } } }
-                .onSuccess { useBackground(id); onBackgroundPicked?.invoke(); toast(if (requestCode == REQ_BG_PORTRAIT) "Portrait version set" else "Picture added") }
-                .onFailure { toast("Couldn't use that picture: ${it.message}") }
+            if (resultCode != RESULT_OK || data == null) return
+            val first = pickingFor ?: return
+            val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+            val portrait = requestCode == REQ_BG_PORTRAIT
+            // private copies: the pictures keep working even if the originals are moved or deleted
+            val ids = uris.mapIndexedNotNull { i, uri ->
+                val id = if (portrait || i == 0) first else (first.toLong() + i).toString()
+                runCatching { contentResolver.openInputStream(uri)!!.use { s -> bgFile(id, portrait).outputStream().use { s.copyTo(it) } }; id }
+                    .onFailure { toast("Couldn't use a picture: ${it.message}") }.getOrNull()
+            }
+            ids.firstOrNull()?.let { useBackground(it); onBackgroundPicked?.invoke() }
+            toast(when { ids.isEmpty() -> "No picture added"; portrait -> "Portrait version set"; ids.size == 1 -> "Picture added"; else -> "${ids.size} pictures added" })
             return
         }
         if (requestCode == SearchBar.VOICE_REQUEST && resultCode == RESULT_OK) searchBar.onVoiceResult(data)
@@ -441,7 +481,10 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
-        if (hub.touch) { apps.forgetList(); refreshApps() } // back from uninstalling (or installing) something
+        if (hub.touch) {
+            apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
+            if (backgrounds().isNotEmpty()) applyBackground() // takes in pictures dropped in the inbox
+        }
     }
 
     override fun onDestroy() {

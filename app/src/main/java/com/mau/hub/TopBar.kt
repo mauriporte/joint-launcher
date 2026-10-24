@@ -43,22 +43,20 @@ class TopBar(private val a: MainActivity) {
         setPadding(a.dp(30), 0, a.dp(36), 0)
         if (a.hub.touch) {
             // touchscreens have no Left key to slide the sidebar in: a menu button does it; tabs scroll in portrait
-            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.outlineCircle() })
+            addView(a.iconButton(R.drawable.ic_rows, "Menu") { a.sidebar.show() }.apply { touchSize(this); marginEnd(this, 8); background = a.bareButton() })
             addView(search.also { touchSize(it) })
             addView(android.widget.HorizontalScrollView(a).apply {
                 isHorizontalScrollBarEnabled = false
                 addView(tabStrip)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
-            addView(titlesButton.also { touchSize(it); it.background = a.outlineCircle(); applyTitlesButton() })
+            addView(titlesButton.also { touchSize(it); it.background = a.bareButton(); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
-            // same height and corner radius as the flip clock's cards; temperature first, then a bigger icon
+            // same height as the clock; temperature first, then a bigger icon
             addView(weather.apply {
                 textSize = 26f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 gravity = Gravity.CENTER_VERTICAL; includeFontPadding = false
-                setPadding(a.dp(16), 0, a.dp(16), 0)
-                background = GradientDrawable().apply { cornerRadius = a.dp(8).toFloat(); setColor(0xFF1C1C1F.toInt()) }
-                elevation = a.dp(4).toFloat()
+                setPadding(a.dp(16), 0, a.dp(16), 0) // no card behind it: just the text over the background
             }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
             addView(flipClock())
         } else {
@@ -75,21 +73,17 @@ class TopBar(private val a: MainActivity) {
     }
 
     /**
-     * Tablet corner clock in the flip-clock style: hours and minutes on two dark cards, each split across the middle
-     * where the leaves would fold. TextClock keeps them on time by itself.
+     * Tablet corner clock: big hours and minutes side by side, straight on the background (no cards).
+     * TextClock keeps them on time by itself.
      */
     private fun flipClock() = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
         fun card(format: String) = android.widget.FrameLayout(a).apply {
-            background = GradientDrawable().apply { cornerRadius = a.dp(8).toFloat(); setColor(0xFF1C1C1F.toInt()) }
-            elevation = a.dp(4).toFloat()
             addView(android.widget.TextClock(a).apply {
                 format24Hour = format; format12Hour = format
                 textSize = 34f; setTextColor(0xFFF2F2F2.toInt()); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
                 includeFontPadding = false; gravity = Gravity.CENTER
             }, android.widget.FrameLayout.LayoutParams(-1, -1))
-            // the fold line between the two leaves
-            addView(View(a).apply { setBackgroundColor(0xFF050505.toInt()) }, android.widget.FrameLayout.LayoutParams(-1, a.dp(2), Gravity.CENTER_VERTICAL))
         }
         addView(card("HH"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)))
         addView(card("mm"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)).apply { marginStart = a.dp(6) })

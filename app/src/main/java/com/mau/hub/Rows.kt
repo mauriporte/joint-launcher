@@ -230,7 +230,7 @@ class Rows(private val a: MainActivity) {
     private fun roundButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(a).apply {
         setImageResource(icon); setColorFilter(Color.WHITE); contentDescription = label
         setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
-        background = a.outlineCircle()
+        background = a.bareButton()
         isClickable = true; setOnClickListener { onClick() }
     }
 
@@ -361,7 +361,7 @@ class Rows(private val a: MainActivity) {
                     // while editing it's a green tick, so it reads as "done", not as another pencil
                     val edit = roundButton(if (w.editing) R.drawable.ic_check else R.drawable.ic_edit, if (w.editing) "Done editing widgets" else "Edit widgets") {
                         w.editing = !w.editing; refreshWidgets()
-                    }.apply { if (w.editing) (background as GradientDrawable).setColor(0xFF2E7D32.toInt()) }
+                    }.apply { if (w.editing) setColorFilter(0xFF4CAF50.toInt()) }
                     addView(foldHeader("widgets", folded, listOfNotNull(add, edit.takeIf { ids.isNotEmpty() })) {
                         a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
                     }, LinearLayout.LayoutParams(-1, -2))

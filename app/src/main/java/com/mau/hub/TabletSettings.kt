@@ -104,7 +104,7 @@ class TabletSettings(private val a: MainActivity) {
                 addView(android.widget.ImageView(a).apply {
                     setImageDrawable(icon(a, s)); setColorFilter(Color.WHITE); contentDescription = "Change the icon of ${name(hub, s)}"
                     setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
-                    background = a.outlineCircle()
+                    background = a.bareButton()
                     setOnClickListener { pickIcon(s) }
                 }, LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginEnd = a.dp(12) })
                 addView(a.text(17f, Color.WHITE).apply {
@@ -119,6 +119,15 @@ class TabletSettings(private val a: MainActivity) {
         // the Apps section's other name, shown while its heart is on
         line("Favorites section name", name(hub, "favorites")) { rename("favorites") }
         line(name(hub, "watch"), "Order and show/hide its rows") { a.chooseRows() }
+
+        heading("Screen")
+        fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
+            text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)
+            setOnCheckedChangeListener { _, on -> p.edit().putBoolean(key, on).apply(); a.applySystemBars() }
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        barSwitch("Hide the status bar (clock, Wi-Fi, battery)", "hide_status_bar")
+        barSwitch("Hide the navigation bar (back, home, recents)", "hide_nav_bar")
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Hidden bars come back for a moment with a swipe in from the edge" })
 
         heading("Clock")
         val format = p.getString("clock_format", null)
