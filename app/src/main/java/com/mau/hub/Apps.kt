@@ -140,7 +140,11 @@ class Apps(private val hub: Hub, private val images: Images) {
         iconCache[pkg]?.let { into.setImageDrawable(it); return }
         into.tag = "icon:$pkg"
         hub.imagePool.execute {
-            val d = packs.iconFor(pkg) ?: customIcon(pkg) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull() ?: return@execute
+            // a pack on: only pack icons (guessing the missing ones); no pack: only the apps' own (and ours for banner-only TV apps)
+            val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(hub.pkgFor(pkg) ?: pkg, 0)).toString() }.getOrDefault(pkg)
+            val d = if (packs.active() != null) packs.packIcon(pkg, label) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
+                else customIcon(pkg) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
+            d ?: return@execute
             hub.main.post { iconCache[pkg] = d; if (into.tag == "icon:$pkg") into.setImageDrawable(d) }
         }
     }
@@ -151,6 +155,16 @@ class Apps(private val hub: Hub, private val images: Images) {
 
     /** Catalogue-only services (app not installed): their logo from JustWatch, looked up once. */
     fun logoInto(p: Provider, into: ImageView) {
+        // with an icon pack, the service's pack icon (found by package even though it isn't installed)
+        if (packs.active() != null) {
+            iconCache["logo:${p.pkg}"]?.let { into.setImageDrawable(it); return }
+            into.tag = "logo:${p.pkg}"
+            hub.imagePool.execute {
+                val d = packs.packIcon(p.pkg, p.source.label) ?: return@execute
+                hub.main.post { iconCache["logo:${p.pkg}"] = d; if (into.tag == "logo:${p.pkg}") into.setImageDrawable(d) }
+            }
+            return
+        }
         customIcon(p.pkg)?.let { into.setImageDrawable(it); return }
         hub.prefs.getString("logo_${p.source.name}", null)?.let { images.load(it, into); return }
         hub.pool.execute {

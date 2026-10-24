@@ -51,6 +51,27 @@ class IconPacks(private val hub: Hub) {
     }
 
     /**
+     * With a pack on, every icon comes from it (no mixing with the apps' own): the pack's icon for the app or its
+     * phone/TV twin (by package, so it works for apps that aren't installed), else one whose name matches the app's
+     * name, else the pack's letter icon for its first letter. Guessed ones are recoloured in the app's colour when
+     * the app is installed, like hand-picked ones. Null only without a pack.
+     */
+    fun packIcon(pkg: String, label: String): Drawable? {
+        val pack = active() ?: return null
+        iconFor(pkg)?.let { return it }
+        val map = map(pack)
+        (Links.MOBILE[pkg].orEmpty() + Links.canonical(pkg)).firstNotNullOfOrNull { map[it] }?.let { n -> drawable(pack, n)?.let { return it } }
+        val names = allIcons(pack).toHashSet()
+        val clean = label.lowercase().replace("+", "_plus").replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        val name = listOf(clean, clean.substringBefore('_'), clean.replace("_", "")).firstOrNull { it.isNotEmpty() && it in names }
+            ?: clean.firstOrNull()?.let { c -> listOf("alphabets_$c", "letter_$c", "$c").firstOrNull { it in names } }
+            ?: return null
+        val d = drawable(pack, name) ?: return null
+        if (hub.installed(pkg)) appColour(pkg)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
+        return d
+    }
+
+    /**
      * The main colour of an app's own icon: the most common strong colour (white, black and greys don't count),
      * brightened enough to read on a dark tile. Null for black-and-white logos.
      */

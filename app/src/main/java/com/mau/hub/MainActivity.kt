@@ -119,7 +119,8 @@ class MainActivity : Activity() {
             // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen)
             if (touch) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
-            addView(sidebar.panel, FrameLayout.LayoutParams(dp(RAIL_DP + 8), -1))
+            // tablet: wide enough to cover the section icons on Home when it slides in
+            addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
             addView(detail.view)
         })
         // focus leaving the sidebar any other way (e.g. Up past its top) closes it too

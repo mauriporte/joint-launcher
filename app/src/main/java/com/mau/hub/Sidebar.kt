@@ -26,7 +26,7 @@ class Sidebar(private val a: MainActivity) {
     val panel = ScrollView(a).apply {
         isFillViewport = true; isVerticalScrollBarEnabled = false
         visibility = View.GONE
-        setBackgroundColor(0xF2050505.toInt()) // solid panel; the content behind is dimmed while it is open
+        setBackgroundColor(0xFF050505.toInt()) // solid panel (fully: the section icons it covers mustn't show through); the content behind is dimmed
         addView(rail)
     }
     val dim = View(a).apply {
@@ -69,7 +69,7 @@ class Sidebar(private val a: MainActivity) {
         if (isOpen) return
         panel.visibility = View.VISIBLE
         dim.visibility = View.VISIBLE
-        panel.translationX = -a.dp(RAIL_DP).toFloat()
+        panel.translationX = -(panel.width.takeIf { it > 0 } ?: a.dp(RAIL_DP)).toFloat()
         panel.animate().translationX(0f).setDuration(160).start()
     }
 
@@ -101,7 +101,8 @@ class Sidebar(private val a: MainActivity) {
             scaleType = ImageView.ScaleType.FIT_CENTER
             if (tint) setColorFilter(if (selected) Color.WHITE else 0xFFB3B3B3.toInt())
             clipToOutline = true; outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            background = if (tint) null else GradientDrawable().apply { cornerRadius = a.dp(12).toFloat(); setColor(0xFF2A2B30.toInt()) }
+            // pack icons on the tablet stand alone (like the Apps grid); app icons keep Google TV's rounded tile
+            background = if (tint || (a.hub.touch && a.apps.packs.active() != null)) null else GradientDrawable().apply { cornerRadius = a.dp(12).toFloat(); setColor(0xFF2A2B30.toInt()) }
             alpha = if (selected) 1f else 0.75f
         }
         val item = FrameLayout(a).apply {
