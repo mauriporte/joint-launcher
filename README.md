@@ -89,9 +89,16 @@ release.keyAlias=...
 release.keyPassword=...
 ```
 
+Two apps come from this code, so the TV and the tablet never share an install: **tv** (`com.mau.hub.redesign`, "Joint Launcher") and **tablet** (`com.mau.hub.tablet`, "Joint Launcher Tablet").
+
 ```bash
-gradle testReleaseUnitTest assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+gradle testTvReleaseUnitTest assembleTvRelease
+adb install -r app/build/outputs/apk/tv/release/app-tv-release.apk
+```
+
+```bash
+gradle testTabletReleaseUnitTest assembleTabletRelease
+adb install -r app/build/outputs/apk/tablet/release/app-tablet-release.apk
 ```
 
 Keep a backup of the signing key: Android only installs updates signed with the same key.

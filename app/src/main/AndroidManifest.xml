@@ -62,7 +62,7 @@
     </queries>
 
     <application
-        android:label="Joint Launcher"
+        android:label="${appLabel}"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"

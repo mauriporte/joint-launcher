@@ -12,7 +12,6 @@ android {
     namespace = "com.mau.hub"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.mau.hub.redesign" // installs next to the running Joint Launcher instead of replacing it
         minSdk = 24
         targetSdk = 35
         versionCode = 6
@@ -22,6 +21,21 @@ android {
         // Home Assistant for the tablet's section: ha.local (used when it answers, i.e. at home) and ha.remote in local.properties
         buildConfigField("String", "HA_LOCAL", "\"${local.getProperty("ha.local", "")}\"")
         buildConfigField("String", "HA_REMOTE", "\"${local.getProperty("ha.remote", "")}\"")
+    }
+    // two separate apps from the same code, so the TV and the tablet never share an install or its settings:
+    // assembleTvRelease for the TV, assembleTabletRelease for the tablet
+    flavorDimensions += "device"
+    productFlavors {
+        create("tv") {
+            dimension = "device"
+            applicationId = "com.mau.hub.redesign" // what the TV runs
+            manifestPlaceholders["appLabel"] = "Joint Launcher"
+        }
+        create("tablet") {
+            dimension = "device"
+            applicationId = "com.mau.hub.tablet"
+            manifestPlaceholders["appLabel"] = "Joint Launcher Tablet"
+        }
     }
     signingConfigs {
         // release.storeFile / storePassword / keyAlias / keyPassword in local.properties; without them, release builds stay unsigned
