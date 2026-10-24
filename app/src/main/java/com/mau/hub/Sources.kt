@@ -356,6 +356,24 @@ object Sources {
     }
 
     /** Frees the tuner a live channel held (Tvheadend only has a few). */
+    /** A subtitle file Jellyfin has for a video (outside the video stream itself), converted to WebVTT by the server. */
+    class Subtitle(val url: String, val language: String?, val label: String)
+
+    /** Separate subtitle files of a library item (embedded ones come with the video stream). */
+    fun jellyfinSubtitles(server: String, key: String, itemId: String, userId: String?): List<Subtitle> =
+        parseSubtitles(get("$server/Items/$itemId/PlaybackInfo" + (userId?.let { "?userId=$it" } ?: ""), Links.jfAuth(key)), server, itemId)
+
+    fun parseSubtitles(json: String, server: String, itemId: String): List<Subtitle> {
+        val src = JSONObject(json).optJSONArray("MediaSources").objs().firstOrNull() ?: return emptyList()
+        val sourceId = src.optString("Id")
+        return src.optJSONArray("MediaStreams").objs()
+            .filter { it.optString("Type") == "Subtitle" && it.optBoolean("IsExternal") && it.optBoolean("IsTextSubtitleStream", true) }
+            .map { s ->
+                Subtitle("$server/Videos/$itemId/$sourceId/Subtitles/${s.optInt("Index")}/0/Stream.vtt",
+                    s.str("Language"), s.str("DisplayTitle") ?: s.str("Language") ?: "Subtitles")
+            }
+    }
+
     /**
      * Tells Jellyfin what's playing so it can resume later and show it on the dashboard.
      * event = "" (started), "Progress" or "Stopped".

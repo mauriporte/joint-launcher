@@ -22,7 +22,8 @@ class Actions(private val a: MainActivity) {
             is Play.Jelly -> if (p.folder) a.apps.launch(Links.JELLYFIN) else a.startActivity(
                 Intent(a, PlayerActivity::class.java)
                     .putExtra("url", Links.jfStream(hub.server, p.id)).putExtra("key", hub.jfKey).putExtra("pos", p.posMs)
-                    .putExtra("server", hub.server).putExtra("itemId", p.id) // so the player can report progress for resuming
+                    .putExtra("server", hub.server).putExtra("itemId", p.id) // so the player can report progress and fetch subtitles
+                    .putExtra("userId", hub.userId ?: hub.prefs.getString("uid", null))
             )
             is Play.Link -> try {
                 val i = if (p.uri.startsWith("intent:")) Intent.parseUri(p.uri, Intent.URI_INTENT_SCHEME).apply {

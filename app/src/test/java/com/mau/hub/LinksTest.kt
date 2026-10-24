@@ -263,6 +263,18 @@ class RowOrderTest {
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
     }
 
+    @Test fun subtitleFilesOnlyTextAndExternal() {
+        val json = """{"MediaSources":[{"Id":"src1","MediaStreams":[
+            {"Type":"Video","Index":0},
+            {"Type":"Subtitle","Index":2,"IsExternal":false,"Language":"eng"},
+            {"Type":"Subtitle","Index":3,"IsExternal":true,"IsTextSubtitleStream":true,"Language":"spa","DisplayTitle":"Spanish - SRT"},
+            {"Type":"Subtitle","Index":4,"IsExternal":true,"IsTextSubtitleStream":false,"Language":"fre"}]}]}"""
+        val subs = Sources.parseSubtitles(json, "http://jf", "item9")
+        assertEquals(listOf("http://jf/Videos/item9/src1/Subtitles/3/0/Stream.vtt"), subs.map { it.url })
+        assertEquals("Spanish - SRT", subs.single().label)
+        assertEquals("spa", subs.single().language)
+    }
+
     @Test fun categoryChannelsFollowTheListOrderAndSkipMissing() {
         val json = """{"Items":[{"Id":"a","Name":"MTV Live","Number":"707"},{"Id":"b","Name":"MTV2","Number":"708"},{"Id":"c","Name":"News","Number":"1"}]}"""
         assertEquals(listOf("708  MTV2", "707  MTV Live"), Sources.pickChannels(json, listOf("708", "999", "707"), "http://jf").map { it.title })

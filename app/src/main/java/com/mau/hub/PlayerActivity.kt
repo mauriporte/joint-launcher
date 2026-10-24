@@ -11,6 +11,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -44,12 +45,27 @@ class PlayerActivity : Activity() {
         val http = DefaultHttpDataSource.Factory().setDefaultRequestProperties(Links.jfAuth(key))
         val p = ExoPlayer.Builder(this).setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http)).build()
         player = p
-        setContentView(PlayerView(this).apply { player = p; keepScreenOn = true })
-        p.setMediaItem(MediaItem.fromUri(intent.getStringExtra("url")!!), intent.getLongExtra("pos", 0))
+        // CC button = subtitle choice (hidden by default); the gear also has audio tracks
+        setContentView(PlayerView(this).apply { player = p; keepScreenOn = true; setShowSubtitleButton(true) })
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) finish() }
             override fun onPlayerError(error: PlaybackException) { release(); playInVlc() }
         })
+        // library items: add Jellyfin's separate subtitle files first (live TV has none); network, so off the UI thread
+        val id = itemId; val server = server
+        if (id == null || server == null) start(MediaItem.fromUri(intent.getStringExtra("url")!!))
+        else Thread {
+            val subs = runCatching { Sources.jellyfinSubtitles(server, key, id, intent.getStringExtra("userId")) }.getOrDefault(emptyList())
+            val item = MediaItem.Builder().setUri(intent.getStringExtra("url")).setSubtitleConfigurations(subs.map {
+                MediaItem.SubtitleConfiguration.Builder(Uri.parse(it.url)).setMimeType(MimeTypes.TEXT_VTT).setLanguage(it.language).setLabel(it.label).build()
+            }).build()
+            main.post { if (player === p) start(item) }
+        }.start()
+    }
+
+    private fun start(item: MediaItem) {
+        val p = player ?: return
+        p.setMediaItem(item, intent.getLongExtra("pos", 0))
         p.playWhenReady = true
         p.prepare()
         report("")
