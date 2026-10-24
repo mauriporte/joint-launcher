@@ -355,10 +355,7 @@ class Rows(private val a: MainActivity) {
                         a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
                     }, LinearLayout.LayoutParams(-1, -2))
                     if (folded) return
-                    if (ids.isEmpty()) addView(a.text(14f, TEXT_MUTED).apply {
-                        text = "Tap + to add a widget (clock, weather, calendar…)"; setPadding(a.dp(8), 0, 0, a.dp(12))
-                    })
-                    else addView(FlowBox(a).apply { ids.forEach { id -> w.viewFor(id)?.let(::addView) } })
+                    if (ids.isNotEmpty()) addView(FlowBox(a).apply { ids.forEach { id -> w.viewFor(id)?.let(::addView) } })
                 }
             }
         }
