@@ -173,6 +173,26 @@ class Rows(private val a: MainActivity) {
         setPadding(a.dp(8), a.dp(4), 0, 0)
     }
 
+    /**
+     * Tablet section header (Apps, To Watch): title on the left, a round dropdown arrow on the right, like a Home
+     * Assistant collapsible card. The whole header is the tap target; the arrow points down when folded, up when open.
+     */
+    private fun foldHeader(title: String, folded: Boolean, toggle: () -> Unit) = LinearLayout(a).apply {
+        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
+        isClickable = true; setOnClickListener { toggle() }
+        contentDescription = (if (folded) "Show " else "Hide ") + title
+        addView(a.text(22f, Color.WHITE).apply { text = title; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        addView(ImageView(a).apply {
+            setImageResource(R.drawable.ic_chevron); setColorFilter(Color.WHITE)
+            rotation = if (folded) 90f else 270f // ic_chevron points right
+            setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+            isClickable = true; setOnClickListener { toggle() }
+        }, LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
+    }
+
     private fun strip() = LinearLayout(a).apply { clipChildren = false; setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(10)) }
 
     /** Left on a row's first tile opens the sidebar. */
@@ -250,9 +270,20 @@ class Rows(private val a: MainActivity) {
                     if (tag == m.id) return // already built; rebuilding would undo a move in progress
                     tag = m.id
                     removeAllViews()
-                    addView(header("Your apps"))
-                    // TV: one sideways row like Google TV's; tablet: a launcher-style grid that wraps to the screen width
+                    // TV: one sideways row like Google TV's; tablet: a launcher-style grid that wraps to the screen width,
+                    // under a foldable "Apps" header like To Watch's (remembered)
                     val strip: ViewGroup = if (a.hub.touch) FlowBox(a).apply { setPadding(a.dp(4), a.dp(8), a.dp(4), a.dp(10)) } else strip()
+                    if (a.hub.touch) {
+                        fun folded() = a.hub.prefs.getBoolean("apps_folded", false)
+                        lateinit var head: View
+                        fun draw() {
+                            strip.visibility = if (folded()) View.GONE else View.VISIBLE
+                            val i = indexOfChild(head); removeView(head)
+                            head = foldHeader("Apps", folded()) { a.hub.prefs.edit().putBoolean("apps_folded", !folded()).apply(); draw() }
+                            addView(head, i, LinearLayout.LayoutParams(-1, -2))
+                        }
+                        head = View(a); addView(head); draw()
+                    } else addView(header("Your apps"))
                     if (a.hub.touch) addView(strip) else addView(HorizontalScrollView(a).apply {
                         isHorizontalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(strip)
                     })
@@ -261,24 +292,7 @@ class Rows(private val a: MainActivity) {
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
-                    // "To Watch" section header with a dropdown arrow on the right, like a Home Assistant collapsible card;
-                    // the whole header is the tap target, the arrow points down when folded (open it) and up when open
-                    addView(LinearLayout(a).apply {
-                        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                        setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
-                        isClickable = true; setOnClickListener { toggleFold() }
-                        contentDescription = if (folded) "Show To Watch" else "Hide To Watch"
-                        addView(a.text(22f, Color.WHITE).apply {
-                            text = "To Watch"; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                        }, LinearLayout.LayoutParams(0, -2, 1f))
-                        addView(ImageView(a).apply {
-                            setImageResource(R.drawable.ic_chevron); setColorFilter(Color.WHITE)
-                            rotation = if (folded) 90f else 270f // ic_chevron points right
-                            setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
-                            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
-                            isClickable = true; setOnClickListener { toggleFold() }
-                        }, LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
-                    }, LinearLayout.LayoutParams(-1, -2))
+                    addView(foldHeader("To Watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
                 }
             }
         }
