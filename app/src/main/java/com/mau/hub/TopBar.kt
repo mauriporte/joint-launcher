@@ -41,19 +41,48 @@ class TopBar(private val a: MainActivity) {
             addView(search.also { touchSize(it) })
             addView(android.widget.HorizontalScrollView(a).apply {
                 isHorizontalScrollBarEnabled = false
-                addView(LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL; addView(tabStrip); addView(gear.also { touchSize(it) }) })
+                addView(tabStrip)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
+            // the corner, right to left: flip clock, weather, settings gear
+            addView(gear.also { touchSize(it) })
+            addView(weather.apply {
+                textSize = 22f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setPadding(a.dp(14), a.dp(6), a.dp(14), a.dp(6))
+                background = GradientDrawable().apply { cornerRadius = a.dp(14).toFloat(); setColor(0x1FFFFFFF) }
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
+            addView(flipClock())
         } else {
             addView(search)
             addView(tabStrip)
             addView(gear)
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+            addView(weather)
+            addView(android.widget.TextClock(a).apply {
+                format24Hour = "HH:mm"; format12Hour = "h:mm"
+                textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            })
         }
-        addView(weather)
-        addView(android.widget.TextClock(a).apply {
-            format24Hour = "HH:mm"; format12Hour = "h:mm"
-            textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        })
+    }
+
+    /**
+     * Tablet corner clock in the flip-clock style: hours and minutes on two dark cards, each split across the middle
+     * where the leaves would fold. TextClock keeps them on time by itself.
+     */
+    private fun flipClock() = LinearLayout(a).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        fun card(format: String) = android.widget.FrameLayout(a).apply {
+            background = GradientDrawable().apply { cornerRadius = a.dp(8).toFloat(); setColor(0xFF1C1C1F.toInt()) }
+            elevation = a.dp(4).toFloat()
+            addView(android.widget.TextClock(a).apply {
+                format24Hour = format; format12Hour = format
+                textSize = 34f; setTextColor(0xFFF2F2F2.toInt()); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+                includeFontPadding = false; gravity = Gravity.CENTER
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            // the fold line between the two leaves
+            addView(View(a).apply { setBackgroundColor(0xFF050505.toInt()) }, android.widget.FrameLayout.LayoutParams(-1, a.dp(2), Gravity.CENTER_VERTICAL))
+        }
+        addView(card("HH"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)))
+        addView(card("mm"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)).apply { marginStart = a.dp(6) })
     }
 
     private var pendingTab: Tab? = null

@@ -95,11 +95,12 @@ class MainActivity : Activity() {
         val touch = hub.touch
         page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(topBar.view, LinearLayout.LayoutParams(-1, dp(if (touch) 52 else 36)).apply { topMargin = dp(if (touch) 6 else 10) })
+            addView(topBar.view, LinearLayout.LayoutParams(-1, dp(if (touch) 72 else 36)).apply { topMargin = dp(if (touch) 6 else 10) })
             if (!touch) addView(heroText, LinearLayout.LayoutParams(-1, dp(136)))
             addView(rows.view, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         setContentView(FrameLayout(this).apply {
+            root = this
             setBackgroundColor(BG)
             if (!touch) {
                 addView(heroImg, FrameLayout.LayoutParams(-1, dp(320), Gravity.END).apply { leftMargin = dp(300) })
@@ -126,9 +127,17 @@ class MainActivity : Activity() {
         // disk cache for every HTTP GET that allows caching (all the poster/backdrop/logo CDNs do);
         // small, because this TV has 4 GB in total and other apps' caches already fill it up
         runCatching { android.net.http.HttpResponseCache.install(java.io.File(cacheDir, "http"), 40L * 1024 * 1024) }
+        applyBackground()
         loadHome()
         nowPlaying.start()
     }
+
+    /** Tablet home-screen widgets (see [Widgets]). */
+    val widgets by lazy { Widgets(this) }
+
+    // widgets only update while the screen is showing
+    override fun onStart() { super.onStart(); if (hub.touch) widgets.start() }
+    override fun onStop() { super.onStop(); if (hub.touch) widgets.stop() }
 
     /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
     private fun edgeOpensSidebar(): View.OnTouchListener {
@@ -140,6 +149,26 @@ class MainActivity : Activity() {
                 android.view.MotionEvent.ACTION_UP -> { if (!sidebar.isOpen) sidebar.show(); v.performClick(); true }
                 else -> true
             }
+        }
+    }
+
+    private lateinit var root: FrameLayout
+
+    /**
+     * Tablet background: black (as on the TV), or your wallpaper showing through a dark layer you can make lighter or
+     * darker (bg_dim 0-100 %). Set in Settings → Background.
+     */
+    fun applyBackground() {
+        val wallpaper = hub.touch && hub.prefs.getBoolean("bg_wallpaper", false)
+        if (wallpaper) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+            window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            val dim = hub.prefs.getInt("bg_dim", 60).coerceIn(0, 100)
+            root.setBackgroundColor(Color.argb(dim * 255 / 100, 5, 5, 5))
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+            window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(BG))
+            root.setBackgroundColor(BG)
         }
     }
 
@@ -172,6 +201,7 @@ class MainActivity : Activity() {
             }
             // tablet Home: your apps first, like a launcher, then one button that folds all the video rows away
             hub.touch -> {
+                rows.widgets()
                 rows.apps()
                 rows.connect(actions.connectEntries())
                 rows.fold()
@@ -314,6 +344,7 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SearchBar.VOICE_REQUEST && resultCode == RESULT_OK) searchBar.onVoiceResult(data)
+        else widgets.onResult(requestCode, resultCode == RESULT_OK)
     }
 
     override fun onResume() {

@@ -113,6 +113,39 @@ class Actions(private val a: MainActivity) {
         return "TV storage: ${size(s.availableBytes)} free of ${size(s.totalBytes)} · Joint Launcher uses ${size(ours)}"
     }
 
+    /** Tablet background: your wallpaper behind Joint Launcher (or plain black), darkened as much as you like. Applies live. */
+    private fun background() {
+        val p = hub.prefs
+        val show = android.widget.Switch(a).apply {
+            text = "Show my wallpaper"; textSize = 16f; setTextColor(Color.WHITE)
+            isChecked = p.getBoolean("bg_wallpaper", false)
+            setOnCheckedChangeListener { _, on -> p.edit().putBoolean("bg_wallpaper", on).apply(); a.applyBackground() }
+        }
+        val label = a.text(14f, TEXT_SOFT)
+        fun dimText(v: Int) { label.text = "Darken: $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
+        val dim = android.widget.SeekBar(a).apply {
+            max = 100; progress = p.getInt("bg_dim", 60); dimText(progress)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: android.widget.SeekBar, v: Int, user: Boolean) {
+                    dimText(v); p.edit().putInt("bg_dim", v).apply(); a.applyBackground()
+                }
+                override fun onStartTrackingTouch(s: android.widget.SeekBar) = Unit
+                override fun onStopTrackingTouch(s: android.widget.SeekBar) = Unit
+            })
+        }
+        val box = LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(12), a.dp(24), 0)
+            addView(show)
+            addView(label, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(16) })
+            addView(dim, LinearLayout.LayoutParams(-1, a.dp(48)))
+            addView(a.button("Change wallpaper") {
+                runCatching { a.startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choose a wallpaper")) }
+                    .onFailure { a.toast("Couldn't open the wallpaper picker") }
+            }.apply { layoutParams = LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) } })
+        }
+        AlertDialog.Builder(a).setTitle("Background").setView(box).setPositiveButton("Done", null).show()
+    }
+
     fun settings() {
         fun field(hint: String, value: String, password: Boolean = false) = EditText(a).apply {
             this.hint = hint; setText(value); isSingleLine = true
@@ -123,6 +156,9 @@ class Actions(private val a: MainActivity) {
         val box = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(8), a.dp(24), 0)
             listOf(url, key).forEach(::addView)
+            if (hub.touch) addView(a.button("Background") { background() }.apply {
+                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(12) }
+            })
             addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
         }
         AlertDialog.Builder(a).setTitle("Settings").setView(box)

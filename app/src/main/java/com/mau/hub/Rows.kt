@@ -32,6 +32,8 @@ class ConnectRow(id: Long, val entries: List<Pair<Item, () -> Unit>>) : RowModel
 class AppsRow(id: Long) : RowModel(id)
 /** Tablet Home: the one button that folds all the video rows below it away. */
 class FoldRow(id: Long) : RowModel(id)
+/** Tablet Home: your widgets, foldable, with add and remove buttons in the header. */
+class WidgetsRow(id: Long) : RowModel(id)
 
 /**
  * The home screen's rows, on RecyclerView: only rows near the screen are built, and every content row shares one
@@ -165,6 +167,10 @@ class Rows(private val a: MainActivity) {
     fun connect(entries: List<Pair<Item, () -> Unit>>) { if (entries.isNotEmpty()) add(ConnectRow(nextId++, entries)) }
     fun apps() = add(AppsRow(nextId++))
     fun fold() = add(FoldRow(nextId++))
+    fun widgets() = add(WidgetsRow(nextId++))
+
+    /** A widget was added or removed, or edit mode switched: redraw the Widgets section. */
+    fun refreshWidgets() { shown.indexOfFirst { it is WidgetsRow }.takeIf { it >= 0 }?.let(adapter::notifyItemChanged) }
 
     // ---- views ----
 
@@ -177,20 +183,25 @@ class Rows(private val a: MainActivity) {
      * Tablet section header (Apps, To Watch): title on the left, a round dropdown arrow on the right, like a Home
      * Assistant collapsible card. The whole header is the tap target; the arrow points down when folded, up when open.
      */
-    private fun foldHeader(title: String, folded: Boolean, toggle: () -> Unit) = LinearLayout(a).apply {
+    private fun foldHeader(title: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit) = LinearLayout(a).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
         isClickable = true; setOnClickListener { toggle() }
         contentDescription = (if (folded) "Show " else "Hide ") + title
         addView(a.text(22f, Color.WHITE).apply { text = title; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) },
             LinearLayout.LayoutParams(0, -2, 1f))
-        addView(ImageView(a).apply {
-            setImageResource(R.drawable.ic_chevron); setColorFilter(Color.WHITE)
+        extra.forEach { addView(it, LinearLayout.LayoutParams(a.dp(48), a.dp(48)).apply { marginEnd = a.dp(10) }) }
+        addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { toggle() }.apply {
             rotation = if (folded) 90f else 270f // ic_chevron points right
-            setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
-            isClickable = true; setOnClickListener { toggle() }
         }, LinearLayout.LayoutParams(a.dp(48), a.dp(48)))
+    }
+
+    /** Round 48 dp icon button, the touch target used in the tablet's section headers. */
+    private fun roundButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(a).apply {
+        setImageResource(icon); setColorFilter(Color.WHITE); contentDescription = label
+        setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12))
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0x26FFFFFF) }
+        isClickable = true; setOnClickListener { onClick() }
     }
 
     private fun strip() = LinearLayout(a).apply { clipChildren = false; setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(10)) }
@@ -212,7 +223,7 @@ class Rows(private val a: MainActivity) {
         override fun getItemCount() = shown.size
         override fun getItemId(position: Int) = shown[position].id
         override fun getItemViewType(position: Int) = when (shown[position]) {
-            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3; is FoldRow -> 4
+            is ContentRow -> 0; is NowRow -> 1; is ConnectRow -> 2; is AppsRow -> 3; is FoldRow -> 4; is WidgetsRow -> 5
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -293,6 +304,23 @@ class Rows(private val a: MainActivity) {
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
                     addView(foldHeader("To Watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
+                }
+                is WidgetsRow -> (holder.itemView as LinearLayout).apply {
+                    removeAllViews()
+                    val w = a.widgets
+                    val ids = w.ids()
+                    val folded = a.hub.prefs.getBoolean("widgets_folded", false)
+                    val add = roundButton(R.drawable.ic_add, "Add widget") { w.pick() }
+                    val edit = roundButton(R.drawable.ic_edit, if (w.editing) "Done removing" else "Remove widgets") { w.editing = !w.editing; refreshWidgets() }
+                        .apply { if (w.editing) (background as GradientDrawable).setColor(ACCENT) }
+                    addView(foldHeader("Widgets", folded, listOfNotNull(add, edit.takeIf { ids.isNotEmpty() })) {
+                        a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
+                    }, LinearLayout.LayoutParams(-1, -2))
+                    if (folded) return
+                    if (ids.isEmpty()) addView(a.text(14f, TEXT_MUTED).apply {
+                        text = "Tap + to add a widget (clock, weather, calendar…)"; setPadding(a.dp(8), 0, 0, a.dp(12))
+                    })
+                    else addView(FlowBox(a).apply { ids.forEach { id -> w.viewFor(id)?.let(::addView) } })
                 }
             }
         }
