@@ -56,7 +56,7 @@ class IconPacks(private val hub: Hub) {
      * name, else the pack's letter icon for its first letter. Guessed ones are recoloured in the app's colour when
      * the app is installed, like hand-picked ones. Null only without a pack.
      */
-    fun packIcon(pkg: String, label: String): Drawable? {
+    fun packIcon(pkg: String, label: String, brand: Int? = null): Drawable? {
         val pack = active() ?: return null
         iconFor(pkg)?.let { return it }
         val map = map(pack)
@@ -67,7 +67,8 @@ class IconPacks(private val hub: Hub) {
             ?: clean.firstOrNull()?.let { c -> listOf("alphabets_$c", "letter_$c", "$c").firstOrNull { it in names } }
             ?: return null
         val d = drawable(pack, name) ?: return null
-        if (hub.installed(pkg)) appColour(pkg)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
+        // guessed icons take the app's colour; a service that isn't installed takes its brand colour (Filmin's F in green)
+        (if (hub.installed(pkg)) appColour(pkg) else brand)?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
         return d
     }
 

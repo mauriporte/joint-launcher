@@ -160,7 +160,7 @@ class Apps(private val hub: Hub, private val images: Images) {
             iconCache["logo:${p.pkg}"]?.let { into.setImageDrawable(it); return }
             into.tag = "logo:${p.pkg}"
             hub.imagePool.execute {
-                val d = packs.packIcon(p.pkg, p.source.label) ?: return@execute
+                val d = packs.packIcon(p.pkg, p.source.label, p.source.color) ?: return@execute
                 hub.main.post { iconCache["logo:${p.pkg}"] = d; if (into.tag == "logo:${p.pkg}") into.setImageDrawable(d) }
             }
             return
