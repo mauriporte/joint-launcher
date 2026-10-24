@@ -77,6 +77,17 @@ class TabletSettings(private val a: MainActivity) {
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val sideLabel = a.text(15f, TEXT_SOFT)
+        fun sideText(v: Int) { sideLabel.text = "Sidebar: $v % solid" + if (v == 100) " (no see-through)" else "" }
+        list.addView(sideLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 80; progress = p.getInt("sidebar_opacity", 100) - 20; sideText(progress + 20) // 20-100 %: below that the icons get lost
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { sideText(v + 20); p.edit().putInt("sidebar_opacity", v + 20).apply() }
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                override fun onStopTrackingTouch(s: SeekBar) = Unit
+            })
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
         if (a.bgMode() == "wallpaper") buttons("Change wallpaper" to {
             runCatching { a.startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choose a wallpaper")) }
                 .onFailure { a.toast("Couldn't open the wallpaper picker") }

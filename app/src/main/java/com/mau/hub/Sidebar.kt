@@ -66,6 +66,8 @@ class Sidebar(private val a: MainActivity) {
 
     fun show() {
         if (dirty) { build(); dirty = false }
+        // tablet: Settings → Background sets how solid the panel is (solid by default)
+        if (a.hub.touch) panel.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("sidebar_opacity", 100) * 255 / 100, 5, 5, 5))
         if (isOpen) return
         panel.visibility = View.VISIBLE
         dim.visibility = View.VISIBLE
