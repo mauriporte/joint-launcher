@@ -198,7 +198,7 @@ class Rows(private val a: MainActivity) {
     }
 
     /**
-     * Tablet section header (Apps, To Watch...): no title, just its buttons and a round dropdown arrow on the right, like a Home
+     * Tablet section header (Apps, To Watch...): title (unless hidden) on the left, a round dropdown arrow on the right, like a Home
      * Assistant collapsible card. The whole header is the tap target; the arrow points down when folded, up when open.
      */
     private fun foldHeader(title: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit) = LinearLayout(a).apply {
@@ -206,7 +206,11 @@ class Rows(private val a: MainActivity) {
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
         isClickable = true; setOnClickListener { toggle() }
         contentDescription = (if (folded) "Show " else "Hide ") + title
-        addView(View(a), LinearLayout.LayoutParams(0, 0, 1f)) // no title on screen (title still names the buttons): buttons sit right
+        // the titles can be switched off from the top bar's text button; the buttons stay on the right either way
+        if (a.hub.prefs.getBoolean("section_titles", true)) addView(a.text(22f, Color.WHITE).apply {
+            text = title; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        else addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
         extra.forEach { addView(it, LinearLayout.LayoutParams(a.dp(48), a.dp(48)).apply { marginEnd = a.dp(10) }) }
         addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { toggle() }.apply {
             rotation = if (folded) 90f else 270f // ic_chevron points right

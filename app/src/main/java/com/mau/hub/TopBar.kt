@@ -44,7 +44,15 @@ class TopBar(private val a: MainActivity) {
                 isHorizontalScrollBarEnabled = false
                 addView(tabStrip)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = a.dp(12) })
-            // the corner, right to left: flip clock, weather, settings gear
+            // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
+            addView(a.iconButton(R.drawable.ic_text_fields, "Section titles") {}.apply {
+                touchSize(this)
+                fun look() = a.hub.prefs.getBoolean("section_titles", true).also { on ->
+                    alpha = if (on) 1f else 0.4f; contentDescription = if (on) "Hide section titles" else "Show section titles"
+                }
+                look()
+                setOnClickListener { a.hub.prefs.edit().putBoolean("section_titles", !look()).apply(); look(); a.loadHome() }
+            })
             addView(gear.also { touchSize(it) })
             // same height and corner radius as the flip clock's cards; temperature first, then a bigger icon
             addView(weather.apply {
