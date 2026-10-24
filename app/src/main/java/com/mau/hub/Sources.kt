@@ -356,6 +356,10 @@ object Sources {
     }
 
     /** Frees the tuner a live channel held (Tvheadend only has a few). */
+    /** Where you stopped watching a library item, in ms (0 = not started, or Jellyfin counted it as unwatched/finished). */
+    fun jellyfinPosition(server: String, key: String, userId: String, itemId: String): Long =
+        Links.ticksToMs(JSONObject(get("$server/Users/$userId/Items/$itemId", Links.jfAuth(key))).optJSONObject("UserData")?.optLong("PlaybackPositionTicks") ?: 0)
+
     /** A subtitle file Jellyfin has for a video (outside the video stream itself), converted to WebVTT by the server. */
     class Subtitle(val url: String, val language: String?, val label: String)
 

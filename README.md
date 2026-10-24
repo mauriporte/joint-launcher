@@ -53,6 +53,10 @@ the TV itself, and sign in there. The page only exists while that screen is open
 | Spotify | Your Spotify app's Client ID → Sign in with Spotify (setup below) |
 | YouTube | A Google "TV" client's ID + secret → the TV shows a code to enter at google.com/device (setup below) |
 
+**Moving over from the old Joint Launcher** (no signing in again): with the Connect screen open, POST the old app's
+saved logins (its `shared_prefs/hub.xml`, readable with `adb shell run-as com.mau.hub`) as a form to the page's
+address + `/import`. Only account and order settings are accepted.
+
 **Spotify** (needs Premium on the account that owns the app): developer.spotify.com/dashboard → Create app → API "Web API",
 Redirect URI `https://mauriporte.github.io/joint-launcher/spotify.html`. That page only passes the sign-in back to your TV
 ([docs/spotify.html](https://github.com/mauriporte/joint-launcher/blob/main/docs/spotify.html) on `main`).

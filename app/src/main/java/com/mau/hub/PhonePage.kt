@@ -98,6 +98,15 @@ class PhonePage(
                     "Now open <a href=\"https://${d.url.removePrefix("https://")}\">${d.url.removePrefix("https://")}</a> and enter <b style=\"font-size:1.6em\">${d.userCode}</b><br>(it's on the TV too). Come back here or look at the TV once you've approved."
                 })
             }
+            "/import" -> send(out, 200, result {
+                // moving from the old Joint Launcher: its logins and orders, sent once from the PC (README); only these keys
+                val e = hub.prefs.edit()
+                IMPORT_KEYS.forEach { k -> params[k]?.takeIf { it.isNotEmpty() }?.let { e.putString(k, it) } }
+                IMPORT_SETS.forEach { k -> params[k]?.let { v -> e.putStringSet(k, v.split('\n').filter(String::isNotEmpty).toSet()) } }
+                e.apply()
+                hub.userId = null
+                "Imported ${params.keys.count { it in IMPORT_KEYS || it in IMPORT_SETS }} settings."
+            })
             else -> send(out, 404, page("Not found", ""))
         }
     }
@@ -184,5 +193,13 @@ class PhonePage(
         .hint{color:#9a9da8;font-size:.85em}.msg{color:#5fd068}.err{color:#ff8080}code{word-break:break-all}
         </style></head><body><h1>Joint Launcher · Connect accounts</h1>$body</body></html>"""
 
-    companion object { const val PORT = 8732 }
+    companion object {
+        const val PORT = 8732
+        private val IMPORT_KEYS = listOf(
+            "server", "key", "uid", "stremio", "seerr_url", "seerr_key",
+            "spotify_client_id", "spotify_refresh", "google_client_id", "google_client_secret", "google_refresh",
+            "app_order", "row_order", "app_filter",
+        )
+        private val IMPORT_SETS = listOf("hidden_rows", "extra_rows")
+    }
 }

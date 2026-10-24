@@ -51,8 +51,20 @@ class DetailScreen(private val a: MainActivity) {
                 actions.addView(a.button("▶  Play") { a.actions.playSeries(p.id) })
                 actions.addView(a.button("Open in Jellyfin") { a.actions.open(p) })
             } else {
-                actions.addView(a.button(if (p.posMs > 0) "▶  Resume" else "▶  Play") { a.actions.open(p) })
-                if (p.posMs > 0) actions.addView(a.button("From start") { a.actions.open(p.copy(posMs = 0)) })
+                // the row may be older than your last watch: ask Jellyfin where you stopped, and offer Resume from there
+                var pos = p.posMs
+                val fromStart = a.button("From start") { a.actions.open(p.copy(posMs = 0)) }
+                val play = a.button("") { a.actions.open(p.copy(posMs = pos)) }
+                fun label() {
+                    play.text = if (pos > 0) "▶  Resume" else "▶  Play"
+                    if (pos > 0 && fromStart.parent == null) actions.addView(fromStart, 1)
+                    if (pos == 0L && fromStart.parent != null) actions.removeView(fromStart)
+                }
+                actions.addView(play); label()
+                hub.pool.execute {
+                    val fresh = runCatching { Sources.jellyfinPosition(hub.server, hub.jfKey, hub.jfUser(), p.id) }.getOrNull() ?: return@execute
+                    hub.main.post { if (this.item === item && fresh != pos) { pos = fresh; label() } }
+                }
             }
             else -> playTarget(item).let { (label, target) -> actions.addView(a.button("▶  $label") { a.actions.open(target) }) }
         }
