@@ -49,6 +49,9 @@ class TopBar(private val a: MainActivity) {
                 clearColorFilter(); onFocusChangeListener = null
             })
             addView(search.also { touchSize(it) })
+            // padlock: locks the desktop as it is (Home's section headers, arrows and edit buttons go; see MainActivity.desktopLocked)
+            val lock = a.iconButton(R.drawable.ic_lock_open, "Lock the desktop") {}.apply { touchSize(this); background = a.bareButton() }
+            addView(lock)
             // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
             addView(collapse)
@@ -79,7 +82,16 @@ class TopBar(private val a: MainActivity) {
                 collapse.contentDescription = when (s) { 0 -> "Fold the top bar to the clock"; 1 -> "Hide the top bar"; else -> "Show the top bar" }
             }
             collapse.setOnClickListener { a.hub.prefs.edit().putInt("topbar_fold", (step() + 1) % 3).apply(); applyFold() }
-            applyFold()
+            fun applyLock() {
+                val locked = a.desktopLocked()
+                lock.setImageResource(if (locked) R.drawable.ic_lock else R.drawable.ic_lock_open)
+                lock.contentDescription = if (locked) "Unlock the desktop" else "Lock the desktop"
+                applyFold()
+                collapse.visibility = if (locked) View.GONE else View.VISIBLE // the bar stays folded as it was
+                if (locked) titlesButton.visibility = View.GONE // titles are gone while locked anyway
+            }
+            lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); a.loadHome() }
+            applyLock()
         } else {
             addView(search)
             addView(tabStrip)

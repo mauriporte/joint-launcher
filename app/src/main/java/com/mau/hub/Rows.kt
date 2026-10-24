@@ -203,7 +203,11 @@ class Rows(private val a: MainActivity) {
      * off, and a round dropdown arrow on the right, like a Home Assistant collapsible card. The whole header is the tap
      * target; the arrow points down when folded, up when open.
      */
-    private fun foldHeader(key: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit) = LinearLayout(a).apply {
+    private fun foldHeader(key: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit): View =
+        // desktop locked: no header (title, heart, +, pencil, arrow); a folded section is then just gone
+        if (a.desktopLocked()) View(a) else headerView(key, folded, extra, toggle)
+
+    private fun headerView(key: String, folded: Boolean, extra: List<View>, toggle: () -> Unit) = LinearLayout(a).apply {
         val title = TabletSettings.name(a.hub, key)
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
@@ -358,6 +362,7 @@ class Rows(private val a: MainActivity) {
                 is WidgetsRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
                     val w = a.widgets
+                    if (a.desktopLocked()) w.editing = false
                     val ids = w.ids()
                     val folded = a.hub.prefs.getBoolean("widgets_folded", false)
                     val add = roundButton(R.drawable.ic_add, "Add widget") { w.pick() }

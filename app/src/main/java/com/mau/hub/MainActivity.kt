@@ -355,7 +355,8 @@ class MainActivity : Activity() {
             text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
             setPadding(dp(4), dp(8), dp(4), dp(8))
         })
-        if (favsOnly) dragToReorder(strip) else strip.setOnDragListener(null)
+        val canDrag = favsOnly && !desktopLocked()
+        if (canDrag) dragToReorder(strip) else strip.setOnDragListener(null)
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
             fun menu() =
@@ -377,7 +378,7 @@ class MainActivity : Activity() {
                 )
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
                 // Favorites: hold and drag to put it somewhere else; hold and let go without moving for the menu
-                if (favsOnly) { draggedMenu = ::menu; tile.startDragAndDrop(null, View.DragShadowBuilder(tile), tile, 0); tile.alpha = 0.3f } else menu()
+                if (canDrag) { draggedMenu = ::menu; tile.startDragAndDrop(null, View.DragShadowBuilder(tile), tile, 0); tile.alpha = 0.3f } else menu()
             }
             tile.setOnKeyListener { v, code, e ->
                 if (code == KeyEvent.KEYCODE_DPAD_LEFT && e.action == KeyEvent.ACTION_DOWN && strip.indexOfChild(v) == 0) { sidebar.focus(); true } else false
@@ -454,6 +455,9 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Activity result API needs androidx activity")
+    /** Tablet desktop lock (padlock next to search): sections can't be folded, moved or edited, and their headers go. */
+    fun desktopLocked() = hub.touch && hub.prefs.getBoolean("desktop_locked", false)
+
     var onBackgroundPicked: (() -> Unit)? = null // an open Settings panel redraws with the new picture
     private var pickingFor: String? = null
 
