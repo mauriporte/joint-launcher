@@ -1,6 +1,5 @@
 package com.mau.hub
 
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -22,10 +21,8 @@ class TopBar(private val a: MainActivity) {
         // leftmost thing on screen, like a row's first tile: Left opens the sidebar
         setOnKeyListener { _, code, e -> if (code == KeyEvent.KEYCODE_DPAD_LEFT && e.action == KeyEvent.ACTION_DOWN) { a.sidebar.focus(); true } else false }
     }
-    // little gear right after the tabs: the TV's own Settings app
-    private val gear = a.iconButton(R.drawable.ic_settings, "TV settings") {
-        runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }.onFailure { a.toast("Couldn't open Settings") }
-    }.apply {
+    // little gear right after the tabs: the TV's (or tablet's) own Settings app; Joint Launcher's are in the sidebar
+    private val gear = a.iconButton(R.drawable.ic_settings, if (a.hub.touch) "Tablet settings" else "TV settings") { a.actions.systemSettings() }.apply {
         layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginStart = a.dp(6) }
         setPadding(a.dp(7), a.dp(7), a.dp(7), a.dp(7))
         id = View.generateViewId()

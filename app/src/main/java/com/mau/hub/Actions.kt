@@ -146,6 +146,23 @@ class Actions(private val a: MainActivity) {
         AlertDialog.Builder(a).setTitle("Background").setView(box).setPositiveButton("Done", null).show()
     }
 
+    /** Tablet: tick the apps the Apps section's heart button shows. */
+    private fun favouriteApps() = hub.diskPool.execute {
+        val list = a.apps.all()
+        hub.main.post {
+            val favs = a.apps.favourites()
+            AlertDialog.Builder(a).setTitle("Favorite apps")
+                .setMultiChoiceItems(list.map { it.label }.toTypedArray(), list.map { it.key in favs }.toBooleanArray()) { _, i, on ->
+                    a.apps.setFavourite(list[i].key, on)
+                }
+                .setPositiveButton("Done", null).setOnDismissListener { a.refreshApps() }.show()
+        }
+    }
+
+    fun systemSettings() {
+        runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }.onFailure { a.toast("Couldn't open Settings") }
+    }
+
     fun settings() {
         fun field(hint: String, value: String, password: Boolean = false) = EditText(a).apply {
             this.hint = hint; setText(value); isSingleLine = true
@@ -156,9 +173,9 @@ class Actions(private val a: MainActivity) {
         val box = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), a.dp(8), a.dp(24), 0)
             listOf(url, key).forEach(::addView)
-            if (hub.touch) addView(a.button("Background") { background() }.apply {
-                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(12) }
-            })
+            if (hub.touch) addView(LinearLayout(a).apply {
+                addView(a.button("Background") { background() })
+                addView(a.button("Favorite apps") { favouriteApps() })            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(12) })
             addView(a.text(13f, TEXT_MUTED).apply { text = storageLine(); setPadding(0, a.dp(12), 0, 0) })
         }
         AlertDialog.Builder(a).setTitle("Settings").setView(box)

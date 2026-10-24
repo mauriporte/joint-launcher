@@ -59,7 +59,8 @@ class Sidebar(private val a: MainActivity) {
         }
         rail.addView(View(a), LinearLayout.LayoutParams(0, a.dp(8), 1f))
         item(a.getDrawable(R.drawable.ic_rows), "Rows", "$HOME:rows", tint = true) { hide(); a.chooseRows() }
-        item(a.getDrawable(R.drawable.ic_settings), "Settings", "$HOME:settings", tint = true) { hide(); a.actions.settings() }
+        // tablet: pen and paper, so it isn't confused with the corner gear (the tablet's own settings)
+        item(a.getDrawable(if (a.hub.touch) R.drawable.ic_edit_note else R.drawable.ic_settings), "Settings", "$HOME:settings", tint = true) { hide(); a.actions.settings() }
     }
 
     fun show() {

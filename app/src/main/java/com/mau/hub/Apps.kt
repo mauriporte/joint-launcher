@@ -60,6 +60,16 @@ class Apps(private val hub: Hub, private val images: Images) {
     fun saveOrder(moved: List<String>) =
         hub.prefs.edit().putString("app_order", (moved + savedOrder().filter { it !in moved }).joinToString("\n")).apply()
 
+    /** Tablet: the apps the Apps section shows when its heart button is on. */
+    fun favourites(): Set<String> = hub.prefs.getStringSet("fav_apps", null) ?: emptySet()
+
+    fun setFavourite(pkg: String, on: Boolean) =
+        hub.prefs.edit().putStringSet("fav_apps", favourites().let { if (on) it + pkg else it - pkg }).apply()
+
+    var favouritesOnly: Boolean
+        get() = hub.prefs.getBoolean("apps_favs_only", false)
+        set(v) = hub.prefs.edit().putBoolean("apps_favs_only", v).apply()
+
     /** Opens the app (its TV or phone/tablet version, whichever is installed). */
     fun launch(pkg: String) {
         val p = hub.pkgFor(pkg) ?: pkg

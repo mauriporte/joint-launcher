@@ -285,15 +285,27 @@ class MainActivity : Activity() {
         if (img == null) { heroImg.tag = null; heroImg.setImageDrawable(null) } else images.load(img, heroImg, big = true)
     }
 
+    /** Redraws the Apps section on Home (after favourites change); set by the row while it's shown. */
+    var refreshApps: () -> Unit = {}
+
     /** "Your apps": every installed TV app, laid out like Google TV's apps row. OK opens, a long press offers Move. */
-    fun fillAppsRow(strip: ViewGroup, list: List<SideApp>) {
+    fun fillAppsRow(strip: ViewGroup, all: List<SideApp>) {
         strip.removeAllViews()
+        val favs = apps.favourites()
+        val list = if (hub.touch && apps.favouritesOnly) all.filter { it.key in favs } else all
+        if (list.isEmpty() && all.isNotEmpty()) strip.addView(text(15f, TEXT_MUTED).apply {
+            text = "No favorites yet: press and hold an app and choose “Mark as favorite”, or pick them in Settings → Favorite apps"
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+        })
         list.forEachIndexed { i, app ->
             lateinit var tile: LinearLayout
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
                 MoveMode.holdMenu(this, tile, beside = false,
                     listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
                         moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout) +
+                        listOfNotNull(app.pkg?.takeIf { hub.touch }?.let { pkg ->
+                            (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() }
+                        }) +
                         ("Change icon" to { IconPicker(this, app) { sidebar.dirty = true; loadHome() }.show() }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )

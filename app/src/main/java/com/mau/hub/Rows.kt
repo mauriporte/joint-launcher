@@ -290,7 +290,12 @@ class Rows(private val a: MainActivity) {
                         fun draw() {
                             strip.visibility = if (folded()) View.GONE else View.VISIBLE
                             val i = indexOfChild(head); removeView(head)
-                            head = foldHeader("Apps", folded()) { a.hub.prefs.edit().putBoolean("apps_folded", !folded()).apply(); draw() }
+                            // heart: all apps / favourites only (a red heart, and the section is called Favorites)
+                            val favsOnly = a.apps.favouritesOnly
+                            val heart = roundButton(if (favsOnly) R.drawable.ic_favorite else R.drawable.ic_favorite_border,
+                                if (favsOnly) "Show all apps" else "Show favorite apps") { a.apps.favouritesOnly = !favsOnly; draw(); a.refreshApps() }
+                                .apply { if (favsOnly) setColorFilter(0xFFE53935.toInt()) }
+                            head = foldHeader(if (favsOnly) "Favorites" else "Apps", folded(), listOf(heart)) { a.hub.prefs.edit().putBoolean("apps_folded", !folded()).apply(); draw() }
                             addView(head, i, LinearLayout.LayoutParams(-1, -2))
                         }
                         head = View(a); addView(head); draw()
@@ -299,7 +304,8 @@ class Rows(private val a: MainActivity) {
                         isHorizontalScrollBarEnabled = false; clipChildren = false; clipToPadding = false; addView(strip)
                     })
                     // reading ~25 app names from their packages took 1.6s on the UI thread; do it on the disk thread
-                    a.hub.diskPool.execute { val apps = a.apps.all(); a.hub.main.post { a.fillAppsRow(strip, apps) } }
+                    a.refreshApps = { a.hub.diskPool.execute { val apps = a.apps.all(); a.hub.main.post { a.fillAppsRow(strip, apps) } } }
+                    a.refreshApps()
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
