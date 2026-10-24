@@ -130,7 +130,7 @@ class Widgets(private val a: MainActivity) {
 
     // ---- the grid: a launcher-style home page for widgets ----
     // Cells of about 120 dp, so the full width holds as many columns as a tablet launcher's home page. The grid
-    // itself is resizable (columns x rows, its own corner handle while editing); by default it's as wide as the
+    // itself is resizable (columns x rows, its own corner handle while editing; up to three screens tall); by default it's as wide as the
     // screen and as tall as the screen below the top bar. Each widget has a span (columns x rows) and a spot per
     // orientation, so turning the tablet doesn't scramble the landscape layout.
 
@@ -141,11 +141,13 @@ class Widgets(private val a: MainActivity) {
     private fun cellPx(width: Int) = width / maxCols(width)
     private fun ints(key: String) = a.hub.prefs.getString(key, null)?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
 
+    /** Rows that fit one screen below the top bar; the grid can grow to three of those (three tablets stacked). */
+    private fun screenRows(width: Int) = maxOf(2, (a.resources.displayMetrics.heightPixels - a.dp(160)) / cellPx(width))
+    private fun maxRows(width: Int) = screenRows(width) * 3
+
     /** Columns x rows of the grid in this orientation: yours, else the whole screen below the top bar. */
     private fun gridSize(width: Int): Pair<Int, Int> {
-        val cell = cellPx(width)
-        val fullRows = maxOf(2, (a.resources.displayMetrics.heightPixels - a.dp(160)) / cell)
-        return ints("wgrid_$orient")?.let { (c, r) -> c.coerceIn(1, maxCols(width)) to r.coerceIn(1, MAX_ROWS) } ?: (maxCols(width) to fullRows)
+        return ints("wgrid_$orient")?.let { (c, r) -> c.coerceIn(1, maxCols(width)) to r.coerceIn(1, maxRows(width)) } ?: (maxCols(width) to screenRows(width))
     }
 
     /** A widget's columns x rows: yours, else from the size it was dragged to before the grid, else what it asks for. */
@@ -277,7 +279,7 @@ class Widgets(private val a: MainActivity) {
 
     private fun gridDrag(grid: Grid, c0: Int, r0: Int, dx: Float, dy: Float, done: Boolean) {
         val c = Math.round((c0 * grid.cell + dx) / grid.cell).coerceIn(1, maxCols(grid.width))
-        val r = Math.round((r0 * grid.cell + dy) / grid.cell).coerceIn(1, MAX_ROWS)
+        val r = Math.round((r0 * grid.cell + dy) / grid.cell).coerceIn(1, maxRows(grid.width))
         if (c != grid.cols || r != grid.rows) { grid.cols = c; grid.rows = r; grid.requestLayout(); grid.invalidate() }
         if (done) { a.hub.prefs.edit().putString("wgrid_$orient", "$c,$r").apply(); a.rows.refreshWidgets() } // widgets re-fit the new grid
     }
@@ -301,7 +303,6 @@ class Widgets(private val a: MainActivity) {
 
     companion object {
         private const val HOST_ID = 1024
-        private const val MAX_ROWS = 12 // the widget area can grow to about two screens tall
         private const val REQ_BIND = 41
         private const val REQ_CONFIGURE = 42
     }

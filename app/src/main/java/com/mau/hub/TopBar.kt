@@ -52,13 +52,14 @@ class TopBar(private val a: MainActivity) {
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
             addView(titlesButton.also { touchSize(it); it.background = a.bareButton(); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
-            // same height as the clock; temperature first, then a bigger icon
+            // same height as the clock; temperature first at half the size (the clock is what matters), then the icon
             addView(weather.apply {
-                textSize = 26f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                textSize = 13f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 gravity = Gravity.CENTER_VERTICAL; includeFontPadding = false
                 setPadding(a.dp(16), 0, a.dp(16), 0) // no card behind it: just the text over the background
             }, LinearLayout.LayoutParams(-2, a.dp(58)).apply { marginStart = a.dp(8); marginEnd = a.dp(12) })
-            addView(flipClock())
+            opensApp(weather, "weather", "Weather", listOf("weather", "clima", "tiempo"))
+            addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) })
         } else {
             addView(search)
             addView(tabStrip)
@@ -92,6 +93,31 @@ class TopBar(private val a: MainActivity) {
     }
 
 
+    /**
+     * Tablet corner: tapping the clock or the weather opens the app you pick for it (asked the first time, then
+     * remembered); press and hold to pick another. Apps whose names suggest the job (a clock app, a weather app) come first.
+     */
+    private fun opensApp(v: View, key: String, what: String, hints: List<String>) {
+        fun choose() = a.hub.diskPool.execute {
+            val all = a.apps.all().sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
+            val (likely, rest) = all.partition { app -> hints.any { h -> app.label.contains(h, true) || app.key.contains(h, true) } }
+            val list = likely + rest
+            a.hub.main.post {
+                android.app.AlertDialog.Builder(a).setTitle("Open which app for the $what?")
+                    .setItems(list.map { it.label }.toTypedArray()) { _, i ->
+                        a.hub.prefs.edit().putString("opens_$key", list[i].key).apply(); list[i].pkg?.let(a.apps::launch)
+                    }.setNegativeButton("Cancel", null).show()
+            }
+        }
+        v.isClickable = true
+        v.background = a.bareButton()
+        v.setOnClickListener {
+            val pkg = a.hub.prefs.getString("opens_$key", null)?.takeIf(a.hub::installed)
+            if (pkg != null) a.apps.launch(pkg) else choose()
+        }
+        v.setOnLongClickListener { choose(); true }
+    }
+
     /** Bright while titles show, dimmed while they're off. */
     fun applyTitlesButton() {
         val on = a.hub.prefs.getBoolean("section_titles", true)
@@ -117,7 +143,7 @@ class TopBar(private val a: MainActivity) {
         val icon = text?.substringBefore("  ")?.takeIf { "  " in text } ?: return text.orEmpty()
         val temp = text.substringAfter("  ")
         return android.text.SpannableString("$temp  $icon").apply {
-            setSpan(android.text.style.RelativeSizeSpan(1.35f), length - icon.length, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(android.text.style.RelativeSizeSpan(2.7f), length - icon.length, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
 
