@@ -48,10 +48,13 @@ class TopBar(private val a: MainActivity) {
                 touchSize(this); marginEnd(this, 8); background = a.bareButton(); setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4))
                 clearColorFilter(); onFocusChangeListener = null
             })
-            addView(search.also { touchSize(it) })
-            // padlock: locks the desktop as it is (Home's section headers, arrows and edit buttons go; see MainActivity.desktopLocked)
-            val lock = a.iconButton(R.drawable.ic_lock_open, "Lock the desktop") {}.apply { touchSize(this); background = a.bareButton() }
+            // padlock, between the menu icon and search, a little smaller: locks the desktop as it is (Home's section
+            // headers, arrows and edit buttons go; see MainActivity.desktopLocked)
+            val lock = a.iconButton(R.drawable.ic_lock_open, "Lock the desktop") {}.apply {
+                touchSize(this); background = a.bareButton(); setPadding(a.dp(13), a.dp(13), a.dp(13), a.dp(13))
+            }
             addView(lock)
+            addView(search.also { touchSize(it) })
             // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
             addView(collapse)
