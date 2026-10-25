@@ -188,8 +188,35 @@ class Rows(private val a: MainActivity) {
         }
     }
 
-    /** A widget was added or removed, or edit mode switched: redraw the Widgets section. */
-    fun refreshWidgets() { shown.indexOfFirst { it is WidgetsRow }.takeIf { it >= 0 }?.let(adapter::notifyItemChanged) }
+    /** A widget was added or removed, or edit mode switched: redraw the Widgets section (or the widget page). */
+    fun refreshWidgets() {
+        shown.indexOfFirst { it is WidgetsRow }.takeIf { it >= 0 }?.let(adapter::notifyItemChanged)
+        a.widgetPage.refresh()
+    }
+
+    /** The Widgets section's header and grid: on Home, or on the widget page (no fold arrow there: the page is all widgets). */
+    fun fillWidgets(box: LinearLayout, onPage: Boolean) = box.apply {
+        removeAllViews()
+        val w = a.widgets
+        if (a.desktopLocked()) w.editing = false
+        val ids = w.ids()
+        val folded = !onPage && a.hub.prefs.getBoolean("widgets_folded", false)
+        val add = roundButton(R.drawable.ic_add, "Add widget") { w.pick() }
+        // while editing it's a green tick, so it reads as "done", not as another pencil
+        val edit = roundButton(if (w.editing) R.drawable.ic_check else R.drawable.ic_edit, if (w.editing) "Done editing widgets" else "Edit widgets") {
+            w.editing = !w.editing; refreshWidgets()
+        }.apply { if (w.editing) setColorFilter(0xFF4CAF50.toInt()) }
+        // edit also resizes the grid itself, so it shows even with no widgets
+        if (!a.desktopLocked()) addView(headerView("widgets", folded, listOf(add, edit), fold = !onPage) {
+            a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
+        }, LinearLayout.LayoutParams(-1, -2))
+        if (folded) return@apply
+        if (onPage && ids.isEmpty()) addView(a.text(16f, TEXT_SOFT).apply {
+            text = if (a.desktopLocked()) "No widgets yet. Unlock the desktop (the padlock on Home) to add some." else "No widgets yet. Tap + to add one."
+            setPadding(a.dp(8), a.dp(24), a.dp(8), 0)
+        })
+        addView(w.grid(ids), LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(8), a.dp(4), a.dp(8), 0) }) // a home-page-sized grid
+    }
 
     // ---- views ----
 
@@ -205,14 +232,14 @@ class Rows(private val a: MainActivity) {
      */
     private fun foldHeader(key: String, folded: Boolean, extra: List<View> = emptyList(), toggle: () -> Unit): View =
         // desktop locked: no header (title, heart, +, pencil, arrow); a folded section is then just gone
-        if (a.desktopLocked()) View(a) else headerView(key, folded, extra, toggle)
+        if (a.desktopLocked()) View(a) else headerView(key, folded, extra, toggle = toggle)
 
-    private fun headerView(key: String, folded: Boolean, extra: List<View>, toggle: () -> Unit) = LinearLayout(a).apply {
+    private fun headerView(key: String, folded: Boolean, extra: List<View>, fold: Boolean = true, toggle: () -> Unit) = LinearLayout(a).apply {
         val title = TabletSettings.name(a.hub, key)
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         setPadding(a.dp(8), a.dp(16), a.dp(4), a.dp(8))
         // TV: only the header's buttons take focus, the row itself is no target
-        isClickable = a.hub.touch; if (a.hub.touch) setOnClickListener { toggle() }
+        isClickable = a.hub.touch && fold; if (a.hub.touch && fold) setOnClickListener { toggle() }
         contentDescription = (if (folded) "Show " else "Hide ") + title
         // titles switch off from the top bar's text button (or Settings): the section's icon, styled like the buttons, instead
         if (a.hub.prefs.getBoolean("section_titles", true)) addView(a.text(22f, Color.WHITE).apply {
@@ -227,7 +254,7 @@ class Rows(private val a: MainActivity) {
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
         }
         extra.forEach { addView(it, LinearLayout.LayoutParams(a.dp(48), a.dp(48)).apply { marginEnd = a.dp(10) }) }
-        addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { refocus = key; toggle() }.apply {
+        if (fold) addView(roundButton(R.drawable.ic_chevron, if (folded) "Show $title" else "Hide $title") { refocus = key; toggle() }.apply {
             rotation = if (folded) 90f else 270f // ic_chevron points right
             // TV: the section is rebuilt when it folds; the remote's focus stays on its arrow instead of jumping to the top
             if (!a.hub.touch && refocus == key) { refocus = null; post { requestFocus() } }
@@ -372,24 +399,7 @@ class Rows(private val a: MainActivity) {
                     removeAllViews()
                     addView(foldHeader("watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
                 }
-                is WidgetsRow -> (holder.itemView as LinearLayout).apply {
-                    removeAllViews()
-                    val w = a.widgets
-                    if (a.desktopLocked()) w.editing = false
-                    val ids = w.ids()
-                    val folded = a.hub.prefs.getBoolean("widgets_folded", false)
-                    val add = roundButton(R.drawable.ic_add, "Add widget") { w.pick() }
-                    // while editing it's a green tick, so it reads as "done", not as another pencil
-                    val edit = roundButton(if (w.editing) R.drawable.ic_check else R.drawable.ic_edit, if (w.editing) "Done editing widgets" else "Edit widgets") {
-                        w.editing = !w.editing; refreshWidgets()
-                    }.apply { if (w.editing) setColorFilter(0xFF4CAF50.toInt()) }
-                    // edit also resizes the grid itself, so it shows even with no widgets
-                    addView(foldHeader("widgets", folded, listOf(add, edit)) {
-                        a.hub.prefs.edit().putBoolean("widgets_folded", !folded).apply(); refreshWidgets()
-                    }, LinearLayout.LayoutParams(-1, -2))
-                    if (folded) return
-                    addView(w.grid(ids), LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(8), a.dp(4), a.dp(8), 0) }) // a home-page-sized grid
-                }
+                is WidgetsRow -> fillWidgets(holder.itemView as LinearLayout, onPage = false)
             }
         }
 

@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- the TV's own network address, for the phone sign-in page's QR code -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" /> <!-- swipe gesture: open the notifications -->
     <!-- tablet: "Uninstall" on an app opens Android's own confirm screen -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- only takes effect if granted over adb; used solely to switch our Home button service back on after updates -->

@@ -119,6 +119,7 @@ class MainActivity : Activity() {
             addView(page, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(20) })
             // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen)
             if (touch) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
+            if (touch) addView(widgetPage.view, FrameLayout.LayoutParams(-1, -1)) // over the edge strip: no sidebar from the widget page
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
@@ -138,6 +139,11 @@ class MainActivity : Activity() {
 
     /** Tablet home-screen widgets (see [Widgets]). */
     val widgets by lazy { Widgets(this) }
+    val widgetPage by lazy { WidgetPage(this) }
+    val gestures by lazy { Gestures(this) }
+
+    override fun dispatchTouchEvent(e: android.view.MotionEvent): Boolean =
+        (hub.touch && gestures.onTouch(e) { super.dispatchTouchEvent(it) }) || super.dispatchTouchEvent(e)
 
     // widgets only update while the screen is showing
     override fun onStart() { super.onStart(); if (hub.touch) { widgets.start(); topBar.applyCornerClock() } }
@@ -249,7 +255,7 @@ class MainActivity : Activity() {
             // video rows away) and Home Assistant; the TV has just your apps and To Watch (see TabletSettings.sections)
             else -> TabletSettings.sections(hub).forEach { s ->
                 when (s) {
-                    "widgets" -> rows.widgets()
+                    "widgets" -> if (!hub.touch || !gestures.widgetsOnPage()) rows.widgets() // else it's on the widget page
                     "apps" -> rows.apps()
                     "ha" -> if (BuildConfig.HA_LOCAL.isNotEmpty() || BuildConfig.HA_REMOTE.isNotEmpty()) rows.homeAssistant()
                     else -> {
@@ -428,6 +434,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             detail.isShown -> detail.close()
+            hub.touch && widgetPage.isOpen -> widgetPage.close()
             sidebar.rail.hasFocus() -> backToContent()
             inSearch -> loadHome()
             appFilter != null -> pickApp(null) // single-app view -> back to everything
@@ -445,6 +452,7 @@ class MainActivity : Activity() {
         searchBar.dismiss()
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
+        if (hub.touch) widgetPage.close()
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
     }

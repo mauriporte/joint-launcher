@@ -186,9 +186,9 @@ class Widgets(private val a: MainActivity) {
     private fun cellPx(width: Int) = width / maxCols(width)
     private fun ints(key: String) = a.hub.prefs.getString(key, null)?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
 
-    /** Rows that fit one screen below the top bar; the grid can grow to three of those (three tablets stacked). */
+    /** Rows that fit one screen below the top bar; the grid can grow to ten of those (the widget page scrolls). */
     private fun screenRows(width: Int) = maxOf(2, (a.resources.displayMetrics.heightPixels - a.dp(160)) / cellPx(width))
-    private fun maxRows(width: Int) = screenRows(width) * 3
+    private fun maxRows(width: Int) = screenRows(width) * 10
 
     /** Columns x rows of the grid in this orientation: yours, else the whole screen below the top bar. */
     private fun gridSize(width: Int): Pair<Int, Int> {

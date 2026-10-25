@@ -135,6 +135,10 @@ class TabletSettings(private val a: MainActivity) {
         line(name(hub, "watch"), "Order and show/hide its rows") { a.chooseRows() }
 
         if (hub.touch) {
+        heading("Gestures")
+        listOf(Gestures.SWIPE_RIGHT, Gestures.SWIPE_LEFT, Gestures.DOUBLE_TAP).forEach { k ->
+            line(Gestures.LABELS.getValue(k), a.gestures.describe(k)) { a.gestures.choose(k) { draw() } }
+        }
         heading("Screen")
         fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
             text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)
