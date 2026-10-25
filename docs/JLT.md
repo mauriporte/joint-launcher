@@ -165,6 +165,13 @@ outlines, padlocked server plugs ask before turning off, columns follow the widg
 with a long-lived token saved on the Connect page (Home Assistant section). Tiles without a sure HA match are grey
 "Sin asignar" placeholders. A.R.T. Phone extended it to 36 tiles with cameras.
 
+### Home Herald widget
+
+The house's daily paper from HA's `sensor.home_herald` (`HeraldWidget.kt`), read-only with MauHome's token, laid
+out like its HA page and in the same font (Gelasio, Georgia's free twin, also embedded in the page): masthead with
+the round logo, night/day and EN/ES switches, numbers 4 across, watch box, briefs. Keeps the last edition when HA is
+away; a tap opens it in the HA app. Mau approved the look (no blackletter masthead).
+
 ### Other details
 
 - Settings → Background → **Lock screen** puts the current background picture on the lock screen too.
