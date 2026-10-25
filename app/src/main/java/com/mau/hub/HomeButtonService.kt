@@ -16,8 +16,8 @@ import android.view.accessibility.AccessibilityEvent
  * The user switches it on in Settings > Accessibility; switching it off gives Home back to Google TV.
  */
 class HomeButtonService : AccessibilityService() {
-    override fun onServiceConnected() { running = true; instance = this; wanted(this, true) }
-    override fun onDestroy() { running = false; instance = null; super.onDestroy() }
+    override fun onServiceConnected() { instance = this; wanted(this, true) }
+    override fun onDestroy() { instance = null; super.onDestroy() }
 
     // the user switched it off (an app update kills the process without calling this, so it stays "wanted")
     override fun onUnbind(intent: Intent?): Boolean { if (!restoring) wanted(this, false); return super.onUnbind(intent) }
@@ -38,8 +38,6 @@ class HomeButtonService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     companion object {
-        // same process as the app: true while Android has this service running
-        @Volatile private var running = false
         @Volatile private var restoring = false // our own off-and-on below isn't the user switching it off
         @Volatile private var instance: HomeButtonService? = null
 
@@ -55,7 +53,10 @@ class HomeButtonService : AccessibilityService() {
          * Touches only this app's own entry in the enabled-services list.
          */
         fun restore(c: Context) {
-            if (running) return
+            // asked of Android: the service lives in its own process (":home"), so `running` here never sees it
+            val am = c.getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
+            if (am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                    .any { it.resolveInfo.serviceInfo.packageName == c.packageName }) return
             if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return
             if (!prefs(c).getBoolean("wanted", false)) return
             val me = ComponentName(c, HomeButtonService::class.java).flattenToString()

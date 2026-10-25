@@ -69,6 +69,13 @@ class PhonePage(
                 hub.prefs.edit().putString("seerr_url", base).putString("seerr_key", key).apply()
                 "Jellyseerr connected as $name."
             })
+            "/immich" -> send(out, 200, result {
+                val base = params["url"].orEmpty().trim().trimEnd('/').also { require(it.startsWith("http")) { "the address must start with http:// or https://" } }
+                val key = params["apikey"].orEmpty().trim().ifEmpty { Immich.createKey(base, params["email"].orEmpty().trim(), params["password"].orEmpty()) }
+                val name = Immich.userName(base, key)
+                hub.prefs.edit().putString("immich_url", base).putString("immich_key", key).apply()
+                "Immich connected as $name. Pick the photos for the screensaver in Settings → Screensaver."
+            })
             "/stremio" -> send(out, 200, result {
                 hub.prefs.edit().putString("stremio", Sources.stremioLogin(params["email"].orEmpty().trim(), params["password"].orEmpty())).apply()
                 "Stremio connected."
@@ -189,6 +196,15 @@ class PhonePage(
           <p class=hint>…or paste the API key instead (Jellyseerr → Settings → General):</p>
           <input name=apikey placeholder="API key (optional)">
           <button>Connect Jellyseerr</button></form>
+        <h2>Immich${mark(hub.prefs.contains("immich_key"))}</h2>
+        <form method=post action="/$token/immich">
+          <input name=url placeholder="https://immich.example.com" value="${pref("immich_url")}">
+          <input name=email type=email placeholder="Immich email" autocomplete=username>
+          <input name=password type=password placeholder="Immich password (not stored)" autocomplete=current-password>
+          <p class=hint>…or paste an API key instead (Immich → Account settings → API keys):</p>
+          <input name=apikey placeholder="API key (optional)">
+          <button>Connect Immich</button></form>
+        <p class=hint>For the photo screensaver.</p>
         <h2>Stremio${mark(hub.stremioKey.isNotEmpty())}</h2>
         <form method=post action="/$token/stremio"><input name=email type=email placeholder="Email" autocomplete=username><input name=password type=password placeholder="Password (not stored)" autocomplete=current-password><button>Connect Stremio</button></form>
         <h2>Spotify${mark(hub.connected("spotify"))}</h2>
@@ -213,7 +229,7 @@ class PhonePage(
     companion object {
         const val PORT = 8732
         private val IMPORT_KEYS = listOf(
-            "server", "key", "uid", "stremio", "seerr_url", "seerr_key",
+            "server", "key", "uid", "stremio", "seerr_url", "seerr_key", "immich_url", "immich_key",
             "spotify_client_id", "spotify_refresh", "google_client_id", "google_client_secret", "google_refresh",
             "app_order", "row_order", "app_filter",
         )
@@ -221,7 +237,7 @@ class PhonePage(
         private val ICON_PICK = Regex("[A-Za-z0-9_.]+\\|[A-Za-z0-9_]+(\\|auto)?") // package|icon name[|auto], nothing else
         /** What /export hands to another device: the accounts that aren't tied to this device (Jellyfin signs in per device). */
         private val ACCOUNT_KEYS = listOf(
-            "stremio", "seerr_url", "seerr_key",
+            "stremio", "seerr_url", "seerr_key", "immich_url", "immich_key",
             "spotify_client_id", "spotify_refresh", "google_client_id", "google_client_secret", "google_refresh",
         )
     }

@@ -346,3 +346,13 @@ class WidgetGridTest {
         org.junit.Assert.assertEquals(null, Widgets.nearestFree(0, 0, 8, 4, 8, 4, listOf(beeper)))   // no room anywhere
     }
 }
+
+class ImmichTest {
+    @org.junit.Test fun readsAlbumsAndPhotos() {
+        org.junit.Assert.assertEquals(listOf("a1" to "Family · 12 photos"),
+            Immich.parseAlbums("""[{"id":"a1","albumName":"Family","assetCount":12}]"""))
+        org.junit.Assert.assertEquals(listOf("p1", "p3"),
+            Immich.parseIds("""[{"id":"p1","type":"IMAGE"},{"id":"p2","type":"VIDEO"},{"id":"p3","type":"IMAGE"}]"""))
+        org.junit.Assert.assertEquals(listOf("p9"), Immich.parseAlbumPhotos("""{"id":"a1","assets":[{"id":"p9","type":"IMAGE"}]}"""))
+    }
+}

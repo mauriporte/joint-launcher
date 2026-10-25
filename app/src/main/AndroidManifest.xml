@@ -121,5 +121,14 @@
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+        <!-- screensavers (Settings > Screensaver): the flip clock on your background, and your Immich photos -->
+        <service android:name=".ClockDream" android:exported="true" android:label="Joint Launcher clock"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter><action android:name="android.service.dreams.DreamService" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </service>
+        <service android:name=".PhotoDream" android:exported="true" android:label="Joint Launcher photos (Immich)"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter><action android:name="android.service.dreams.DreamService" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </service>
     </application>
 </manifest>
