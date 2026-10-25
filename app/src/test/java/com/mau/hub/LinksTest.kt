@@ -454,3 +454,12 @@ class MiniSocketTest {
         assertEquals(4 + 4 + 200, g.size)
     }
 }
+
+class JarvisLanguageTest {
+    @Test fun answersAreReadInTheirOwnLanguage() {
+        assertTrue(Jarvis.spanish("Las luces del salón están encendidas."))
+        assertTrue(Jarvis.spanish("¿Quieres que apague la tele?"))
+        assertTrue(!Jarvis.spanish("The living room lights are on."))
+        assertTrue(!Jarvis.spanish("Done: I turned off the TV for you."))
+    }
+}
