@@ -352,11 +352,11 @@ class HaWidgetTest {
     private fun tile(name: String) = HaWidget.TILES.first { it.name == name }
 
     @Test fun tilesShowHomeAssistantStates() {
-        val strip = tile("Regleta Multimedia")
-        // a strip is on while any outlet is on
-        val s = mapOf(st("switch.regleta_multimedia_enchufe_1", "off"), st("switch.regleta_multimedia_enchufe_2", "on"), st("switch.regleta_multimedia_enchufe_3", "off"))
-        assertTrue(HaWidget.look(strip, s).on)
-        assertEquals("Apagado", HaWidget.look(strip, s.mapValues { org.json.JSONObject(it.value.toString().replace("\"on\"", "\"off\"")) }).status)
+        // a placeholder shows, grey, until it's wired to an entity
+        assertEquals("Sin asignar", HaWidget.look(tile("Regleta USB"), mapOf(st("switch.other", "on"))).status)
+        val desk = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet_3"
+        assertTrue(HaWidget.look(tile("Escritorio"), mapOf(st(desk, "on"))).on)
+        assertEquals("Apagado", HaWidget.look(tile("Escritorio"), mapOf(st(desk, "off"))).status)
         // the thermostat reports °F; the tile shows °C
         assertEquals("25.7 °C", HaWidget.look(tile("Termostato"), mapOf(st("sensor.termostato_temperatura", "78.26", """{"unit_of_measurement":"°F"}"""))).status)
         // the lights group counts its members that are on

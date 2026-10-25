@@ -46,17 +46,16 @@ class HaWidget : AppWidgetProvider() {
         private const val OFFICE_STRIP = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet"
         private fun s(name: String, icon: Int, vararg e: String, guard: String? = null) = HaTile(name, icon, HaTile.Kind.SWITCH, e.toList(), guard)
 
-        /** Google Home's order (4 across). Which strip's "USB" is "Regleta USB" (4) and which is "USB" (8) is a guess. */
+        /** Google Home's order (4 across). A tile with no entity is a placeholder: shown, does nothing until it's wired. */
         internal val TILES = listOf(
             s("Regleta TV", R.drawable.ic_ha_plug, TV_STRIP),
             s("Regleta Oficina", R.drawable.ic_ha_plug, OFFICE_STRIP),
             s("Escritorio", R.drawable.ic_ha_plug, "${OFFICE_STRIP}_3"),
-            s("Regleta USB", R.drawable.ic_ha_plug, "${OFFICE_STRIP}_5"),
-            // HA has no switch for the whole strip: its three outlets together
-            s("Regleta Multimedia", R.drawable.ic_ha_plug, "switch.regleta_multimedia_enchufe_1", "switch.regleta_multimedia_enchufe_2", "switch.regleta_multimedia_enchufe_3"),
+            s("Regleta USB", R.drawable.ic_ha_plug), // placeholder: both strips' outlet_5 are "USB" in HA; Mau picks
+            s("Regleta Multimedia", R.drawable.ic_ha_plug), // placeholder: HA has no switch for the whole strip
             s("TV", R.drawable.ic_ha_tv, "${TV_STRIP}_2"),
             HaTile("Audio", R.drawable.ic_ha_music, HaTile.Kind.IR, listOf("button.audio_on_off")),
-            s("USB", R.drawable.ic_ha_plug, "${TV_STRIP}_5"),
+            s("USB", R.drawable.ic_ha_plug), // placeholder, see Regleta USB
             s("Server Mini", R.drawable.ic_ha_server, "${TV_STRIP}_3", guard = "Server Mini runs Home Assistant and OMV. Turning it off takes both down, " +
                 "and this widget can't turn it back on: the plug has to be switched on by hand."),
             HaTile("Termostato", R.drawable.ic_ha_thermo, HaTile.Kind.TEMP, listOf("sensor.termostato_temperatura")),
@@ -80,6 +79,7 @@ class HaWidget : AppWidgetProvider() {
 
         /** What a tile shows for these HA states. */
         internal fun look(t: HaTile, st: Map<String, JSONObject>): Look {
+            if (t.entities.isEmpty()) return Look(false, GREY, "Sin asignar")
             val all = t.entities.mapNotNull { st[it] }
             val state = all.firstOrNull()?.optString("state")
             if (all.isEmpty() || all.all { it.optString("state") == "unavailable" }) return Look(false, GREY, if (st.isEmpty()) "—" else "No disponible")
@@ -135,7 +135,7 @@ class HaWidget : AppWidgetProvider() {
                 HaTile.Kind.TV -> "media_player/toggle"
                 HaTile.Kind.SPEAKER -> "media_player/media_play_pause"
             }
-            if (service == null) return refresh(app)
+            if (service == null || t.entities.isEmpty()) return refresh(app)
             Thread {
                 runCatching { Sources.post("${base(app)}/api/services/$service", JSONObject().put("entity_id", JSONArray(t.entities)).toString(), auth(app)) }
                     .onFailure { problem = msg(app, it) }
