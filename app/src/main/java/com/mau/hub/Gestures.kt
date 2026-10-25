@@ -94,8 +94,15 @@ class Gestures(private val a: MainActivity) {
     private fun run(what: String) {
         when {
             what == WIDGETS -> a.widgetPage.open()
-            what.startsWith("app:") -> a.packageManager.getLaunchIntentForPackage(what.removePrefix("app:"))
-                ?.let { runCatching { a.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } ?: a.toast("That app isn't installed")
+            what.startsWith("app:") -> {
+                val pkg = what.removePrefix("app:")
+                if (a.hub.phone) HomeButtonService.watch(a, pkg) // a swipe right from its left edge comes back here
+                a.packageManager.getLaunchIntentForPackage(pkg)?.let {
+                    // it slides in from the side the finger came from, like a page next to Home
+                    val opts = android.app.ActivityOptions.makeCustomAnimation(a, R.anim.page_in_right, R.anim.page_out_left).toBundle()
+                    runCatching { a.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), opts) }
+                } ?: a.toast("That app isn't installed")
+            }
             what == "search" -> if (a.hub.phone) a.phoneHome.drawer.open(typing = true) else a.searchBar.open()
             what == "notifications" -> expandNotifications()
             what == "lock" -> if (!HomeButtonService.global(a, android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN))
