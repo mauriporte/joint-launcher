@@ -6,7 +6,7 @@ enum class Source(val label: String, val color: Int) {
     NETFLIX("Netflix", 0xFFE50914.toInt()),
     PRIME("Prime Video", 0xFF1A98FF.toInt()),
     DISNEY("Disney+", 0xFF01B4C9.toInt()), // teal, so it doesn't clash with Jellyfin's navy
-    FILMIN("Filmin", 0xFFEC1C5B.toInt()),
+    FILMIN("Filmin", 0xFF00C46A.toInt()), // Filmin's green
     HULU("Hulu", 0xFFB4E61E.toInt()), // lime: Hulu's own green is too close to Spotify's
     PEACOCK("Peacock", 0xFFFF8A00.toInt()), // orange, one of the logo's feather colours and still unused
     STAN("Stan", 0xFFFFFFFF.toInt()), // white (Stan's logo is a white wordmark on blue)

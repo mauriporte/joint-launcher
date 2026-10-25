@@ -2,6 +2,7 @@ package com.mau.hub
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LinksTest {
@@ -128,6 +129,12 @@ class SourcesTest {
         assertEquals("🌙", Sources.weatherIcon(0, day = false))
         assertEquals("🌧️", Sources.weatherIcon(61, day = true))
         assertEquals("⛈️", Sources.weatherIcon(95, day = false))
+    }
+
+    @Test fun weatherPlaceFromOpenMeteoGeocoder() {
+        val json = """{"results":[{"name":"Valencia","latitude":39.47,"longitude":-0.38,"country":"Spain"}]}"""
+        assertEquals(Triple("Valencia, Spain", 39.47, -0.38), Sources.parseGeocode(json))
+        assertEquals(null, Sources.parseGeocode("""{"generationtime_ms":0.5}""")) // nothing matched
     }
 
     @Test fun liveChannelShowsCurrentProgram() {
@@ -263,10 +270,105 @@ class RowOrderTest {
         assertEquals("location unavailable", Sources.explain(IllegalStateException("location unavailable")))
     }
 
+    @Test fun iconColourComesFromTheAppsLogo() {
+        val black = 0xFF000000.toInt(); val yellow = 0xFFFFC400.toInt(); val grey = 0xFF808080.toInt()
+        val geesports = IntArray(48 * 48) { if (it % 3 == 0) yellow else black } // yellow G on a black tile
+        val c = IconPacks.dominant(geesports)!!
+        assertTrue("red ${c shr 16 and 0xFF}", (c shr 16 and 0xFF) > 200); assertTrue((c shr 8 and 0xFF) > 150); assertTrue((c and 0xFF) < 100)
+        assertEquals(null, IconPacks.dominant(IntArray(48 * 48) { if (it % 2 == 0) grey else black })) // no colour to match
+    }
+
+    @Test fun mobileAppsStandForTheirTvApps() {
+        assertEquals(Links.SPOTIFY, Links.canonical("com.spotify.music"))
+        assertEquals(Links.SMARTTUBE, Links.canonical("com.android.youtube.premium")) // ReVanced counts as YouTube
+        assertEquals("com.stremio.one", Links.canonical("com.stremio.one")) // same package everywhere
+        assertEquals("com.android.youtube.premium", Links.MOBILE.getValue(Links.SMARTTUBE).first()) // ReVanced preferred
+    }
+
+    @Test fun continueWatchingOneTilePerShow() {
+        fun ep(n: Int, pos: Long) = Item(Source.JELLYFIN, "Pluribus", Play.Jelly("e$n", pos, false))
+        val resume = Result.success(listOf(ep(1, 1_800_000)))
+        val nextUp = Result.success(listOf(ep(1, 0), Item(Source.JELLYFIN, "Slow Horses", Play.Jelly("s1", 0, false))))
+        val row = Catalog.oneEach(listOf(resume, nextUp))
+        assertEquals(listOf("Pluribus", "Slow Horses"), row.map { it.title })
+        assertEquals(1_800_000L, (row.first().play as Play.Jelly).posMs) // the one you're partway through
+        assertEquals(listOf("Pluribus"), Catalog.oneEach(listOf(Result.failure(RuntimeException("503")), resume)).map { it.title })
+        assertEquals("503", runCatching { Catalog.oneEach(listOf(Result.failure(RuntimeException("503")))) }.exceptionOrNull()?.message)
+    }
+
+    @Test fun subtitleFilesOnlyTextAndExternal() {
+        val json = """{"MediaSources":[{"Id":"src1","MediaStreams":[
+            {"Type":"Video","Index":0},
+            {"Type":"Subtitle","Index":2,"IsExternal":false,"Language":"eng"},
+            {"Type":"Subtitle","Index":3,"IsExternal":true,"IsTextSubtitleStream":true,"Language":"spa","DisplayTitle":"Spanish - SRT"},
+            {"Type":"Subtitle","Index":4,"IsExternal":true,"IsTextSubtitleStream":false,"Language":"fre"}]}]}"""
+        val subs = Sources.parseSubtitles(json, "http://jf", "item9")
+        assertEquals(listOf("http://jf/Videos/item9/src1/Subtitles/3/0/Stream.vtt"), subs.map { it.url })
+        assertEquals("Spanish - SRT", subs.single().label)
+        assertEquals("spa", subs.single().language)
+    }
+
     @Test fun categoryChannelsFollowTheListOrderAndSkipMissing() {
         val json = """{"Items":[{"Id":"a","Name":"MTV Live","Number":"707"},{"Id":"b","Name":"MTV2","Number":"708"},{"Id":"c","Name":"News","Number":"1"}]}"""
         assertEquals(listOf("708  MTV2", "707  MTV Live"), Sources.pickChannels(json, listOf("708", "999", "707"), "http://jf").map { it.title })
         assertEquals(listOf("707", "708", "784"), LIVE_CATEGORIES.getValue("Music").take(3))
         assertEquals(listOf(43, 34, 15), listOf("Music", "Movies", "Series").map { LIVE_CATEGORIES.getValue(it).size })
+    }
+}
+
+class BackupTest {
+    @org.junit.Test fun roundTripsLayoutButLeavesOutSecretsAndWidgets() {
+        val prefs = mapOf<String, Any>("apps_favs_only" to true, "bg_dim" to 25, "section_name_ha" to "Casa",
+            "fav_apps" to setOf("a", "b"), "key" to "secret", "widgets" to "3,4", "wpos_l_3" to "0,0")
+        val back = TabletSettings.restore(TabletSettings.backup(prefs))
+        org.junit.Assert.assertEquals(mapOf("apps_favs_only" to true, "bg_dim" to 25, "section_name_ha" to "Casa", "fav_apps" to setOf("a", "b")), back)
+    }
+
+    @org.junit.Test(expected = IllegalArgumentException::class) fun refusesOtherFiles() { TabletSettings.restore("{\"x\":1}") }
+}
+
+class AppSearchTest {
+    private fun app(label: String) = SideApp(label, label, null, label)
+
+    @org.junit.Test fun findsByPartOfTheNameIgnoringAccentsAndCase() {
+        val apps = listOf(app("Cámara"), app("Spotify"), app("Google Calendar"), app("Calendario"))
+        org.junit.Assert.assertEquals(listOf("Calendario", "Google Calendar"), Apps.matches(apps, "CAL").map { it.label }) // starts-with first
+        org.junit.Assert.assertEquals(listOf("Cámara"), Apps.matches(apps, "camara").map { it.label })
+        org.junit.Assert.assertEquals(emptyList<String>(), Apps.matches(apps, "  ").map { it.label })
+    }
+}
+
+class WidgetGridTest {
+    @org.junit.Test fun dropOnAWidgetGoesToTheNearestFreeSpot() {
+        val beeper = intArrayOf(0, 0, 4, 3) // columns 0-3, rows 0-2
+        org.junit.Assert.assertEquals(5 to 1, Widgets.nearestFree(5, 1, 2, 2, 8, 4, listOf(beeper))) // free: stays
+        org.junit.Assert.assertEquals(4 to 1, Widgets.nearestFree(3, 1, 2, 2, 8, 4, listOf(beeper))) // on Beeper: next to it
+        org.junit.Assert.assertEquals(null, Widgets.nearestFree(0, 0, 8, 4, 8, 4, listOf(beeper)))   // no room anywhere
+    }
+}
+
+class HaWidgetTest {
+    private fun st(id: String, state: String, attrs: String = "{}") = id to org.json.JSONObject("""{"entity_id":"$id","state":"$state","attributes":$attrs}""")
+    private fun tile(name: String) = HaWidget.TILES.first { it.name == name }
+
+    @Test fun tilesShowHomeAssistantStates() {
+        val desk = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet_3"
+        assertTrue(HaWidget.look(tile("Escritorio"), mapOf(st(desk, "on"))).on)
+        assertEquals("Apagado", HaWidget.look(tile("Escritorio"), mapOf(st(desk, "off"))).status)
+        // the thermostat reports °F; the tile shows °C
+        assertEquals("25.7 °C", HaWidget.look(tile("Termostato"), mapOf(st("sensor.termostato_temperatura", "78.26", """{"unit_of_measurement":"°F"}"""))).status)
+        // the lights group counts its members that are on
+        val lights = mapOf(st("light.lucesmultimedia", "on", """{"entity_id":["light.a","light.b"]}"""), st("light.a", "on"), st("light.b", "on"))
+        assertEquals("2 encendidas", HaWidget.look(tile("Luces de Multimedia"), lights).status)
+        // not in HA, or unreachable: grey, never "on"
+        assertEquals("No disponible", HaWidget.look(tile("TV"), mapOf(st("switch.other", "on"))).status)
+        assertTrue(!HaWidget.look(tile("MauTV"), mapOf(st("media_player.mautv_2", "unavailable"))).on)
+        // a single lamp, not a group
+        assertEquals("Encendida", HaWidget.look(tile("Lámpara Vestidor"), mapOf(st("light.salon_lampara_vestidor", "on"))).status)
+        // the servers and the strips feeding them ask before turning off; nothing else does
+        assertEquals(setOf("Regleta TV", "Regleta Oficina", "Server Mini", "PC Escritorio", "Regleta Monitor"), HaWidget.TILES.filter { it.guard != null }.map { it.name }.toSet())
+        // 20 Google Home favourites + 12 everyday + 4 cameras: 9 full rows of 4
+        assertEquals(36, HaWidget.TILES.size)
+        assertEquals(4, HaWidget.TILES.count { it.kind == HaTile.Kind.CAMERA })
     }
 }

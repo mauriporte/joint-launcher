@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- one MauHome tile: icon in a tinted round badge, padlock for the server plugs, name and state at the bottom -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ha_tile" android:layout_width="match_parent" android:layout_height="100dp"
+    android:background="@drawable/ha_tile_off" android:padding="10dp">
+    <!-- camera tiles: the camera's latest still under the name -->
+    <ImageView android:id="@+id/ha_shot" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:layout_margin="-8dp" android:scaleType="centerCrop" android:visibility="gone" />
+    <ImageView android:id="@+id/ha_badge" android:layout_width="34dp" android:layout_height="34dp"
+        android:src="@drawable/ha_badge" android:alpha="0.18" />
+    <ImageView android:id="@+id/ha_icon" android:layout_width="34dp" android:layout_height="34dp" android:padding="7dp" />
+    <ImageView android:id="@+id/ha_lock" android:layout_width="14dp" android:layout_height="14dp"
+        android:layout_gravity="top|end" android:src="@drawable/ic_lock" android:alpha="0.55" android:visibility="gone" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:orientation="vertical">
+        <TextView android:id="@+id/ha_name" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:ellipsize="end" android:singleLine="true" android:textSize="14sp" android:textStyle="bold"
+            android:shadowColor="#CC000000" android:shadowRadius="6" />
+        <TextView android:id="@+id/ha_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:ellipsize="end" android:singleLine="true" android:textSize="12sp"
+            android:shadowColor="#CC000000" android:shadowRadius="6" />
+    </LinearLayout>
+</FrameLayout>

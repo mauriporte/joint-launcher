@@ -254,6 +254,13 @@ object Sources {
     // ---- Weather for the top bar (no API keys: location from the connection's IP, forecast from Open-Meteo) ----
 
     /** Returns (lat, lon). */
+    /** A town typed in Settings -> (name, lat, lon) from Open-Meteo's geocoder (the weather's own provider); null if unknown. */
+    fun geocode(place: String) = parseGeocode(get("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + URLEncoder.encode(place, "UTF-8")))
+
+    fun parseGeocode(json: String): Triple<String, Double, Double>? = JSONObject(json).optJSONArray("results")?.optJSONObject(0)?.let {
+        Triple(listOf(it.optString("name"), it.optString("country")).filter(String::isNotEmpty).joinToString(", "), it.getDouble("latitude"), it.getDouble("longitude"))
+    }
+
     fun locate(): Pair<Double, Double> {
         val j = JSONObject(get("http://ip-api.com/json/?fields=status,lat,lon"))
         if (j.optString("status") != "success") error("location unavailable")
@@ -356,15 +363,49 @@ object Sources {
     }
 
     /** Frees the tuner a live channel held (Tvheadend only has a few). */
+    /** Where you stopped watching a library item, in ms (0 = not started, or Jellyfin counted it as unwatched/finished). */
+    fun jellyfinPosition(server: String, key: String, userId: String, itemId: String): Long =
+        Links.ticksToMs(JSONObject(get("$server/Users/$userId/Items/$itemId", Links.jfAuth(key))).optJSONObject("UserData")?.optLong("PlaybackPositionTicks") ?: 0)
+
+    /** A subtitle file Jellyfin has for a video (outside the video stream itself), converted to WebVTT by the server. */
+    class Subtitle(val url: String, val language: String?, val label: String)
+
+    /** Separate subtitle files of a library item (embedded ones come with the video stream). */
+    fun jellyfinSubtitles(server: String, key: String, itemId: String, userId: String?): List<Subtitle> =
+        parseSubtitles(get("$server/Items/$itemId/PlaybackInfo" + (userId?.let { "?userId=$it" } ?: ""), Links.jfAuth(key)), server, itemId)
+
+    fun parseSubtitles(json: String, server: String, itemId: String): List<Subtitle> {
+        val src = JSONObject(json).optJSONArray("MediaSources").objs().firstOrNull() ?: return emptyList()
+        val sourceId = src.optString("Id")
+        return src.optJSONArray("MediaStreams").objs()
+            .filter { it.optString("Type") == "Subtitle" && it.optBoolean("IsExternal") && it.optBoolean("IsTextSubtitleStream", true) }
+            .map { s ->
+                Subtitle("$server/Videos/$itemId/$sourceId/Subtitles/${s.optInt("Index")}/0/Stream.vtt",
+                    s.str("Language"), s.str("DisplayTitle") ?: s.str("Language") ?: "Subtitles")
+            }
+    }
+
+    /**
+     * Tells Jellyfin what's playing so it can resume later and show it on the dashboard.
+     * event = "" (started), "Progress" or "Stopped".
+     */
+    fun jellyfinReport(server: String, key: String, event: String, itemId: String, posMs: Long, paused: Boolean) {
+        val body = JSONObject(mapOf("ItemId" to itemId, "PositionTicks" to posMs * 10_000, "IsPaused" to paused, "CanSeek" to true, "PlayMethod" to "DirectPlay"))
+        post("$server/Sessions/Playing" + if (event.isEmpty()) "" else "/$event", body.toString(), Links.jfAuth(key))
+    }
+
     fun jellyfinCloseLive(server: String, key: String, liveStreamId: String) {
         post("$server/LiveStreams/Close?liveStreamId=${enc(liveStreamId)}", "", Links.jfAuth(key))
     }
 
     // ---- Streaming providers via JustWatch (see PROVIDERS) ----
 
-    private const val JW_QUERY = "query P(\$c:Country!,\$l:Language!,\$f:TitleFilter,\$s:PopularTitlesSorting!){popularTitles(country:\$c,first:40,filter:\$f,sortBy:\$s){edges{node{objectType " +
+    /** Which app version JustWatch's links should open: "ANDROID_TV", or "ANDROID" on phones and tablets (set by Hub). */
+    @Volatile var jwPlatform = "ANDROID_TV"
+
+    private val JW_QUERY get() ="query P(\$c:Country!,\$l:Language!,\$f:TitleFilter,\$s:PopularTitlesSorting!){popularTitles(country:\$c,first:40,filter:\$f,sortBy:\$s){edges{node{objectType " +
         "content(country:\$c,language:\$l){title shortDescription originalReleaseYear posterUrl backdrops{backdropUrl} externalIds{imdbId tmdbId} scoring{imdbScore tomatoMeter}}" +
-        "offers(country:\$c,platform:WEB){package{technicalName} deeplinkURL(platform:ANDROID_TV) standardWebURL}}}}}"
+        "offers(country:\$c,platform:WEB){package{technicalName} deeplinkURL(platform:$jwPlatform) standardWebURL}}}}}"
 
     /** objectType "MOVIE"/"SHOW" narrows it; sortBy "POPULAR" or "IMDB_SCORE"; minYear keeps only recent releases. */
     fun streaming(
@@ -649,7 +690,11 @@ object Sources {
 
     /** One GeeSports row per entry: row name -> ESPN league paths. No NFL / MLB on purpose. */
     val SPORT_ROWS = listOf(
-        "Football" to listOf("soccer/arg.1", "soccer/esp.1", "soccer/ita.1"), // Liga Argentina, LaLiga, Serie A
+        "Football" to listOf(
+            "soccer/arg.1", "soccer/esp.1", "soccer/ita.1", "soccer/eng.1", // Liga Argentina, LaLiga, Serie A, Premier League
+            "soccer/fra.1", "soccer/ger.1", "soccer/uefa.champions", "soccer/conmebol.libertadores", // Ligue 1, Bundesliga, Champions, Libertadores
+            "soccer/uefa.europa", "soccer/uefa.euro", "soccer/uefa.euroq", // Europa League, the Euros and their qualifiers (only when on)
+        ),
         "Basketball" to listOf("basketball/nba"),
         "Rugby" to listOf(
             "rugby/267979", "rugby/270559", "rugby/270557", "rugby/180659", // Premiership, Top 14, URC, Six Nations

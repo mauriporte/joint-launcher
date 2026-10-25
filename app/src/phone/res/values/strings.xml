@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the phone's own wording for the accessibility service (the TV's talks about its remote) -->
+<resources>
+    <string name="home_button_service_label">Joint Launcher gestures</string>
+    <string name="home_button_service_description">Lets Joint Launcher go back Home with a swipe from the left edge while the app you open with a swipe (Beeper) is on screen, and lock the screen with a double-tap if you set it. It only notes which app is on screen and reads nothing in it.</string>
+</resources>

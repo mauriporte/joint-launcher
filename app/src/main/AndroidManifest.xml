@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- the TV's own network address, for the phone sign-in page's QR code -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" /> <!-- swipe gesture: open the notifications -->
+    <!-- tablet: "Uninstall" on an app opens Android's own confirm screen -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- only takes effect if granted over adb; used solely to switch our Home button service back on after updates -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
@@ -21,6 +29,28 @@
         <package android:name="com.filmin.androidtv" />
         <package android:name="com.spotify.tv.android" />
         <package android:name="org.videolan.vlc" />
+        <!-- phone/tablet versions (Links.MOBILE) -->
+        <package android:name="com.netflix.mediaclient" />
+        <package android:name="com.android.youtube.premium" />
+        <package android:name="app.revanced.android.youtube" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.spotify.music" />
+        <package android:name="org.jellyfin.mobile" />
+        <package android:name="com.amazon.avod.thirdpartyclient" />
+        <package android:name="com.hulu.plus" />
+        <package android:name="es.filmin.app" />
+        <!-- icon packs (ADW / Nova format), for app icons -->
+        <intent>
+            <action android:name="org.adw.launcher.THEMES" />
+        </intent>
+        <intent>
+            <action android:name="com.novalauncher.THEME" />
+        </intent>
+        <!-- every app on a phone/tablet, for the "Your apps" row -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="stremio" />
@@ -33,15 +63,19 @@
     </queries>
 
     <application
-        android:label="Joint Launcher"
+        android:label="${appLabel}"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <!-- singleTask: pressing Home brings back this one home screen instead of stacking new copies -->
+        <!-- configChanges: turning a tablet keeps the screen as it is instead of rebuilding it -->
+        <!-- resizeableActivity false: the home screen is always full screen, so no split-screen / floating-window
+             handle (Xiaomi's "•••" bar) on it -->
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
-            android:stateNotNeeded="true">
+            android:stateNotNeeded="true" android:resizeableActivity="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -68,6 +102,12 @@
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_button_service" />
         </service>
 
+        <receiver android:name=".HomeButtonService$Restorer" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".NowPlayingListener"
             android:exported="true"
@@ -77,8 +117,20 @@
             </intent-filter>
         </service>
 
+        <!-- MauHome: the Home Assistant switches widget (tablet and phone; Google TV has no widgets) -->
+        <receiver android:name=".HaWidget" android:label="MauHome" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ha_widget_info" />
+        </receiver>
+        <!-- a tap on a MauHome tile: runs it with no screen, or asks first for the server plugs -->
+        <activity android:name=".HaTap" android:exported="false" android:excludeFromRecents="true"
+            android:noHistory="true" android:taskAffinity="" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".PlayerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
     </application>
 </manifest>
