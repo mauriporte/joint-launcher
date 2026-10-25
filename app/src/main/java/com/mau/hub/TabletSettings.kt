@@ -224,10 +224,11 @@ class TabletSettings(private val a: MainActivity) {
         val token = EditText(a).apply {
             hint = "Long-lived access token"; isSingleLine = true; textSize = 16f; setTextColor(Color.WHITE); setHintTextColor(TEXT_MUTED)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD // never shown on screen
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO // a saved password filled in here is what HA refused on the tablet
         }
         list.addView(token)
         buttons("Save token" to {
-            val t = token.text.toString().trim()
+            val t = token.text.toString().replace(Regex("\s+"), "").removePrefix("Bearer") // pasted with spaces or as a header
             if (t.isEmpty()) a.toast("Paste the token first")
             else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); a.toast("Token saved"); draw() }
         })
