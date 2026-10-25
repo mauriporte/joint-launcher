@@ -13,9 +13,9 @@ import android.widget.LinearLayout
 /** Google TV-style top bar: search, content-type tabs, TV settings gear, then weather and clock on the right. */
 class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
-    // before the bar is built below: flipClock() fills clocks, init starts the weather timer
-    private var clocks: List<android.widget.TextClock> = emptyList()
-    private val tvClock = android.widget.TextClock(a) // the TV's clock; Settings' format and timezone apply to it too
+    // before the bar is built below (init starts the weather timer); the Xperia-style flip clock: 58 dp cards on the
+    // tablet's tall corner, 30 dp on the TV's slim bar
+    private val clock = FlipClock(a, if (a.hub.touch) 58 else 30)
     // tablet corner: the built-in clock, or a widget you picked for it (Settings → Clock), e.g. Flip Clock's real flip clock
     private val corner = android.widget.FrameLayout(a)
     // tablet: shows/hides Home's section titles (icons instead); also a switch in Settings
@@ -126,31 +126,12 @@ class TopBar(private val a: MainActivity) {
             addView(gear)
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
             addView(weather)
-            addView(tvClock.apply {
-                format24Hour = "HH:mm"; format12Hour = "HH:mm" // always 24-hour
-                textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            })
+            addView(clock)
         }
     }
 
-    /**
-     * Tablet corner clock: big hours and minutes side by side, straight on the background (no cards).
-     * TextClock keeps them on time by itself.
-     */
-    private fun flipClock() = LinearLayout(a).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        fun card(format: String) = android.widget.FrameLayout(a).apply {
-            addView(android.widget.TextClock(a).apply {
-                format24Hour = format; format12Hour = format
-                textSize = 34f; setTextColor(0xFFF2F2F2.toInt()); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-                includeFontPadding = false; gravity = Gravity.CENTER
-            }, android.widget.FrameLayout.LayoutParams(-1, -1))
-        }
-        addView(card("HH"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)))
-        addView(card("mm"), LinearLayout.LayoutParams(a.dp(58), a.dp(58)).apply { marginStart = a.dp(6) })
-        clocks = (0 until childCount).map { (getChildAt(it) as ViewGroup).getChildAt(0) as android.widget.TextClock }
-        applyClock()
-    }
+    /** The tablet's corner clock (see [FlipClock]), with Settings' timezone. */
+    private fun flipClock() = clock.also { applyClock() }
 
 
     /**
@@ -197,12 +178,7 @@ class TopBar(private val a: MainActivity) {
 
     /** Clocks are always 24-hour; Settings' timezone (the device's unless picked) applies to them. */
     fun applyClock() {
-        val tz = a.hub.prefs.getString("clock_tz", null)
-        clocks.firstOrNull()?.apply { format24Hour = "HH"; format12Hour = "HH" } // always 24-hour
-        clocks.forEach { it.timeZone = tz }
-        if (!a.hub.touch) tvClock.apply {
-            format24Hour = "HH:mm"; format12Hour = "HH:mm"; timeZone = tz // always 24-hour
-        }
+        clock.timeZone = a.hub.prefs.getString("clock_tz", null)
     }
 
     private var pendingTab: Tab? = null
