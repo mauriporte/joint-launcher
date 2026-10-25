@@ -18,7 +18,7 @@ import java.util.Locale
 
 /** One MauHome button: its name, icon, what it controls and how. entities: one, or a strip's outlets (any on = on). */
 internal data class HaTile(val name: String, val icon: Int, val kind: Kind, val entities: List<String>, val guard: String? = null) {
-    enum class Kind { SWITCH, LIGHT, TEMP, IR, TV, SPEAKER, CAMERA }
+    enum class Kind { SWITCH, LIGHT, TEMP, IR, TV, SPEAKER, CAMERA, RUN }
 }
 
 /**
@@ -96,6 +96,45 @@ class HaWidget : AppWidgetProvider() {
             cam("Webcam MauStation", "camera.webcam_maustation"),
         )
 
+        /** The icons a tile can have, by the name tiles are saved with (a drawable's number changes between builds). */
+        internal val ICONS = linkedMapOf("plug" to R.drawable.ic_ha_plug, "bulb" to R.drawable.ic_ha_bulb, "tv" to R.drawable.ic_ha_tv,
+            "monitor" to R.drawable.ic_ha_monitor, "server" to R.drawable.ic_ha_server, "charger" to R.drawable.ic_ha_charger,
+            "music" to R.drawable.ic_ha_music, "speaker" to R.drawable.ic_ha_speaker, "thermo" to R.drawable.ic_ha_thermo,
+            "camera" to R.drawable.ic_ha_camera, "night" to R.drawable.ic_ha_night, "movie" to R.drawable.ic_ha_movie, "away" to R.drawable.ic_ha_away)
+        private const val SAVED = "ha_tiles"
+
+        /** Your tiles as edited in [HaTiles]; [TILES] until you change them. */
+        internal fun tiles(c: Context): List<HaTile> = c.getSharedPreferences("hub", Context.MODE_PRIVATE).getString(SAVED, null)
+            ?.let { runCatching { fromJson(it) }.getOrNull() } ?: TILES
+        internal fun save(c: Context, list: List<HaTile>?) {
+            c.getSharedPreferences("hub", Context.MODE_PRIVATE).edit().apply { if (list == null) remove(SAVED) else putString(SAVED, toJson(list)) }.apply()
+            refresh(c)
+        }
+        internal fun toJson(list: List<HaTile>): String = JSONArray(list.map { t ->
+            JSONObject().put("name", t.name).put("icon", ICONS.entries.firstOrNull { it.value == t.icon }?.key ?: "plug")
+                .put("kind", t.kind.name).put("entities", JSONArray(t.entities)).apply { t.guard?.let { put("guard", it) } }
+        }).toString()
+        internal fun fromJson(s: String): List<HaTile> = JSONArray(s).let { a ->
+            (0 until a.length()).map(a::getJSONObject).map { o ->
+                val e = o.optJSONArray("entities") ?: JSONArray()
+                HaTile(o.optString("name"), ICONS[o.optString("icon")] ?: R.drawable.ic_ha_plug,
+                    runCatching { HaTile.Kind.valueOf(o.optString("kind")) }.getOrDefault(HaTile.Kind.SWITCH),
+                    (0 until e.length()).map(e::getString), o.optString("guard").ifEmpty { null })
+            }
+        }
+
+        /** What a tile for this entity does, and its icon, going by its domain (switch.x, light.x...). */
+        internal fun guess(entity: String, attrs: JSONObject? = null): Pair<HaTile.Kind, Int> = when (entity.substringBefore('.')) {
+            "light" -> HaTile.Kind.LIGHT to R.drawable.ic_ha_bulb
+            "sensor" -> HaTile.Kind.TEMP to R.drawable.ic_ha_thermo
+            "button" -> HaTile.Kind.IR to R.drawable.ic_ha_music
+            "media_player" -> if (attrs?.optString("device_class") == "tv" || "tv" in entity) HaTile.Kind.TV to R.drawable.ic_ha_tv
+                else HaTile.Kind.SPEAKER to R.drawable.ic_ha_speaker
+            "camera" -> HaTile.Kind.CAMERA to R.drawable.ic_ha_camera
+            "scene", "script" -> HaTile.Kind.RUN to R.drawable.ic_ha_movie
+            else -> HaTile.Kind.SWITCH to R.drawable.ic_ha_plug // switch, input_boolean, fan...: on and off
+        }
+
         @Volatile private var states: Map<String, JSONObject> = emptyMap()
         @Volatile private var shots: Map<String, android.graphics.Bitmap> = emptyMap() // camera tiles: their latest still, small
         @Volatile private var problem: String? = null
@@ -121,6 +160,7 @@ class HaWidget : AppWidgetProvider() {
                     Look(true, GREEN, String.format(Locale.ROOT, "%.1f °C", if (f) (v - 32) * 5 / 9 else v))
                 }
                 HaTile.Kind.IR -> Look(true, VIOLET, "Mando IR")
+                HaTile.Kind.RUN -> Look(true, VIOLET, "Activar")
                 HaTile.Kind.TV -> (state !in setOf("off", "standby", "unknown")).let { Look(it, if (it) BLUE else GREY, if (it) "Encendido" else "Apagado") }
                 // when the still was taken; or that HA gave none (camera off, or a stream HA can't take a still from)
                 HaTile.Kind.CAMERA -> if (shots[t.entities[0]] == null) Look(false, GREY, "Sin imagen")
@@ -147,7 +187,7 @@ class HaWidget : AppWidgetProvider() {
                         (0 until arr.length()).map(arr::getJSONObject).associateBy { it.getString("entity_id") }
                     }.onSuccess { states = it; problem = null }.onFailure { problem = msg(app, it) }
                     // cameras: a small still each (a widget's pictures all travel in one bundle, which has a size limit)
-                    if (problem == null) shots = TILES.filter { it.kind == HaTile.Kind.CAMERA }.mapNotNull { t ->
+                    if (problem == null) shots = tiles(app).filter { it.kind == HaTile.Kind.CAMERA }.mapNotNull { t ->
                         snapshot(app, t.entities[0], 240)?.let { t.entities[0] to it }
                     }.toMap()
                     ids.forEach { m.updateAppWidget(it, views(app, m.getAppWidgetOptions(it))) }
@@ -160,7 +200,9 @@ class HaWidget : AppWidgetProvider() {
             val app = c.applicationContext
             val on = look(t, states).on
             val service = when (t.kind) {
-                HaTile.Kind.SWITCH -> if (on) "switch/turn_off" else "switch/turn_on" // a strip: any on turns them all off
+                // homeassistant/turn_*: works for switches, input booleans, fans... (a strip: any on turns them all off)
+                HaTile.Kind.SWITCH -> if (on) "homeassistant/turn_off" else "homeassistant/turn_on"
+                HaTile.Kind.RUN -> "homeassistant/turn_on" // a scene or script
                 HaTile.Kind.LIGHT -> "light/toggle"
                 HaTile.Kind.TEMP -> null
                 HaTile.Kind.IR -> "button/press"
@@ -204,6 +246,8 @@ class HaWidget : AppWidgetProvider() {
         private fun views(c: Context, opts: Bundle): RemoteViews = RemoteViews(c.packageName, R.layout.ha_widget).apply {
             setOnClickPendingIntent(R.id.ha_title, PendingIntent.getBroadcast(c, 0,
                 Intent(c, HaWidget::class.java).setAction(REFRESH), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            setOnClickPendingIntent(R.id.ha_edit, PendingIntent.getActivity(c, 1,
+                Intent(c, HaTiles::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
             setTextViewText(R.id.ha_msg, problem.orEmpty())
             setViewVisibility(R.id.ha_msg, if (problem == null) View.GONE else View.VISIBLE)
             if (Build.VERSION.SDK_INT < 31) return@apply
@@ -213,7 +257,7 @@ class HaWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
             val st = states
             setRemoteAdapter(R.id.ha_grid, RemoteViews.RemoteCollectionItems.Builder().setHasStableIds(true).setViewTypeCount(1).apply {
-                TILES.forEachIndexed { i, t -> addItem(i.toLong(), tile(c, t, look(t, st), i)) }
+                tiles(c).forEachIndexed { i, t -> addItem(i.toLong(), tile(c, t, look(t, st), i)) }
             }.build())
         }
 
@@ -242,7 +286,7 @@ class HaWidget : AppWidgetProvider() {
 class HaTap : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        val t = HaWidget.TILES.getOrNull(intent.getIntExtra("tile", -1)) ?: return finish()
+        val t = HaWidget.tiles(this).getOrNull(intent.getIntExtra("tile", -1)) ?: return finish()
         if (t.kind == HaTile.Kind.CAMERA) return camera(t)
         val guard = HaWidget.guardFor(t) ?: run { HaWidget.tap(this, t); return finish() }
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Turn off ${t.name}?").setMessage(guard)

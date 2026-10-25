@@ -390,6 +390,20 @@ class ProfilesTest {
     }
 }
 
+class HaTilesTest {
+    @Test fun tilesSurviveSavingAndLoading() {
+        val back = HaWidget.fromJson(HaWidget.toJson(HaWidget.TILES))
+        assertEquals(HaWidget.TILES, back) // names, icons, kinds, strips' outlets and warnings all come back
+    }
+
+    @Test fun aNewTileGuessesFromTheDevice() {
+        assertEquals(HaTile.Kind.LIGHT, HaWidget.guess("light.salon").first)
+        assertEquals(HaTile.Kind.CAMERA, HaWidget.guess("camera.entrada").first)
+        assertEquals(HaTile.Kind.RUN, HaWidget.guess("scene.cine").first)
+        assertEquals(HaTile.Kind.SWITCH, HaWidget.guess("input_boolean.guests").first)
+    }
+}
+
 class HeraldWidgetTest {
     private val sensor = org.json.JSONObject("""{"state":"Quiet night at home","attributes":{"edition":12,"published":"2026-10-24T15:53:39+02:00",
         "subhead":"All servers up","headline_es":"Noche tranquila en casa","briefs":["One","Two"],"watch":"Nothing urgent.",

@@ -147,6 +147,9 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/herald_widget_info" />
         </receiver>
         <!-- a tap on a MauHome tile: runs it with no screen, or asks first for the server plugs -->
+        <!-- MauHome's tile editor (the widget's pencil, or Settings) -->
+        <activity android:name=".HaTiles" android:exported="false" android:label="MauHome tiles"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <activity android:name=".HaTap" android:exported="false" android:excludeFromRecents="true"
             android:noHistory="true" android:taskAffinity="" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 

@@ -117,6 +117,7 @@ class TabletSettings(private val a: MainActivity) {
 
         if (!hub.phone) {
         heading("Home")
+        if (hub.touch) line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(android.widget.Switch(a).apply {
             text = "Show section titles (off: their icons instead)"; textSize = 16f; setTextColor(Color.WHITE)
             isChecked = p.getBoolean("section_titles", true)

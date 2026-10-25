@@ -165,6 +165,10 @@ outlines, padlocked server plugs ask before turning off, columns follow the widg
 with a long-lived token saved on the Connect page (Home Assistant section). Tiles without a sure HA match are grey
 "Sin asignar" placeholders. A.R.T. Phone extended it to 36 tiles with cameras.
 
+**Tile editor** (`HaTiles.kt`): the widget's pencil, or Settings → Home → MauHome widget. Add a tile by picking any HA
+device from a searchable list (accents ignored), rename it, change its icon and what a tap does, ask before turning it
+off, reorder, remove, or go back to the original tiles. Saved in prefs `ha_tiles`; the widget redraws at once.
+
 ### Home Herald widget
 
 The house's daily paper from HA's `sensor.home_herald` (`HeraldWidget.kt`), read-only with MauHome's token, laid
@@ -201,9 +205,7 @@ row order and the content parsers.
 
 - 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
 - The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
-- MauHome tiles can only be changed in code (no add/remove/reorder screen yet).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
-- The flip clock's card flip hasn't been watched on screen at the moment a minute changes.
 
 ## Day log, 25/10/2026
 
@@ -212,6 +214,9 @@ row order and the content parsers.
 - Phone flavor and the TV work merged into `redesign`; the tablet checked after each merge.
 - Lock screen picture from the background; Lock app and App lock on the tablet.
 - Home Herald widget, matched to its HA page in the same font; HA admin made the page use the same fonts.
+- MauHome tile editor. The corner flip clock now flips even with the tablet's animations switched off (it times
+  itself instead of relying on Android's animation setting, which is at 0 on the tablet).
+- Joint Remote keeps its own (v0.6) icon in the launcher, any pack.
 
 ## Decisions Mau made along the way
 
