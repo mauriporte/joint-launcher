@@ -230,7 +230,7 @@ class JarvisChat : Activity() {
             if (busy) return
             val t = field.text.toString().trim().takeIf { it.isNotEmpty() } ?: return
             field.setText(""); bubble(t, mine = true); busy = true
-            val thinking = bubble("…", mine = false)
+            val thinking = bubble("Thinking…", mine = false)
             Thread {
                 val r = runCatching { Jarvis.say(this, t) }
                 runOnUiThread {
