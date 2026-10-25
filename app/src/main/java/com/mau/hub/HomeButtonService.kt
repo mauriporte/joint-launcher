@@ -16,8 +16,17 @@ import android.view.accessibility.AccessibilityEvent
  * The user switches it on in Settings > Accessibility; switching it off gives Home back to Google TV.
  */
 class HomeButtonService : AccessibilityService() {
-    override fun onServiceConnected() { running = true; instance = this; wanted(this, true) }
-    override fun onDestroy() { running = false; instance = null; super.onDestroy() }
+    // the app asks for a system action (lock the screen) by broadcast: this service runs in its own process
+    private val asked = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { performGlobalAction(i.getIntExtra("action", 0)) }
+    }
+
+    override fun onServiceConnected() {
+        running = true; wanted(this, true)
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(asked, android.content.IntentFilter(ACTION), RECEIVER_NOT_EXPORTED)
+        else registerReceiver(asked, android.content.IntentFilter(ACTION))
+    }
+    override fun onDestroy() { running = false; runCatching { unregisterReceiver(asked) }; super.onDestroy() }
 
     // the user switched it off (an app update kills the process without calling this, so it stays "wanted")
     override fun onUnbind(intent: Intent?): Boolean { if (!restoring) wanted(this, false); return super.onUnbind(intent) }
@@ -41,10 +50,15 @@ class HomeButtonService : AccessibilityService() {
         // same process as the app: true while Android has this service running
         @Volatile private var running = false
         @Volatile private var restoring = false // our own off-and-on below isn't the user switching it off
-        @Volatile private var instance: HomeButtonService? = null
+        private const val ACTION = "com.mau.hub.GLOBAL_ACTION"
 
-        /** A system action only an accessibility service may do (lock the screen, for the double-tap); false while it's off. */
-        fun global(action: Int) = instance?.performGlobalAction(action) == true
+        /** A system action only an accessibility service may do (lock the screen, for a gesture); false while it's switched off. */
+        fun global(c: Context, action: Int): Boolean {
+            val me = ComponentName(c, HomeButtonService::class.java).flattenToString()
+            val on = Settings.Secure.getString(c.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty().split(':').contains(me)
+            if (on) c.sendBroadcast(Intent(ACTION).setPackage(c.packageName).putExtra("action", action))
+            return on
+        }
 
         private fun prefs(c: Context) = c.getSharedPreferences("home_button", Context.MODE_PRIVATE)
         private fun wanted(c: Context, on: Boolean) = prefs(c).edit().putBoolean("wanted", on).commit()

@@ -98,6 +98,7 @@ class MainActivity : Activity() {
         val touch = hub.touch
         page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            if (hub.phone) { addView(phoneHome.view, LinearLayout.LayoutParams(-1, -1)); return@apply } // Pro Launcher-style Home instead
             addView(topBar.view, LinearLayout.LayoutParams(-1, dp(if (touch) 72 else 36)).apply { topMargin = dp(if (touch) 6 else 10) })
             if (!touch) addView(heroText, LinearLayout.LayoutParams(-1, dp(136)))
             addView(rows.view, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -116,9 +117,9 @@ class MainActivity : Activity() {
                 v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
                 insets
             }
-            addView(page, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(20) })
-            // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen)
-            if (touch) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
+            addView(page, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(if (hub.phone) 0 else 20) })
+            // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen); the phone has no sidebar
+            if (touch && !hub.phone) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             if (touch) addView(widgetPage.view, FrameLayout.LayoutParams(-1, -1)) // over the edge strip: no sidebar from the widget page
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
@@ -133,6 +134,7 @@ class MainActivity : Activity() {
         // small, because this TV has 4 GB in total and other apps' caches already fill it up
         runCatching { android.net.http.HttpResponseCache.install(java.io.File(cacheDir, "http"), 40L * 1024 * 1024) }
         applyBackground()
+        if (hub.phone) refreshApps = { phoneHome.render(); phoneHome.drawer.refresh() }
         loadHome()
         nowPlaying.start()
     }
@@ -140,6 +142,7 @@ class MainActivity : Activity() {
     /** Tablet home-screen widgets (see [Widgets]). */
     val widgets by lazy { Widgets(this) }
     val widgetPage by lazy { WidgetPage(this) }
+    val phoneHome by lazy { PhoneHome(this) }
     val gestures by lazy { Gestures(this) }
 
     override fun dispatchTouchEvent(e: android.view.MotionEvent): Boolean =
@@ -191,7 +194,7 @@ class MainActivity : Activity() {
     fun removeBackground(id: String) { bgFile(id, false).delete(); bgFile(id, true).delete(); applyBackground() }
 
     /** "black", "wallpaper" (the tablet's) or "picture" (yours); older versions only had the wallpaper switch. */
-    fun bgMode(): String = hub.prefs.getString("bg_mode", null) ?: if (hub.prefs.getBoolean("bg_wallpaper", false)) "wallpaper" else "black"
+    fun bgMode(): String = hub.prefs.getString("bg_mode", null) ?: if (hub.phone || hub.prefs.getBoolean("bg_wallpaper", false)) "wallpaper" else "black"
 
     /**
      * Tablet background: black (as on the TV), your wallpaper, or your own picture for the way the tablet is turned,
@@ -199,7 +202,7 @@ class MainActivity : Activity() {
      */
     fun applyBackground() {
         val mode = bgMode()
-        val dim = Color.argb(hub.prefs.getInt("bg_dim", 60).coerceIn(0, 100) * 255 / 100, 5, 5, 5)
+        val dim = Color.argb(hub.prefs.getInt("bg_dim", if (hub.phone) 0 else 60).coerceIn(0, 100) * 255 / 100, 5, 5, 5)
         val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
         val pic = if (mode == "picture") currentBackground()?.let { id -> bgFile(id, true).takeIf { portrait && it.exists() } ?: bgFile(id, false) } else null
         if (pic != null) {
@@ -233,6 +236,7 @@ class MainActivity : Activity() {
     // ---- what's on screen ----
 
     fun loadHome() {
+        if (hub.phone) { phoneHome.render(); return }
         gen++; inSearch = false
         rows.clear()
         sidebar.dirty = true // rebuilt when the sidebar is next opened, not at startup
@@ -434,7 +438,9 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             detail.isShown -> detail.close()
+            hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
+            hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
             inSearch -> loadHome()
             appFilter != null -> pickApp(null) // single-app view -> back to everything
@@ -453,6 +459,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
+        if (hub.phone) { phoneHome.drawer.close(); return }
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
     }
@@ -468,6 +475,14 @@ class MainActivity : Activity() {
 
     private var fileToSave: String? = null
     private var fileOpened: ((String) -> Unit)? = null
+    private var bytesOpened: ((ByteArray) -> Unit)? = null
+
+    /** Like [openFile], for a file that isn't text (Pro Launcher's backup is a .zip). */
+    fun openBytes(onBytes: (ByteArray) -> Unit) = runCatching {
+        bytesOpened = onBytes; fileOpened = null
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*"), REQ_OPEN_FILE)
+    }.onFailure { toast("Couldn't open the file picker") }
 
     /** Settings → Back up: you choose where the file goes (Downloads, Drive...). */
     fun saveFile(name: String, text: String) = runCatching {
@@ -478,7 +493,7 @@ class MainActivity : Activity() {
 
     /** Settings → Restore: pick a backup file; onText gets its contents. */
     fun openFile(onText: (String) -> Unit) = runCatching {
-        fileOpened = onText
+        fileOpened = onText; bytesOpened = null
         @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
             .setType("*/*"), REQ_OPEN_FILE)
     }.onFailure { toast("Couldn't open the file picker") }
@@ -505,8 +520,8 @@ class MainActivity : Activity() {
     /** Which bars are hidden comes from Settings (both by default). */
     fun applySystemBars() {
         if (!hub.touch) return
-        val status = hub.prefs.getBoolean("hide_status_bar", true)
-        val nav = hub.prefs.getBoolean("hide_nav_bar", true)
+        val status = hub.prefs.getBoolean("hide_status_bar", !hub.phone) // the phone keeps its bars unless you hide them
+        val nav = hub.prefs.getBoolean("hide_nav_bar", !hub.phone)
         if (android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
             val s = android.view.WindowInsets.Type.statusBars(); val n = android.view.WindowInsets.Type.navigationBars()
             if (status) hide(s) else show(s)
@@ -531,8 +546,8 @@ class MainActivity : Activity() {
             val uri = data?.data.takeIf { resultCode == RESULT_OK } ?: return
             if (requestCode == REQ_SAVE_FILE) runCatching { contentResolver.openOutputStream(uri, "wt")!!.use { it.write(fileToSave!!.toByteArray()) } }
                 .onSuccess { toast("Backup saved") }.onFailure { toast("Couldn't save: ${it.message}") }
-            else runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) } }
-                .onSuccess { fileOpened?.invoke(it) }.onFailure { toast("Couldn't read that file: ${it.message}") }
+            else runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes() } }
+                .onSuccess { b -> bytesOpened?.invoke(b) ?: fileOpened?.invoke(b.toString(Charsets.UTF_8)) }.onFailure { toast("Couldn't read that file: ${it.message}") }
             return
         }
         if (requestCode == REQ_BG_LANDSCAPE || requestCode == REQ_BG_PORTRAIT) {

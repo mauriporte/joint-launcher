@@ -23,7 +23,7 @@ android {
         buildConfigField("String", "HA_REMOTE", "\"${local.getProperty("ha.remote", "")}\"")
     }
     // two separate apps from the same code, so the TV and the tablet never share an install or its settings:
-    // assembleTvRelease for the TV, assembleTabletRelease for the tablet
+    // assembleTvRelease for the TV, assembleTabletRelease for the tablet, assemblePhoneRelease for the phone
     flavorDimensions += "device"
     productFlavors {
         create("tv") {
@@ -35,6 +35,11 @@ android {
             dimension = "device"
             applicationId = "com.mau.hub.tablet"
             manifestPlaceholders["appLabel"] = "Joint Launcher Tablet"
+        }
+        create("phone") {
+            dimension = "device"
+            applicationId = "com.mau.hub.phone"
+            manifestPlaceholders["appLabel"] = "Joint Launcher Phone"
         }
     }
     signingConfigs {

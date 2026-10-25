@@ -40,6 +40,8 @@ class Hub(val ctx: Context) {
 
     /** Phone or tablet (touchscreen, no TV remote UI): different app versions, links and layout. */
     val touch = !ctx.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+    /** The phone app (its own flavor): Pro Launcher-style Home instead of the tablet's sections (see PhoneHome). */
+    val phone = BuildConfig.FLAVOR == "phone"
 
     init { Sources.jwPlatform = if (touch) "ANDROID" else "ANDROID_TV" } // catalogue links that open the right app version
 

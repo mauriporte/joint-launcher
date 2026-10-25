@@ -19,6 +19,7 @@ import kotlin.math.abs
 class Gestures(private val a: MainActivity) {
     private var x0 = 0f; private var y0 = 0f; private var t0 = 0L
     private var tracking = false // this touch may still become a swipe
+    private var side = false     // it started on something that scrolls sideways: no left/right swipe
     private var swallow = false  // it became one: the rest of the touch is ours
     private var lastTapAt = 0L; private var lastTapX = 0f; private var lastTapY = 0f
 
@@ -27,23 +28,33 @@ class Gestures(private val a: MainActivity) {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 x0 = e.rawX; y0 = e.rawY; t0 = e.eventTime; swallow = false
-                tracking = allowed() && e.rawX > a.dp(32) && !sideways(a.window.decorView, e.rawX.toInt(), e.rawY.toInt())
+                tracking = allowed() && e.rawX > a.dp(32)
+                side = tracking && scrolls(a.window.decorView, e.rawX.toInt(), e.rawY.toInt()) { it.canScrollHorizontally(1) || it.canScrollHorizontally(-1) }
             }
             MotionEvent.ACTION_MOVE -> {
                 if (swallow) return true
+                if (!tracking) return false
                 val dx = e.rawX - x0; val dy = e.rawY - y0
-                if (tracking && abs(dy) > a.dp(48)) tracking = false // scrolling Home up or down
-                if (tracking && abs(dx) > a.dp(90) && abs(dx) > 2 * abs(dy)) {
+                val swipe = when {
+                    !side && abs(dx) > a.dp(90) && abs(dx) > 2 * abs(dy) -> { swiped(right = dx > 0); true }
+                    // the phone: up and down too, unless what's under the finger scrolls that way (the drawer's list)
+                    a.hub.phone && abs(dy) > a.dp(80) && abs(dy) > 2 * abs(dx) -> {
+                        val dir = if (dy < 0) 1 else -1
+                        !scrolls(a.window.decorView, x0.toInt(), y0.toInt()) { it.canScrollVertically(dir) } && vertical(up = dy < 0)
+                    }
+                    !a.hub.phone && abs(dy) > a.dp(48) -> { tracking = false; false } // scrolling the tablet's Home
+                    else -> false
+                }
+                if (swipe) {
                     tracking = false; swallow = true
                     pass(MotionEvent.obtain(e).apply { action = MotionEvent.ACTION_CANCEL }) // the tile under the finger isn't tapped
-                    swiped(right = dx > 0)
                     return true
                 }
             }
             MotionEvent.ACTION_UP -> {
                 if (swallow) { swallow = false; return true }
                 val tap = abs(e.rawX - x0) < a.dp(12) && abs(e.rawY - y0) < a.dp(12) && e.eventTime - t0 < 300
-                if (tap && allowed() && empty(a.window.decorView, e.rawX.toInt(), e.rawY.toInt())) {
+                if (tap && allowed() && !drawerOpen() && empty(a.window.decorView, e.rawX.toInt(), e.rawY.toInt())) {
                     val again = e.eventTime - lastTapAt < 350 && abs(e.rawX - lastTapX) < a.dp(40) && abs(e.rawY - lastTapY) < a.dp(40)
                     lastTapAt = if (again) 0 else e.eventTime; lastTapX = e.rawX; lastTapY = e.rawY
                     if (again) run(action(DOUBLE_TAP))
@@ -55,13 +66,27 @@ class Gestures(private val a: MainActivity) {
     }
 
     private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown
+    private fun drawerOpen() = a.hub.phone && a.phoneHome.drawer.isOpen
 
     private fun swiped(right: Boolean) {
         val page = a.widgetPage
         when {
+            drawerOpen() -> Unit // the drawer's own lists
             page.isOpen -> if (!right) page.close() // the page is to the left of Home: finger left goes back
             else -> run(action(if (right) SWIPE_RIGHT else SWIPE_LEFT))
         }
+    }
+
+    /** Phone: up opens every app, down closes them (or, on Home, pulls the notifications down). False = not ours. */
+    private fun vertical(up: Boolean): Boolean {
+        if (a.widgetPage.isOpen) return false // it scrolls
+        val drawer = a.phoneHome.drawer
+        when {
+            drawer.isOpen -> if (!up) drawer.close() else return false
+            up -> drawer.open()
+            else -> expandNotifications()
+        }
+        return true
     }
 
     fun action(key: String): String = a.hub.prefs.getString(key, null) ?: DEFAULTS.getValue(key)
@@ -71,9 +96,9 @@ class Gestures(private val a: MainActivity) {
             what == WIDGETS -> a.widgetPage.open()
             what.startsWith("app:") -> a.packageManager.getLaunchIntentForPackage(what.removePrefix("app:"))
                 ?.let { runCatching { a.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } ?: a.toast("That app isn't installed")
-            what == "search" -> a.searchBar.open()
+            what == "search" -> if (a.hub.phone) a.phoneHome.drawer.open(typing = true) else a.searchBar.open()
             what == "notifications" -> expandNotifications()
-            what == "lock" -> if (!HomeButtonService.global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN))
+            what == "lock" -> if (!HomeButtonService.global(a, android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN))
                 a.toast("To lock the screen, turn on Joint Launcher in Settings → Accessibility")
         }
     }
@@ -85,17 +110,17 @@ class Gestures(private val a: MainActivity) {
         sb.javaClass.getMethod("expandNotificationsPanel").invoke(sb)
     }.onFailure { a.toast("Couldn't open the notifications") }
 
-    /** True when something under (x, y) scrolls sideways: the swipe is its. */
-    private fun sideways(v: View, x: Int, y: Int): Boolean {
+    /** True when something under (x, y) scrolls the way [can] asks: the swipe is its. */
+    private fun scrolls(v: View, x: Int, y: Int, can: (View) -> Boolean): Boolean {
         if (!under(v, x, y)) return false
-        if (v.canScrollHorizontally(1) || v.canScrollHorizontally(-1)) return true
-        return v is ViewGroup && (v.childCount - 1 downTo 0).any { sideways(v.getChildAt(it), x, y) }
+        if (can(v)) return true
+        return v is ViewGroup && (v.childCount - 1 downTo 0).any { scrolls(v.getChildAt(it), x, y, can) }
     }
 
     /** True when nothing under (x, y) takes taps (no tile, button, header or widget): a double-tap there is a gesture. */
     private fun empty(v: View, x: Int, y: Int): Boolean {
         if (!under(v, x, y)) return true
-        if (v.isClickable || v.isLongClickable || v is android.webkit.WebView || v is android.widget.EditText) return false
+        if (v.isClickable || v is android.webkit.WebView || v is android.widget.EditText) return false
         return v !is ViewGroup || (0 until v.childCount).all { empty(v.getChildAt(it), x, y) }
     }
 

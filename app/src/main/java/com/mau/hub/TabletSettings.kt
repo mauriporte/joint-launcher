@@ -21,7 +21,7 @@ import java.util.TimeZone
 class TabletSettings(private val a: MainActivity) {
     private val hub get() = a.hub
     private val p get() = hub.prefs
-    private val device get() = if (hub.touch) "tablet" else "TV" // "Like the tablet" / "Like the TV"
+    private val device get() = if (hub.phone) "phone" else if (hub.touch) "tablet" else "TV" // "Like the tablet" / "Like the TV"
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), 0, a.dp(24), a.dp(24)) }
     // made once so a redraw keeps what you've typed
     private val url = field("Jellyfin URL", hub.server)
@@ -41,7 +41,7 @@ class TabletSettings(private val a: MainActivity) {
             addView(ScrollView(a).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         })
         dialog.window?.apply {
-            setLayout(minOf(a.resources.displayMetrics.widthPixels * 11 / 20, a.dp(760)), -1)
+            setLayout(if (hub.phone) -1 else minOf(a.resources.displayMetrics.widthPixels * 11 / 20, a.dp(760)), -1)
             setGravity(Gravity.END)
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         }
@@ -53,10 +53,13 @@ class TabletSettings(private val a: MainActivity) {
     private fun draw() {
         list.removeAllViews()
 
+        if (hub.phone) phone()
+        if (!hub.phone) {
         heading("Accounts")
         list.addView(url); list.addView(key)
         // Jellyseerr, Stremio, Spotify and YouTube: signed in from your phone (QR code), nothing to type here
         buttons("Connect accounts" to { ConnectScreen(a).show() })
+        }
 
         heading("Background")
         val modes = linkedMapOf("black" to "Black", "wallpaper" to "The $device's wallpaper", "picture" to "My pictures (landscape and portrait)")
@@ -78,6 +81,7 @@ class TabletSettings(private val a: MainActivity) {
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        if (!hub.phone) {
         val sideLabel = a.text(15f, TEXT_SOFT)
         fun sideText(v: Int) { sideLabel.text = "Sidebar: $v % solid" + if (v == 100) " (no see-through)" else "" }
         list.addView(sideLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
@@ -89,6 +93,7 @@ class TabletSettings(private val a: MainActivity) {
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        }
         if (a.bgMode() == "wallpaper") buttons("Change wallpaper" to {
             runCatching { a.startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choose a wallpaper")) }
                 .onFailure { a.toast("Couldn't open the wallpaper picker") }
@@ -98,9 +103,10 @@ class TabletSettings(private val a: MainActivity) {
         val packs = a.apps.packs.installed()
         val pack = a.apps.packs.active()
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
-        line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
+        if (!hub.phone) line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
         line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
 
+        if (!hub.phone) {
         heading("Home")
         list.addView(android.widget.Switch(a).apply {
             text = "Show section titles (off: their icons instead)"; textSize = 16f; setTextColor(Color.WHITE)
@@ -133,6 +139,7 @@ class TabletSettings(private val a: MainActivity) {
         // the Apps section's other name, shown while its heart is on
         line("Favorites section name", name(hub, "favorites")) { rename("favorites") }
         line(name(hub, "watch"), "Order and show/hide its rows") { a.chooseRows() }
+        }
 
         if (hub.touch) {
         heading("Gestures")
@@ -141,7 +148,7 @@ class TabletSettings(private val a: MainActivity) {
         }
         heading("Screen")
         fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
-            text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)
+            text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, !hub.phone)
             setOnCheckedChangeListener { _, on -> p.edit().putBoolean(key, on).apply(); a.applySystemBars() }
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
         barSwitch("Hide the status bar (clock, Wi-Fi, battery)", "hide_status_bar")
@@ -171,7 +178,7 @@ class TabletSettings(private val a: MainActivity) {
 
         heading("Clock")
         val cornerSet = p.getInt("corner_widget", -1) >= 0
-        if (hub.touch) line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
+        if (hub.touch && !hub.phone) line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
             val opts = arrayOf("Built-in clock", "Pick a widget (e.g. Flip Clock)")
             AlertDialog.Builder(a).setTitle("Corner clock").setItems(opts) { _, i -> if (i == 0) a.widgets.clearCorner() else a.widgets.pick(forCorner = true); draw() }.show()
         }
@@ -182,6 +189,33 @@ class TabletSettings(private val a: MainActivity) {
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
 
         list.addView(a.text(13f, TEXT_MUTED).apply { text = a.actions.storageLine(); setPadding(0, a.dp(24), 0, 0) })
+    }
+
+    /** The phone's own: how Home shows apps, the drawer's keyboard, and bringing Pro Launcher's setup over. */
+    private fun phone() {
+        val home = a.phoneHome
+        heading("Home")
+        line("Apps on Home and in the list", if (home.icons) "Icons (from the icon pack) and names" else "Names only") {
+            home.icons = !home.icons; a.refreshApps(); draw()
+        }
+        list.addView(android.widget.Switch(a).apply {
+            text = "Keyboard up when the app list opens"; textSize = 16f; setTextColor(Color.WHITE)
+            isChecked = p.getBoolean("phone_keyboard", false)
+            setOnCheckedChangeListener { _, on -> p.edit().putBoolean("phone_keyboard", on).apply() }
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
+        heading("Pro Launcher")
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Pick its backup (.zip, from Pro Launcher → Settings → Backup): your Home list, app names, categories, hidden apps, shortcuts and swipe-left app come over." })
+        buttons("Import from Pro Launcher" to {
+            a.openBytes { bytes ->
+                val r = runCatching { ProLauncherImport.read(bytes) }.getOrNull()
+                if (r == null) a.toast("That isn't a Pro Launcher backup")
+                else {
+                    ProLauncherImport.apply(a, r); a.refreshApps(); draw()
+                    a.toast("Imported: ${r.home.size} on Home, ${r.names.size} names, ${r.cats.size} apps in ${r.catOrder.size} categories")
+                }
+            }
+        })
     }
 
     /** Your pictures side by side: tap one to use it, hold it for its portrait version or to remove it; + adds one. */

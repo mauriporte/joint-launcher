@@ -157,7 +157,7 @@ class TopBar(private val a: MainActivity) {
      * Tablet corner: tapping the clock or the weather opens the app you pick for it (asked the first time, then
      * remembered); press and hold to pick another. Apps whose names suggest the job (a clock app, a weather app) come first.
      */
-    private fun opensApp(v: View, key: String, what: String, hints: List<String>) {
+    fun opensApp(v: View, key: String, what: String, hints: List<String>) {
         fun choose() = a.hub.diskPool.execute {
             val all = a.apps.all().sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
             val (likely, rest) = all.partition { app -> hints.any { h -> app.label.contains(h, true) || app.key.contains(h, true) } }
@@ -177,6 +177,9 @@ class TopBar(private val a: MainActivity) {
         }
         v.setOnLongClickListener { choose(); true }
     }
+
+    /** The phone's Home shows the weather itself: takes it out of this bar (which the phone doesn't show). */
+    fun takeWeather(): View? = weather.also { (it.parent as? android.view.ViewGroup)?.removeView(it) }
 
     /** Shows the corner widget instead of the built-in clock when one is set (and its app still exists). */
     fun applyCornerClock() {
