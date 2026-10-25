@@ -262,10 +262,11 @@ class AllApps(private val a: MainActivity) {
         refresh()
         if (isOpen) return
         // see-through as much as Settings says (0 = clear, the wallpaper shows; 100 = black)
-        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 15) * 255 / 100, 5, 5, 5))
+        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 40) * 255 / 100, 5, 5, 5))
         view.visibility = View.VISIBLE
         view.translationY = a.window.decorView.height * 0.3f; view.alpha = 0f
         view.animate().translationY(0f).alpha(1f).setDuration(200).start()
+        homeContent.animate().alpha(0f).setDuration(200).start() // only the wallpaper behind the list, not Home's names too
         recycler.scrollToPosition(0)
         if (typing || a.hub.prefs.getBoolean("phone_keyboard", false)) { search.requestFocus(); keyboard(true) }
     }
@@ -274,7 +275,10 @@ class AllApps(private val a: MainActivity) {
         if (!isOpen) return
         keyboard(false); search.clearFocus()
         view.animate().translationY(a.window.decorView.height * 0.3f).alpha(0f).setDuration(180).withEndAction { view.visibility = View.GONE }.start()
+        homeContent.animate().alpha(1f).setDuration(180).start()
     }
+
+    private val homeContent get() = (home.view as ViewGroup).getChildAt(0) // Home's clock, list and shortcuts, under this list
 
     /** Is the list at its top (so a swipe down closes the drawer instead of scrolling)? */
     fun atTop() = !recycler.canScrollVertically(-1)
