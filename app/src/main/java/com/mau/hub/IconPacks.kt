@@ -60,6 +60,7 @@ class IconPacks(private val hub: Hub) {
 
     /** The pack icon for an app (see [pickFor]); null = use the app's own. brand: the colour for a service that isn't installed. */
     fun packIcon(pkg: String, label: String, brand: Int? = null): Drawable? {
+        if (pkg in OWN && override(pkg) == null) return ownIcon(pkg)
         val pick = pickFor(pkg, label)?.split('|') ?: return null
         val d = drawable(pick[0], pick[1]) ?: return null
         // hand-picked and guessed icons take the app's colour (GeeSports' G stays yellow); a service that isn't
@@ -68,6 +69,15 @@ class IconPacks(private val hub: Hub) {
             ?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
         return d
     }
+
+    /**
+     * One of our own apps' icon as drawn, straight from its resources: asking Android for it (getApplicationIcon) gets
+     * it in HyperOS's white rounded box, because it isn't an adaptive icon.
+     */
+    fun ownIcon(pkg: String): Drawable? = if (pkg !in OWN) null else runCatching {
+        val info = ctx.packageManager.getApplicationInfo(pkg, 0)
+        ctx.packageManager.getResourcesForApplication(info).getDrawable(info.icon, null)
+    }.getOrNull()
 
     /** Every app here by name, with the icon it gets: what another device (the TV) copies to show the same icons. */
     fun exportPicks(): String = org.json.JSONObject().apply {

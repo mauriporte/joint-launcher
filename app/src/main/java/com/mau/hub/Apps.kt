@@ -143,7 +143,7 @@ class Apps(private val hub: Hub, private val images: Images) {
             // a pack on: only pack icons (guessing the missing ones); no pack: only the apps' own (and ours for banner-only TV apps)
             val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(hub.pkgFor(pkg) ?: pkg, 0)).toString() }.getOrDefault(pkg)
             val d = if (packs.active() != null) packs.packIcon(pkg, label) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
-                else customIcon(pkg) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
+                else customIcon(pkg) ?: packs.ownIcon(pkg) ?: runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
             d ?: return@execute
             hub.main.post { iconCache[pkg] = d; if (into.tag == "icon:$pkg") into.setImageDrawable(d) }
         }
