@@ -85,7 +85,7 @@ class PhoneHome(private val a: MainActivity) {
                     orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
                     a.topBar.takeWeather()?.let { w ->
                         (w as? TextView)?.apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) } // icon over the degrees
-                        addView(w, LinearLayout.LayoutParams(-1, -2))
+                        addView(w, LinearLayout.LayoutParams(-1, a.dp(88))) // as tall as the two buttons opposite, so the remotes line up
                         w.setOnClickListener { weatherPanel.open(from = w) }
                     }
                     addView(remoteButtons[1], LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
