@@ -158,7 +158,17 @@ Opened from the sidebar's Settings; a panel down the right side so Home stays vi
 The HA dashboard inside Home. It uses the home address when it answers (on the home Wi-Fi) and the public one
 otherwise; both come from `local.properties`. You sign in once inside the section.
 
+### MauHome widget
+
+Mau's Google Home widget, button for button, run by Home Assistant (`HaWidget.kt`): see-through tiles with coloured
+outlines, padlocked server plugs ask before turning off, columns follow the widget's width. It reads HA's REST API
+with a long-lived token saved on the Connect page (Home Assistant section). Tiles without a sure HA match are grey
+"Sin asignar" placeholders. A.R.T. Phone extended it to 36 tiles with cameras.
+
 ### Other details
+
+- Settings → Background → **Lock screen** puts the current background picture on the lock screen too.
+- **Lock app** (hold menu) and Settings → **App lock** (PIN), from the TV merge; the phone doesn't have them.
 
 - The launcher is the tablet's default Home app and is declared non-resizable (no split-screen handle on it).
 - More football leagues in the GeeSports row: Premier League, Ligue 1, Bundesliga, Champions League, Europa League,

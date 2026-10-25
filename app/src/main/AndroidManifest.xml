@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" /> <!-- Settings: the background picture on the lock screen too -->
     <!-- the TV's own network address, for the phone sign-in page's QR code -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" /> <!-- swipe gesture: open the notifications -->

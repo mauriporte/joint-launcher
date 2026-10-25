@@ -70,6 +70,12 @@ class TabletSettings(private val a: MainActivity) {
                 }.show()
         }
         if (a.bgMode() == "picture") gallery()
+        if (hub.touch && a.bgMode() == "picture") a.currentBackground()?.let { id ->
+            line("Lock screen", "Use this picture there too") {
+                runCatching { a.bgFile(id, false).inputStream().use { android.app.WallpaperManager.getInstance(a).setStream(it, null, true, android.app.WallpaperManager.FLAG_LOCK) } }
+                    .onSuccess { a.toast("Lock screen picture set") }.onFailure { a.toast("Couldn't set the lock screen: ${it.message}") }
+            }
+        }
         val dimLabel = a.text(15f, TEXT_SOFT)
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
@@ -105,7 +111,7 @@ class TabletSettings(private val a: MainActivity) {
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
         if (!hub.phone) line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
         line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
-        if (!hub.touch) line("App lock", a.appLock.locked().size.let { n ->
+        if (!hub.phone) line("App lock", a.appLock.locked().size.let { n ->
             (if (a.appLock.hasPin()) "PIN set" else "No PIN yet") + " · " + if (n == 0) "no apps locked: hold an app and choose Lock app" else "$n locked"
         }) { a.appLock.changePin { a.toast("PIN saved"); draw() } }
 

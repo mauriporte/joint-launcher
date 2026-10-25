@@ -386,7 +386,7 @@ class MainActivity : Activity() {
                             listOfNotNull(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
                                 // TV only for now: the tablet and phone have no Settings line to change the PIN
-                                if (hub.touch) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
+                                if (hub.phone) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
                                 // back from Settings → Hidden apps
                                 "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
                                 // Android asks you to confirm; the Apps section updates when you come back
