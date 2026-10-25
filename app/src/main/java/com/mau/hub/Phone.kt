@@ -94,6 +94,7 @@ class PhoneHome(private val a: MainActivity) {
     }
 
     init {
+        nowPanel.coverTo = date; weatherPanel.coverTo = date
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
     }
@@ -493,6 +494,8 @@ open class PopPanel(protected val a: MainActivity) {
         visibility = View.GONE
     }
     val isOpen get() = view.visibility == View.VISIBLE
+    /** The card reaches at least down to this view's bottom (the phone: Home's date), so the whole top is covered. */
+    var coverTo: View? = null
 
     protected open fun update() = Unit
 
@@ -502,6 +505,9 @@ open class PopPanel(protected val a: MainActivity) {
         if (isOpen) return
         val inView = IntArray(2).also(view::getLocationOnScreen)
         val btn = IntArray(2).also { from?.getLocationOnScreen(it) }
+        // as see-through as Settings says (the same for both cards)
+        (panel.background as GradientDrawable).setColor(Color.argb(a.hub.prefs.getInt("card_dim", 90) * 255 / 100, 16, 16, 18))
+        coverTo?.let { c -> panel.minimumHeight = IntArray(2).also(c::getLocationOnScreen)[1] + c.height - inView[1] }
         view.visibility = View.VISIBLE
         panel.pivotX = btn[0] - inView[0] - a.dp(8) + (from?.width ?: 0) / 2f
         panel.pivotY = btn[1] - inView[1] - a.dp(8) + (from?.height ?: 0) / 2f

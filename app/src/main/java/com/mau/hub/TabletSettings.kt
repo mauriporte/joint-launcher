@@ -263,6 +263,17 @@ class TabletSettings(private val a: MainActivity) {
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val cardLabel = a.text(15f, TEXT_SOFT)
+        fun cardText(v: Int) { cardLabel.text = "Music and weather cards: darken $v %" + when (v) { 0 -> " (see-through)"; 100 -> " (black)"; else -> "" } }
+        list.addView(cardLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 100; progress = p.getInt("card_dim", 90); cardText(progress)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { cardText(v); p.edit().putInt("card_dim", v).apply() }
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                override fun onStopTrackingTouch(s: SeekBar) = Unit
+            })
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
         // the MauHome widget's Home Assistant token: typed here on the phone (the Connect page is for setting up another device)
         heading("Home Assistant")
