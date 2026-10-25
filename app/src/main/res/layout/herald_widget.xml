@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home Herald, laid out like its page in HA (homelab-pc-helper/herald.py): meta line, masthead over a double rule,
-     centred headline and italic subhead, the lead with a drop cap, "By the numbers", the watch box, briefs -->
+<!-- Home Herald, laid out like its page in HA (homelab-pc-helper/herald.py): meta line, night/day and EN/ES switches
+     around the round logo, the masthead, the tagline row over a double rule, centred headline and italic subhead,
+     the lead with a drop cap, "By the numbers", the watch box, briefs. RemoteViews take no plain View: rules are FrameLayouts. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/herald" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="14dp" android:background="@drawable/herald_bg_night">
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/herald_bg_night">
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
         <TextView android:id="@+id/herald_no" style="@style/HeraldMeta" android:layout_width="wrap_content" />
@@ -11,60 +12,77 @@
         <TextView android:id="@+id/herald_edition" style="@style/HeraldMeta" android:layout_width="wrap_content" />
     </LinearLayout>
     <FrameLayout android:id="@+id/herald_rule1" android:layout_width="match_parent" android:layout_height="1dp" />
-    <FrameLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-        <TextView android:id="@+id/herald_masthead" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:gravity="center" android:fontFamily="@font/unifrakturcook" android:textSize="44sp" android:singleLine="true"
-            android:paddingTop="4dp" android:paddingBottom="4dp" />
-        <!-- EN / ES, like the page's language switch; tap to flip -->
-        <TextView android:id="@+id/herald_lang" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_gravity="end|center_vertical" android:background="@drawable/herald_pill" android:fontFamily="@font/gelasio"
-            android:textStyle="bold" android:textSize="11sp" android:letterSpacing="0.08" android:paddingStart="12dp"
-            android:paddingEnd="12dp" android:paddingTop="5dp" android:paddingBottom="5dp" />
+
+    <FrameLayout android:id="@+id/herald_top" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <LinearLayout android:id="@+id/herald_mode" style="@style/HeraldPill" android:layout_gravity="start|top">
+            <TextView android:id="@+id/herald_night" style="@style/HeraldPillPart" android:text="☾" />
+            <TextView android:id="@+id/herald_day" style="@style/HeraldPillPart" android:text="☀&#xFE0E;" />
+        </LinearLayout>
+        <ImageView android:id="@+id/herald_logo" android:layout_width="64dp" android:layout_height="64dp"
+            android:layout_gravity="center_horizontal" android:scaleType="centerCrop" />
+        <LinearLayout android:id="@+id/herald_lang" style="@style/HeraldPill" android:layout_gravity="end|top">
+            <TextView android:id="@+id/herald_en" style="@style/HeraldPillPart" android:text="EN" />
+            <TextView android:id="@+id/herald_es" style="@style/HeraldPillPart" android:text="ES" />
+        </LinearLayout>
     </FrameLayout>
-    <FrameLayout android:id="@+id/herald_rule2" android:layout_width="match_parent" android:layout_height="1dp" />
+    <TextView android:id="@+id/herald_masthead" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:fontFamily="@font/gelasio" android:textStyle="bold" android:textSize="46sp"
+        android:singleLine="true" android:includeFontPadding="false" android:paddingTop="2dp" android:paddingBottom="4dp" />
+    <LinearLayout android:id="@+id/herald_tags" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@+id/herald_tag1" style="@style/HeraldMeta" android:layout_width="0dp" android:layout_weight="1" />
+        <TextView android:id="@+id/herald_tag2" style="@style/HeraldMeta" android:layout_width="wrap_content" />
+    </LinearLayout>
+    <FrameLayout android:id="@+id/herald_rule2" android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="2dp" />
     <FrameLayout android:id="@+id/herald_rule3" android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="2dp" />
 
     <TextView android:id="@+id/herald_headline" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="10dp" android:gravity="center" android:fontFamily="@font/gelasio" android:textStyle="bold"
-        android:textSize="21sp" android:maxLines="3" android:ellipsize="end" />
+        android:layout_marginTop="12dp" android:gravity="center" android:fontFamily="@font/gelasio" android:textStyle="bold"
+        android:textSize="27sp" android:maxLines="3" android:ellipsize="end" />
     <TextView android:id="@+id/herald_subhead" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="4dp" android:gravity="center" android:fontFamily="@font/gelasio" android:textStyle="italic"
-        android:textSize="14sp" android:maxLines="2" android:ellipsize="end" />
+        android:layout_marginTop="6dp" android:gravity="center" android:fontFamily="@font/gelasio" android:textStyle="italic"
+        android:textSize="16sp" android:lineSpacingMultiplier="1.2" android:maxLines="2" android:ellipsize="end" />
     <TextView android:id="@+id/herald_lead" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="10dp" android:fontFamily="@font/gelasio" android:textSize="14sp" android:lineSpacingMultiplier="1.15"
+        android:layout_marginTop="14dp" android:fontFamily="@font/gelasio" android:textSize="16sp" android:lineSpacingMultiplier="1.1"
         android:maxLines="6" android:ellipsize="end" />
 
     <LinearLayout android:id="@+id/herald_numbers_box" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="12dp" android:orientation="vertical" android:padding="10dp">
+        android:layout_marginTop="16dp" android:orientation="vertical" android:paddingStart="14dp" android:paddingEnd="14dp"
+        android:paddingTop="10dp" android:paddingBottom="10dp">
         <TextView android:id="@+id/herald_numbers_h" style="@style/HeraldH3" />
         <FrameLayout android:id="@+id/herald_numbers_rule" android:layout_width="match_parent" android:layout_height="1dp" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp">
             <TextView android:id="@+id/herald_k1" style="@style/HeraldKpi" />
             <TextView android:id="@+id/herald_k2" style="@style/HeraldKpi" />
             <TextView android:id="@+id/herald_k3" style="@style/HeraldKpi" />
             <TextView android:id="@+id/herald_k4" style="@style/HeraldKpi" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/herald_krow2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp">
             <TextView android:id="@+id/herald_k5" style="@style/HeraldKpi" />
             <TextView android:id="@+id/herald_k6" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k7" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k8" style="@style/HeraldKpi" />
         </LinearLayout>
     </LinearLayout>
 
     <LinearLayout android:id="@+id/herald_watch_box" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="14dp">
         <FrameLayout android:id="@+id/herald_watch_bar" android:layout_width="4dp" android:layout_height="match_parent" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+            android:paddingStart="14dp" android:paddingEnd="14dp" android:paddingTop="10dp" android:paddingBottom="10dp">
             <TextView android:id="@+id/herald_watch_h" style="@style/HeraldH3" />
             <FrameLayout android:id="@+id/herald_watch_rule" android:layout_width="match_parent" android:layout_height="1dp" />
             <TextView android:id="@+id/herald_watch" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="4dp" android:fontFamily="@font/gelasio" android:textSize="13sp" android:maxLines="3" android:ellipsize="end" />
+                android:layout_marginTop="6dp" android:fontFamily="@font/gelasio" android:textSize="15sp" android:lineSpacingMultiplier="1.3"
+                android:maxLines="3" android:ellipsize="end" />
         </LinearLayout>
     </LinearLayout>
 
     <LinearLayout android:id="@+id/herald_briefs_box" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="12dp" android:orientation="vertical">
+        android:layout_marginTop="14dp" android:orientation="vertical">
         <TextView android:id="@+id/herald_briefs_h" style="@style/HeraldH3" />
         <FrameLayout android:id="@+id/herald_briefs_rule" android:layout_width="match_parent" android:layout_height="1dp" />
         <TextView android:id="@+id/herald_briefs" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:fontFamily="@font/gelasio" android:textSize="13sp" android:lineSpacingMultiplier="1.15"
+            android:layout_marginTop="6dp" android:fontFamily="@font/gelasio" android:textSize="15sp" android:lineSpacingMultiplier="1.3"
             android:maxLines="5" android:ellipsize="end" />
     </LinearLayout>
 </LinearLayout>

@@ -401,7 +401,7 @@ class HeraldWidgetTest {
         assertEquals("No. 12", en.no)
         assertEquals("Saturday, 24 October 2026", en.date)
         assertEquals("Morning edition · 15:53", en.edition)
-        assertEquals(listOf("41" to "devices online", "3/3" to "servers up", "2" to "lights on", "17.5°" to "Cloudy"), en.kpis)
+        assertEquals(listOf("41" to "devices online", "3/3" to "servers up", "2" to "lights on", "17.5°C" to "Cloudy"), en.kpis)
         assertEquals("• One\n• Two", en.briefs)
         val es = HeraldWidget.page(sensor, es = true)
         assertEquals("Noche tranquila en casa", es.headline)
