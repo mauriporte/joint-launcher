@@ -76,6 +76,13 @@ class TabletSettings(private val a: MainActivity) {
                     .onSuccess { a.toast("Lock screen picture set") }.onFailure { a.toast("Couldn't set the lock screen: ${it.message}") }
             }
         }
+        // with the device's own wallpaper (the phone's black wood + M) there's no picture of ours to reuse: pick one for the lock screen
+        if (hub.touch && a.bgMode() != "picture") line("Lock screen", "Pick a picture for it") {
+            a.openBytes { bytes ->
+                runCatching { android.app.WallpaperManager.getInstance(a).setStream(bytes.inputStream(), null, true, android.app.WallpaperManager.FLAG_LOCK) }
+                    .onSuccess { a.toast("Lock screen picture set") }.onFailure { a.toast("Couldn't set the lock screen: ${it.message}") }
+            }
+        }
         val dimLabel = a.text(15f, TEXT_SOFT)
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
