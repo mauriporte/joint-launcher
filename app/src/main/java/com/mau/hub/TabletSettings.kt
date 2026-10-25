@@ -146,6 +146,18 @@ class TabletSettings(private val a: MainActivity) {
         listOf(Gestures.SWIPE_RIGHT, Gestures.SWIPE_LEFT, Gestures.DOUBLE_TAP).forEach { k ->
             line(Gestures.LABELS.getValue(k), a.gestures.describe(k)) { a.gestures.choose(k) { draw() } }
         }
+        val heightLabel = a.text(15f, TEXT_SOFT)
+        fun heightText(n: Int) { heightLabel.text = "Widget page height: $n screen${if (n > 1) "s" else ""} (more rows appear by themselves when it's full)" }
+        list.addView(heightLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 9; progress = a.widgets.screens - 1; heightText(progress + 1)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) = heightText(v + 1)
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                // the grid is rebuilt once, when you let go
+                override fun onStopTrackingTouch(s: SeekBar) { a.widgets.screens = s.progress + 1; a.rows.refreshWidgets() }
+            })
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
         heading("Screen")
         fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
             text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)

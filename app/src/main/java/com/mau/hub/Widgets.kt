@@ -190,9 +190,19 @@ class Widgets(private val a: MainActivity) {
     private fun screenRows(width: Int) = maxOf(2, (a.resources.displayMetrics.heightPixels - a.dp(160)) / cellPx(width))
     private fun maxRows(width: Int) = screenRows(width) * 10
 
-    /** Columns x rows of the grid in this orientation: yours, else the whole screen below the top bar. */
+    /** Settings → Widget page height: how many screens tall the grid is (1-10). Setting it replaces a height dragged by hand. */
+    var screens: Int
+        get() = a.hub.prefs.getInt("widget_screens", 1)
+        set(v) = a.hub.prefs.edit().apply {
+            putInt("widget_screens", v.coerceIn(1, 10))
+            listOf("p", "l").forEach { o -> ints("wgrid_$o")?.let { (c, _) -> putString("wgrid_$o", "$c,0") } } // 0 rows = follow Settings
+        }.apply()
+
+    /** Columns x rows of the grid in this orientation: yours (rows dragged by hand, or Settings' screens), else the whole width. */
     private fun gridSize(width: Int): Pair<Int, Int> {
-        return ints("wgrid_$orient")?.let { (c, r) -> c.coerceIn(1, maxCols(width)) to r.coerceIn(1, maxRows(width)) } ?: (maxCols(width) to screenRows(width))
+        val fromSettings = screenRows(width) * screens
+        return ints("wgrid_$orient")?.let { (c, r) -> c.coerceIn(1, maxCols(width)) to (if (r <= 0) fromSettings else r.coerceIn(1, maxRows(width))) }
+            ?: (maxCols(width) to fromSettings)
     }
 
     /** A widget's columns x rows: yours, else from the size it was dragged to before the grid, else what it asks for. */
