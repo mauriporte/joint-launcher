@@ -23,6 +23,10 @@ import java.util.Locale
 class HeraldWidget : AppWidgetProvider() {
     override fun onUpdate(c: Context, m: AppWidgetManager, ids: IntArray) = refresh(c, force = true, done = goAsync())
     override fun onAppWidgetOptionsChanged(c: Context, m: AppWidgetManager, id: Int, o: Bundle) = draw(c)
+    override fun onReceive(c: Context, i: Intent) {
+        super.onReceive(c, i)
+        if (i.action == FLIP) { prefs(c).edit().putBoolean(LANG, !spanish(c)).apply(); draw(c) } // EN <-> ES, for every Herald widget
+    }
 
     /** One edition, in the device's language, with the HA page's labels (herald.py UI). kpis: (figure, label). */
     internal class Page(val no: String, val date: String, val edition: String, val masthead: String, val headline: String,
@@ -32,7 +36,11 @@ class HeraldWidget : AppWidgetProvider() {
     companion object {
         private const val CACHE = "herald_cache"; private const val AT = "herald_at"
 
+        private const val FLIP = "com.mau.hub.HERALD_FLIP"; private const val LANG = "herald_es"
+
         private fun prefs(c: Context) = c.getSharedPreferences("hub", Context.MODE_PRIVATE)
+        /** Spanish: the switch's last choice, else the device's language. */
+        private fun spanish(c: Context) = prefs(c).getBoolean(LANG, Locale.getDefault().language == "es")
 
         /** The sensor's JSON as a page; es: the *_es fields (falling back to English where one is missing). */
         internal fun page(o: JSONObject, es: Boolean): Page {
@@ -94,7 +102,7 @@ class HeraldWidget : AppWidgetProvider() {
         }
 
         private fun views(c: Context, o: JSONObject?, opts: Bundle) = RemoteViews(c.packageName, R.layout.herald_widget).apply {
-            val es = Locale.getDefault().language == "es"
+            val es = spanish(c)
             val night = c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_NO
             // the HA page's colours: --ink, --muted, --accent, --box
             val ink = if (night) 0xFFE1E1E1.toInt() else 0xFF000000.toInt()
@@ -145,6 +153,13 @@ class HeraldWidget : AppWidgetProvider() {
             text(R.id.herald_watch_h, pg?.labels?.second, ink); text(R.id.herald_watch, pg?.watch, ink)
             show(R.id.herald_briefs_box, size >= 2 && !pg?.briefs.isNullOrBlank())
             text(R.id.herald_briefs_h, pg?.labels?.third, ink); text(R.id.herald_briefs, pg?.briefs, ink)
+            // the chosen language bright, the other muted (the page fills the chosen one)
+            text(R.id.herald_lang, android.text.SpannableStringBuilder().apply {
+                fun add(s: String, on: Boolean) { val st = length; append(s); setSpan(android.text.style.ForegroundColorSpan(if (on) ink else muted), st, length, 0) }
+                add("EN", !es); add("  ·  ", false); add("ES", es)
+            }, muted)
+            setOnClickPendingIntent(R.id.herald_lang, PendingIntent.getBroadcast(c, 1, Intent(c, HeraldWidget::class.java).setAction(FLIP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
             setOnClickPendingIntent(R.id.herald, PendingIntent.getActivity(c, 0, open(c), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
 
