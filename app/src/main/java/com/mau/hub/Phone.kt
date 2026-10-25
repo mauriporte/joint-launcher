@@ -328,6 +328,9 @@ object ProLauncherImport {
         val hidden: Set<String>, val dock: List<String>, val swipeLeft: String?,
     )
 
+    // Pro Launcher's own word categories from older versions, folded into your emoji ones
+    private val OLD_CATEGORIES = mapOf("Productivity" to "⚙️", "Social" to "🍥", "Music" to "🎵", "Game" to "🎮")
+
     fun read(zip: ByteArray): Result? {
         val files = HashMap<String, String>()
         java.util.zip.ZipInputStream(zip.inputStream()).use { z ->
@@ -347,7 +350,7 @@ object ProLauncherImport {
             if (m.optString("appType", "app_model") != "app_model") return // web shortcuts: not apps
             val pkg = m.optString("packageName").takeIf { it.isNotEmpty() } ?: return
             (m.optString("homeRename").takeIf { it.isNotBlank() } ?: m.optString("labelRename").takeIf { it.isNotBlank() })?.let { names[pkg] = it.trim() }
-            m.optString("appCategory").trim().takeIf { it.isNotEmpty() && it != "null" }?.let { cats[pkg] = it }
+            m.optString("appCategory").trim().takeIf { it.isNotEmpty() && it != "null" }?.let { cats[pkg] = OLD_CATEGORIES[it] ?: it }
             if (m.optBoolean("hidden")) hidden += pkg
         }
         for (i in 0 until apps.length()) apps.optJSONObject(i)?.let(::takeApp)
