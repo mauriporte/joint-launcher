@@ -49,13 +49,23 @@ object Jarvis {
 
     private fun prefs(c: Context) = c.getSharedPreferences("hub", Context.MODE_PRIVATE)
 
-    /** The device's conversation with Jarvis; a new one after 10 minutes without a word. */
-    private fun conversation(c: Context): String? = prefs(c).takeIf { System.currentTimeMillis() - it.getLong("jarvis_conv_at", 0) < 10 * 60_000 }
-        ?.getString("jarvis_conv", null)
+    /** The device's conversation with Jarvis, kept like the chat on screen until New chat (HA starts a fresh one if it has forgotten it). */
+    private fun conversation(c: Context): String? = prefs(c).getString("jarvis_conv", null)
     private fun keep(c: Context, id: String?) {
-        if (!id.isNullOrEmpty()) prefs(c).edit().putString("jarvis_conv", id).putLong("jarvis_conv_at", System.currentTimeMillis()).apply()
+        if (!id.isNullOrEmpty()) prefs(c).edit().putString("jarvis_conv", id).apply()
     }
-    fun newChat(c: Context) = prefs(c).edit().remove("jarvis_conv").remove("jarvis_conv_at").apply()
+    fun newChat(c: Context) = prefs(c).edit().remove("jarvis_conv").remove("jarvis_log").apply()
+
+    /** The chat as it was on screen (yours: true), kept on this device only, the last 200 messages; New chat empties it. */
+    fun history(c: Context): List<Pair<Boolean, String>> = runCatching {
+        val a = org.json.JSONArray(prefs(c).getString("jarvis_log", "[]"))
+        (0 until a.length()).map { a.getJSONObject(it).let { o -> o.getBoolean("m") to o.getString("t") } }
+    }.getOrDefault(emptyList())
+
+    fun remember(c: Context, mine: Boolean, text: String) {
+        val kept = (history(c) + (mine to text)).takeLast(200)
+        prefs(c).edit().putString("jarvis_log", org.json.JSONArray(kept.map { JSONObject().put("m", it.first).put("t", it.second) }).toString()).apply()
+    }
 
     /** HA call with Jarvis's long timeout (the bigger brains take up to 20 s; HA admin: 150 s). */
     private fun http(c: Context, path: String, body: String? = null): JSONObject {
@@ -253,13 +263,13 @@ class JarvisChat : JarvisScreen() {
         fun send() {
             if (busy) return
             val t = field.text.toString().trim().takeIf { it.isNotEmpty() } ?: return
-            field.setText(""); bubble(t, mine = true); busy = true
+            field.setText(""); bubble(t, mine = true); Jarvis.remember(this, true, t); busy = true
             val thinking = bubble("Thinking…", mine = false)
             Thread {
                 val r = runCatching { Jarvis.say(this, t) }
                 runOnUiThread {
                     busy = false; log.removeView(thinking)
-                    r.fold({ bubble(it.text, false) }, { bubble(it.message ?: "Didn't work", false, error = true) })
+                    r.fold({ bubble(it.text, false); Jarvis.remember(this, false, it.text) }, { bubble(it.message ?: "Didn't work", false, error = true) })
                 }
             }.start()
         }
@@ -281,6 +291,7 @@ class JarvisChat : JarvisScreen() {
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
             })
         })
+        Jarvis.history(this).forEach { (mine, t) -> bubble(t, mine) } // the chat as you left it
         field.requestFocus()
     }
 

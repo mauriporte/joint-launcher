@@ -566,7 +566,7 @@ class TabletSettings(private val a: MainActivity) {
     companion object {
         // backups leave out sign-ins (secrets don't belong in a file on the tablet's storage) and what only means
         // something on this install (placed widgets, picture files, the widget being added)
-        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", AppLock.PIN, "spotify_refresh", "google_client_secret",
+        private val NOT_BACKED_UP = setOf("key", "jarvis_log", "jarvis_conv", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", AppLock.PIN, "spotify_refresh", "google_client_secret",
             "google_refresh", "widgets", "widget_pending", "bg_current", "ha_token")
         private fun backedUp(k: String) = k !in NOT_BACKED_UP && !k.startsWith("widget_size_") && !k.startsWith("wspan_") &&
             !k.startsWith("wpos_") && !k.startsWith("logo_")
