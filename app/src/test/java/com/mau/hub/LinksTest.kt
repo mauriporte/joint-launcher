@@ -356,3 +356,10 @@ class ImmichTest {
         org.junit.Assert.assertEquals(listOf("p9"), Immich.parseAlbumPhotos("""{"id":"a1","assets":[{"id":"p9","type":"IMAGE"}]}"""))
     }
 }
+
+class ProfilesTest {
+    @org.junit.Test fun readsJellyfinUsersSkippingDisabledOnes() {
+        val p = Profiles.parse("""[{"Id":"u1","Name":"Mau","Policy":{"IsDisabled":false}},{"Id":"u2","Name":"Old","Policy":{"IsDisabled":true}},{"Id":"u3","Name":"Guest"}]""")
+        org.junit.Assert.assertEquals(listOf("u1" to "Mau", "u3" to "Guest"), p.map { it.id to it.name })
+    }
+}

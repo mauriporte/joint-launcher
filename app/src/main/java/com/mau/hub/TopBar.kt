@@ -44,6 +44,42 @@ class TopBar(private val a: MainActivity) {
         background = iconBackground() // just the icon at rest; white circle only when focused
     }
 
+    // TV: whose profile is on (Jellyfin user picture, or the name's initial); pick another with OK
+    private val avatarInitial = a.text(15f, Color.WHITE).apply {
+        gravity = Gravity.CENTER; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
+    private val avatarPicture = android.widget.ImageView(a).apply { scaleType = android.widget.ImageView.ScaleType.CENTER_CROP }
+    private val avatar = android.widget.FrameLayout(a).apply {
+        id = View.generateViewId(); isFocusable = true; isClickable = true; contentDescription = "Profile"
+        background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(ACCENT) }
+        clipToOutline = true
+        addView(avatarInitial, android.widget.FrameLayout.LayoutParams(-1, -1))
+        addView(avatarPicture, android.widget.FrameLayout.LayoutParams(-1, -1))
+        // focused: a white ring and a little bigger, like the other round buttons
+        foreground = android.graphics.drawable.StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_focused), android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL; setStroke(a.dp(3), Color.WHITE)
+            })
+        }
+        setOnFocusChangeListener { v, f -> v.animate().scaleX(if (f) 1.15f else 1f).scaleY(if (f) 1.15f else 1f).setDuration(150).start() }
+        setOnClickListener { a.profiles.pick(::refreshAvatar) }
+    }
+
+    /** The avatar shows the profile on now. */
+    fun refreshAvatar() {
+        if (a.hub.touch || a.hub.jfKey.isEmpty()) { avatar.visibility = View.GONE; return }
+        a.hub.pool.execute {
+            val id = a.profiles.currentId() ?: return@execute
+            val name = runCatching { a.profiles.list().firstOrNull { it.id == id }?.name }.getOrNull().orEmpty()
+            a.hub.main.post {
+                avatar.contentDescription = if (name.isEmpty()) "Profile" else "Profile: $name"
+                avatarInitial.text = name.take(1).uppercase()
+                avatarPicture.setImageDrawable(null) // no picture: the initial on orange shows through
+                a.images.load(a.profiles.avatarUrl(id), avatarPicture)
+            }
+        }
+    }
+
     val view = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
         if (a.hub.touch) setPadding(a.dp(17), 0, a.dp(19), 0) else setPadding(a.dp(30), 0, a.dp(36), 0) // tablet: menu icon and clock line up with the section icons and arrows below
@@ -125,7 +161,8 @@ class TopBar(private val a: MainActivity) {
             search.setOnKeyListener(null) // Left now goes to the padlock and the icon
             search.setOnClickListener { a.sidebar.focus(Sidebar.SEARCH) }
             addView(search)
-            // arrow: hides the tabs and the gear (weather and clock stay); remembered. Hidden while the desktop is locked
+            // arrow, in steps: 0 everything, 1 tabs and gear folded away, 2 the avatar too (weather and clock always
+            // stay); remembered. Hidden while the desktop is locked
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply {
                 layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
                 setPadding(a.dp(7), a.dp(7), a.dp(7), a.dp(7)); background = iconBackground()
@@ -135,17 +172,20 @@ class TopBar(private val a: MainActivity) {
             addView(tabStrip)
             addView(gear)
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+            addView(avatar, LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(14) })
             addView(weather)
             addView(clock)
+            fun step() = a.hub.prefs.getInt("topbar_fold_tv", if (a.hub.prefs.getBoolean("topbar_folded_tv", false)) 1 else 0)
             fun applyFold() {
-                val folded = a.hub.prefs.getBoolean("topbar_folded_tv", false)
-                tabStrip.visibility = if (folded) View.INVISIBLE else View.VISIBLE
-                gear.visibility = if (folded) View.INVISIBLE else View.VISIBLE
-                collapse.rotation = if (folded) 0f else 180f // ic_chevron points right: left = hide, right = show
-                collapse.contentDescription = if (folded) "Show the top bar" else "Hide the top bar"
+                val s = step()
+                tabStrip.visibility = if (s > 0) View.INVISIBLE else View.VISIBLE
+                gear.visibility = if (s > 0) View.INVISIBLE else View.VISIBLE
+                avatar.visibility = if (s > 1) View.INVISIBLE else View.VISIBLE
+                collapse.rotation = if (s == 2) 0f else 180f // ic_chevron points right: left = fold more, right = show all
+                collapse.contentDescription = when (s) { 0 -> "Hide the tabs"; 1 -> "Hide the profile too"; else -> "Show the top bar" }
                 collapse.visibility = if (a.desktopLocked()) View.GONE else View.VISIBLE
             }
-            collapse.setOnClickListener { a.hub.prefs.edit().putBoolean("topbar_folded_tv", !a.hub.prefs.getBoolean("topbar_folded_tv", false)).apply(); applyFold() }
+            collapse.setOnClickListener { a.hub.prefs.edit().putInt("topbar_fold_tv", (step() + 1) % 3).apply(); applyFold() }
             lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); applyFold(); a.loadHome() }
             applyFold()
         }

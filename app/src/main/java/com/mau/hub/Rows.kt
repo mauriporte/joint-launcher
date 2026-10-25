@@ -114,7 +114,9 @@ class Rows(private val a: MainActivity) {
         add(row)
         val myGen = a.gen
         val hub = a.hub
-        val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + ".json") }
+        // per profile: another Jellyfin user's Continue watching never flashes up after switching
+        val profile = hub.prefs.getString("uid", "").orEmpty().take(8)
+        val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + profile + ".json") }
         var cached: String? = null // the JSON on screen; only touched on the UI thread
         fun show(items: List<Item>) {
             row.items = items.take(row.cap); row.error = null

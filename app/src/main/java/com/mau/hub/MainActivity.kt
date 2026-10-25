@@ -27,6 +27,7 @@ class MainActivity : Activity() {
     val meta by lazy { Meta(hub) }
     val cards by lazy { Cards(this, images, apps, hub.touch) }
     val actions by lazy { Actions(this) }
+    val profiles by lazy { Profiles(this) }
     lateinit var rows: Rows
     lateinit var sidebar: Sidebar
     lateinit var topBar: TopBar
@@ -82,6 +83,7 @@ class MainActivity : Activity() {
         searchBar = SearchBar(this)
         sidebar = Sidebar(this)
         topBar = TopBar(this)
+        topBar.refreshAvatar()
         detail = DetailScreen(this)
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
