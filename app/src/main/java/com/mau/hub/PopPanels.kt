@@ -38,16 +38,23 @@ open class PopPanel(protected val a: MainActivity) {
     var gravity = Gravity.TOP
 
     protected open fun update() = Unit
+    /** How solid this card is, 40-100 %: the cards' setting; a remote card has its own. */
+    protected open fun solidness() = solid(a.hub)
 
     /** Opens it growing out of [from]'s centre. */
+    /** When it last came out (two remote cards: which one stays when the device is turned upright). */
+    var openedAt = 0L
+        private set
+
     fun open(from: View? = null) {
         update()
         if (isOpen) return
+        openedAt = android.os.SystemClock.uptimeMillis()
         (panel.layoutParams as FrameLayout.LayoutParams).let { it.width = width; it.gravity = gravity }
         panel.requestLayout()
         val inView = IntArray(2).also(view::getLocationOnScreen)
         val btn = IntArray(2).also { from?.getLocationOnScreen(it) }
-        (panel.background as GradientDrawable).setColor(Color.argb(solid(a.hub) * 255 / 100, 16, 16, 18))
+        (panel.background as GradientDrawable).setColor(Color.argb(solidness() * 255 / 100, 16, 16, 18))
         coverTo?.let { c -> panel.minimumHeight = IntArray(2).also(c::getLocationOnScreen)[1] + c.height - inView[1] }
         view.visibility = View.VISIBLE
         // where the card will be: its left edge is the margin, or (anchored right) the far edge minus its width
@@ -233,6 +240,84 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
                 addView(a.text(13f, TEXT_SOFT).apply { text = if (d.rain > 0) "${d.rain}%" else ""; gravity = Gravity.END }, LinearLayout.LayoutParams(a.dp(44), -2))
                 addView(a.text(14f, Color.WHITE).apply { text = "${d.high}° / ${d.low}°"; gravity = Gravity.END }, LinearLayout.LayoutParams(a.dp(84), -2))
             })
+        }
+    }
+}
+
+/**
+ * One of the two remote cards (Joint Remote's widget, one per remote: the TV, the phone...), popping out of its button
+ * in the top bar (tablet) or on Home (phone). Turned sideways both can be out, one per half; upright only one, the whole
+ * width, so opening one puts the other away. The pin keeps a card out (also after Home and restarts): taps beside it
+ * then reach Home, and Back leaves it. Which widget each card shows and its button's name: Settings → Remotes.
+ */
+class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
+    var other: RemotePanel? = null
+    private val prefs get() = a.hub.prefs
+    val name get() = prefs.getString("remote_name_$n", null)?.takeIf { it.isNotBlank() } ?: "Remote $n"
+    private val title = a.text(15f, Color.WHITE).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
+    private val pin = ImageView(a).apply {
+        setImageResource(R.drawable.ic_pin); setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8)); background = a.bareButton()
+        setOnClickListener { pinned = !pinned }
+    }
+    private val holder = FrameLayout(a)
+    var pinned: Boolean
+        get() = prefs.getBoolean("remote_pin_$n", false)
+        set(v) { prefs.edit().putBoolean("remote_pin_$n", v).apply(); showPin() }
+
+    init {
+        panel.orientation = LinearLayout.VERTICAL
+        panel.addView(LinearLayout(a).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(title, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = a.dp(6) })
+            addView(pin, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
+        })
+        panel.addView(holder, LinearLayout.LayoutParams(-1, -2))
+        view.setOnClickListener { if (!pinned) close() }
+        showPin()
+    }
+
+    private fun showPin() {
+        pin.setColorFilter(if (pinned) ACCENT else TEXT_MUTED)
+        pin.rotation = if (pinned) 0f else 45f
+        pin.contentDescription = if (pinned) "Unpin: put it away with a tap beside it" else "Pin: keep it out"
+        view.isClickable = !pinned // pinned: taps beside the card reach Home
+    }
+
+    /** Settings → Remotes: its own "N % solid", the cards' (weather, music) until it's set. */
+    override fun solidness() = prefs.getInt("remote_solid_$n", solid(a.hub)).coerceIn(40, 100)
+
+    /** Opens it, or puts it away if it's out. */
+    fun toggle(from: View?) = if (isOpen) close() else open(from)
+
+    override fun update() {
+        val land = a.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (!land) other?.close() // upright: one at a time
+        val dm = a.resources.displayMetrics
+        // turned: the card's whole layer is its half, so the other half's taps reach the other card or Home
+        (view.layoutParams as? FrameLayout.LayoutParams)?.let {
+            it.width = if (land) dm.widthPixels / 2 else -1; it.gravity = if (n == 1) Gravity.START else Gravity.END; view.layoutParams = it
+        }
+        width = -1; gravity = Gravity.TOP
+        val across = (if (land) dm.widthPixels / 2 else dm.widthPixels) - a.dp(16) - a.dp(32) // margins, card padding
+        val side = minOf(across, dm.heightPixels * 3 / 4) // Joint Remote draws itself square in what it's given
+        title.text = name
+        showPin()
+        holder.removeAllViews()
+        val remote = a.widgets.remoteView(n, side, side)
+        if (remote != null) holder.addView(remote, FrameLayout.LayoutParams(side, side, Gravity.CENTER_HORIZONTAL))
+        else holder.addView(a.text(15f, TEXT_SOFT).apply {
+            text = "No remote here yet. Tap to choose it (Joint Remote's widget, then the device)."
+            setPadding(a.dp(6), a.dp(24), a.dp(6), a.dp(24))
+            setOnClickListener { close(); a.widgets.pick(remote = n) }
+        })
+    }
+
+    companion object {
+        /** After the device turns: the open cards take their new size; upright keeps only the one opened last. */
+        fun relayout(one: RemotePanel, two: RemotePanel) {
+            if (one.isOpen && two.isOpen && one.view.resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+                (if (one.openedAt > two.openedAt) two else one).close()
+            listOf(one, two).filter { it.isOpen }.forEach { it.open() }
         }
     }
 }

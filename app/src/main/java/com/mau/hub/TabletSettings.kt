@@ -219,6 +219,37 @@ class TabletSettings(private val a: MainActivity) {
         heading("Weather")
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
 
+        // the two remote cards (Joint Remote's widget each, see RemotePanel): which remote, its button's name, how solid
+        if (hub.touch) {
+            heading("Remotes")
+            listOf(a.remote1, a.remote2).forEach { r ->
+                val chosen = p.getInt("remote_widget_${r.n}", -1) >= 0
+                line("Remote ${r.n}", r.name + if (chosen) "" else " · not chosen yet") {
+                    AlertDialog.Builder(a).setTitle("Remote ${r.n}").setItems(arrayOf("Choose its remote (device)", "Rename its button")) { _, i ->
+                        if (i == 0) a.widgets.pick(remote = r.n)
+                        else {
+                            val field = EditText(a).apply { setText(r.name); isSingleLine = true; setTextColor(Color.WHITE) }
+                            AlertDialog.Builder(a).setTitle("Button name").setView(field)
+                                .setPositiveButton("Save") { _, _ -> p.edit().putString("remote_name_${r.n}", field.text.toString().trim()).apply(); a.topBar.refreshRemotes(); draw() }
+                                .setNegativeButton("Cancel", null).show()
+                        }
+                    }.show()
+                }
+                val label = a.text(15f, TEXT_SOFT)
+                fun solidText(v: Int) { label.text = "${r.name}: $v % solid" + if (v == 100) " (no see-through)" else "" }
+                list.addView(label, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(4) })
+                list.addView(SeekBar(a).apply {
+                    // its own; like the music and weather cards until it's moved
+                    max = 60; progress = p.getInt("remote_solid_${r.n}", PopPanel.solid(hub)).coerceIn(40, 100) - 40; solidText(progress + 40)
+                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { solidText(v + 40); if (user) p.edit().putInt("remote_solid_${r.n}", v + 40).apply() }
+                        override fun onStartTrackingTouch(s: SeekBar) = Unit
+                        override fun onStopTrackingTouch(s: SeekBar) = Unit
+                    })
+                }, LinearLayout.LayoutParams(-1, a.dp(48)))
+            }
+        }
+
         // the music and weather cards (phone; tablet and TV as they get them), and the launcher's language
         heading("Cards and language")
         val cardLabel = a.text(15f, TEXT_SOFT)

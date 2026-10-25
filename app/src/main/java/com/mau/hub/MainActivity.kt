@@ -86,6 +86,7 @@ class MainActivity : Activity() {
         sidebar = Sidebar(this)
         topBar = TopBar(this)
         topBar.refreshAvatar()
+        if (hub.touch) topBar.refreshRemotes() // the remote buttons show their names
         detail = DetailScreen(this)
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
@@ -128,8 +129,11 @@ class MainActivity : Activity() {
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
+            if (touch) { addView(remote1.view, FrameLayout.LayoutParams(-1, -1)); addView(remote2.view, FrameLayout.LayoutParams(-1, -1)) }
             addView(detail.view)
         })
+        // pinned remote cards come back out (posted: they size themselves from the laid-out screen)
+        if (touch) root.post { listOf(remote1, remote2).filter { it.pinned }.forEach { it.open() } }
         // focus leaving the sidebar any other way (e.g. Up past its top) closes it too
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
             if (!moveMode.active && sidebar.isOpen && now != null && !isInside(now, sidebar.rail)) sidebar.hide()
@@ -147,6 +151,9 @@ class MainActivity : Activity() {
     val widgets by lazy { Widgets(this) }
     val widgetPage by lazy { WidgetPage(this) }
     val phoneHome by lazy { PhoneHome(this) }
+    // the two remote cards (Joint Remote's widget each); the buttons: the tablet's top bar, the phone's Home
+    val remote1 by lazy { RemotePanel(this, 1) }
+    val remote2 by lazy { RemotePanel(this, 2).also { remote1.other = it; it.other = remote1 } }
     val gestures by lazy { Gestures(this) }
 
     override fun dispatchTouchEvent(e: android.view.MotionEvent): Boolean =
@@ -450,6 +457,8 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             detail.isShown -> detail.close()
+            hub.touch && remote2.isOpen && !remote2.pinned -> remote2.close()
+            hub.touch && remote1.isOpen && !remote1.pinned -> remote1.close()
             hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
             hub.phone && phoneHome.nowPanel.isOpen -> phoneHome.nowPanel.close()
             hub.phone && phoneHome.weatherPanel.isOpen -> phoneHome.weatherPanel.close()
@@ -473,6 +482,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
+        if (hub.touch) listOf(remote1, remote2).filter { !it.pinned }.forEach { it.close() } // pinned ones stay out
         if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
@@ -567,6 +577,7 @@ class MainActivity : Activity() {
         super.onConfigurationChanged(newConfig)
         applyBackground()
         if (hub.touch) rows.refreshWidgets() // the widget grid has its own size and spots per orientation
+        if (hub.touch) RemotePanel.relayout(remote1, remote2)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

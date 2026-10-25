@@ -39,9 +39,12 @@ class Widgets(private val a: MainActivity) {
 
     /** Every widget your apps offer, by app; tapping one starts adding it. */
     /** forCorner: the widget replaces the top bar's clock (Settings → Clock) instead of going on the grid. */
-    fun pick(forCorner: Boolean = false) {
+    /** remote 1 or 2: the widget goes in that remote card ([RemotePanel]); Joint Remote's own is taken straight away. */
+    fun pick(forCorner: Boolean = false, remote: Int = 0) {
         val pm = a.packageManager
         val all = manager.installedProviders.sortedWith(compareBy({ it.loadLabel(pm).lowercase() }))
+        a.hub.prefs.edit().putInt("widget_pending_remote", remote).apply()
+        if (remote > 0) all.firstOrNull { it.provider.packageName == JOINT_REMOTE }?.let { return add(it) } // then it asks which device
         if (all.isEmpty()) return a.toast("None of your apps offer widgets")
         lateinit var dialog: AlertDialog
         val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(16), a.dp(8), a.dp(16), a.dp(8)) }
@@ -109,6 +112,11 @@ class Widgets(private val a: MainActivity) {
 
     private fun added(id: Int) {
         pending = AppWidgetManager.INVALID_APPWIDGET_ID
+        a.hub.prefs.getInt("widget_pending_remote", 0).takeIf { it > 0 }?.let { n ->
+            a.hub.prefs.getInt("remote_widget_$n", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId) // the one it replaces
+            a.hub.prefs.edit().putInt("remote_widget_$n", id).remove("widget_pending_remote").apply()
+            (if (n == 1) a.remote1 else a.remote2).open(); return
+        }
         if (a.hub.prefs.getBoolean("widget_pending_corner", false)) {
             a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId) // the one it replaces
             a.hub.prefs.edit().putInt("corner_widget", id).putBoolean("widget_pending_corner", false).apply()
@@ -153,6 +161,13 @@ class Widgets(private val a: MainActivity) {
     /** The top bar's corner widget (e.g. Flip Clock's), w x h px; null if none is set or its app is gone. */
     fun cornerView(w: Int, h: Int): View? {
         val id = a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 } ?: return null
+        val info = manager.getAppWidgetInfo(id) ?: return null
+        return host.createView(a, id, info).also { tellSize(it, w, h) }
+    }
+
+    /** Remote card [n]'s widget at w x h px; null if none is chosen yet or its app is gone. */
+    fun remoteView(n: Int, w: Int, h: Int): View? {
+        val id = a.hub.prefs.getInt("remote_widget_$n", -1).takeIf { it >= 0 } ?: return null
         val info = manager.getAppWidgetInfo(id) ?: return null
         return host.createView(a, id, info).also { tellSize(it, w, h) }
     }
@@ -379,6 +394,7 @@ class Widgets(private val a: MainActivity) {
 
         private const val HOST_ID = 1024
         private const val REQ_BIND = 41
+        private const val JOINT_REMOTE = "com.mau.remote"
         private const val REQ_CONFIGURE = 42
     }
 }
