@@ -31,6 +31,9 @@ class Hub(val ctx: Context) {
     /** The phone app (its own flavor): Pro Launcher-style Home instead of the tablet's sections (see PhoneHome). */
     val phone = BuildConfig.FLAVOR == "phone"
 
+    /** The launcher's language, "en" or "es": Settings → Language ("auto" = the device's, Spanish if it's Spanish, else English). */
+    fun lang(): String = prefs.getString("lang", "auto").let { if (it == "en" || it == "es") it else if (java.util.Locale.getDefault().language == "es") "es" else "en" }
+
     init { Sources.jwPlatform = if (touch) "ANDROID" else "ANDROID_TV" } // catalogue links that open the right app version
 
     // disabled counts as not installed: TVs ship apps like Prime Video preinstalled but switched off

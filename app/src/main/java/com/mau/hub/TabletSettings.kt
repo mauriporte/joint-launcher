@@ -219,6 +219,27 @@ class TabletSettings(private val a: MainActivity) {
         heading("Weather")
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
 
+        // the music and weather cards (phone; tablet and TV as they get them), and the launcher's language
+        heading("Cards and language")
+        val cardLabel = a.text(15f, TEXT_SOFT)
+        fun cardText(v: Int) { cardLabel.text = "Music and weather cards: $v % solid" + if (v == 100) " (no see-through)" else "" }
+        list.addView(cardLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 60; progress = PopPanel.solid(hub) - 40; cardText(progress + 40) // 40-100 %: below that the text gets lost
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { cardText(v + 40); p.edit().putInt("pop_opacity", v + 40).apply() }
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                override fun onStopTrackingTouch(s: SeekBar) = Unit
+            })
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val langs = linkedMapOf("auto" to "Automatic (like the $device)", "en" to "English", "es" to "Español")
+        line("Language", langs.getValue(p.getString("lang", "auto")!!.takeIf { it in langs } ?: "auto")) {
+            AlertDialog.Builder(a).setTitle("Language")
+                .setSingleChoiceItems(langs.values.toTypedArray(), langs.keys.indexOf(p.getString("lang", "auto"))) { d, i ->
+                    p.edit().putString("lang", langs.keys.elementAt(i)).apply(); d.dismiss(); draw()
+                }.show()
+        }
+
         if (!hub.touch) { // the TV's screensavers; not offered on the tablet and phone (yet)
             heading("Screensaver")
             val savers = linkedMapOf<String?, String>(null to "Android's own", ClockDream::class.java.name to "Flip clock on your background",
@@ -259,17 +280,6 @@ class TabletSettings(private val a: MainActivity) {
             max = 100; progress = p.getInt("drawer_dim", 40); drawerText(progress)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { drawerText(v); p.edit().putInt("drawer_dim", v).apply() }
-                override fun onStartTrackingTouch(s: SeekBar) = Unit
-                override fun onStopTrackingTouch(s: SeekBar) = Unit
-            })
-        }, LinearLayout.LayoutParams(-1, a.dp(48)))
-        val cardLabel = a.text(15f, TEXT_SOFT)
-        fun cardText(v: Int) { cardLabel.text = "Music and weather cards: darken $v %" + when (v) { 0 -> " (see-through)"; 100 -> " (black)"; else -> "" } }
-        list.addView(cardLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
-        list.addView(SeekBar(a).apply {
-            max = 100; progress = p.getInt("card_dim", 90); cardText(progress)
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { cardText(v); p.edit().putInt("card_dim", v).apply() }
                 override fun onStartTrackingTouch(s: SeekBar) = Unit
                 override fun onStopTrackingTouch(s: SeekBar) = Unit
             })

@@ -143,6 +143,9 @@ class SourcesTest {
         assertEquals(listOf("15h", "16h"), f.hours.map { it.time }); assertEquals(40, f.hours[0].rain); assertEquals("🌧️", f.hours[0].icon)
         // days start tomorrow, by name
         assertEquals(listOf("Monday", "Tuesday"), f.days.map { it.name }); assertEquals(80, f.days[0].rain); assertEquals(23, f.days[1].high)
+        // in Spanish: the summary and the day names
+        val es = Sources.parseForecast(json, java.util.Locale("es"))
+        assertEquals("Parcialmente nublado", es.summary); assertEquals(listOf("Lunes", "Martes"), es.days.map { it.name })
     }
 
     @Test fun weatherPlaceFromOpenMeteoGeocoder() {
