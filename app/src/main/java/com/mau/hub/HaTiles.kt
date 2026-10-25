@@ -39,7 +39,7 @@ class HaTiles : Activity() {
         super.onCreate(b)
         tiles = HaWidget.tiles(this).toMutableList()
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(32)) }
-        setContentView(ScrollView(this).apply { setBackgroundColor(BG); fitsSystemWindows = true; addView(list) }) // clear of the status bar
+        setContentView(ScrollView(this).apply { setBackgroundColor(BG); addView(list) })
         Thread {
             entities = runCatching {
                 val a = JSONArray(Sources.get("${HaWidget.base(this)}/api/states", HaWidget.auth(this)))
@@ -53,6 +53,15 @@ class HaTiles : Activity() {
     private fun plain(s: String) = java.text.Normalizer.normalize(s.trim().lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}"), "")
 
     private fun name(o: JSONObject) = o.optJSONObject("attributes")?.optString("friendly_name").orEmpty().ifEmpty { o.optString("entity_id") }
+
+    // the status and navigation bars stay hidden here as on Home (Mau: hidden in all his apps); a swipe shows them for a moment
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
+            hide(android.view.WindowInsets.Type.systemBars())
+            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
 
     private fun commit() { HaWidget.save(this, tiles); draw() }
 
