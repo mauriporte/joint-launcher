@@ -450,15 +450,15 @@ class TabletSettings(private val a: MainActivity) {
             }.toMap()
         }
 
-        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "watch" to "To Watch", "ha" to "Home Assistant")
+        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "live" to "Live TV", "watch" to "To Watch", "ha" to "Home Assistant")
         private val DEFAULT_NAMES = SECTIONS + ("favorites" to "Favorites")
 
         /** A section's title on Home: your name for it, else the default. */
         fun name(hub: Hub, key: String) = hub.prefs.getString("section_name_$key", null) ?: DEFAULT_NAMES.getValue(key)
 
         // each section's icon in the icon pack (LineX names; most packs follow them), and a built-in one if the pack lacks it
-        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "mymovies") // a clapperboard: the reel read as a wheel
-        private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie)
+        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "mymovies", "live" to "livetv") // a clapperboard: the reel read as a wheel
+        private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie, "live" to R.drawable.ic_live_tv)
 
         /** The icon a section shows when titles are off: the one you picked, else the selected pack's, else a built-in one. */
         fun icon(a: MainActivity, key: String): android.graphics.drawable.Drawable? {
@@ -471,6 +471,6 @@ class TabletSettings(private val a: MainActivity) {
 
         /** Tablet Home's sections in your order (new ones join at the end). */
         fun sections(hub: Hub) = RowOrder.apply(SECTIONS.keys.toList(), hub.prefs.getString("home_sections", "")!!.split(",").filter(String::isNotEmpty))
-            .filter { hub.touch || it == "apps" || it == "watch" } // the TV: just your apps and the video rows
+            .filter { if (hub.touch) it != "live" else it == "apps" || it == "live" || it == "watch" } // the TV: your apps, Live TV and the video rows
     }
 }

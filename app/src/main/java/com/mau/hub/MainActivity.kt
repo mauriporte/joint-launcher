@@ -258,10 +258,16 @@ class MainActivity : Activity() {
                     "widgets" -> if (!hub.touch || !gestures.widgetsOnPage()) rows.widgets() // else it's on the widget page
                     "apps" -> rows.apps()
                     "ha" -> if (BuildConfig.HA_LOCAL.isNotEmpty() || BuildConfig.HA_REMOTE.isNotEmpty()) rows.homeAssistant()
+                    // TV: your Jellyfin channels, favourites first, in a section of their own instead of among To Watch
+                    "live" -> catalog.homeRows(gen).filter { it.title.startsWith("Live TV") }.takeIf { it.isNotEmpty() }?.let { live ->
+                        rows.fold("live"); live.forEach { rows.content(it.title, it.fetchers, it.top10, 40, cacheKey) } // a whole channel list, not a taste
+                    }
                     else -> {
                         rows.connect(actions.connectEntries())
-                        rows.fold()
-                        catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
+                        rows.fold("watch")
+                        val liveSection = "live" in TabletSettings.sections(hub)
+                        catalog.homeRows(gen).filter(catalog::visible).filter { !liveSection || !it.title.startsWith("Live TV") }
+                            .forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                     }
                 }
             }
