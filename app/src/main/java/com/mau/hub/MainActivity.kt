@@ -27,6 +27,8 @@ class MainActivity : Activity() {
     val meta by lazy { Meta(hub) }
     val cards by lazy { Cards(this, images, apps, hub.touch) }
     val actions by lazy { Actions(this) }
+    val profiles by lazy { Profiles(this) }
+    val appLock by lazy { AppLock(this) }
     lateinit var rows: Rows
     lateinit var sidebar: Sidebar
     lateinit var topBar: TopBar
@@ -82,6 +84,7 @@ class MainActivity : Activity() {
         searchBar = SearchBar(this)
         sidebar = Sidebar(this)
         topBar = TopBar(this)
+        topBar.refreshAvatar()
         detail = DetailScreen(this)
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
@@ -262,10 +265,16 @@ class MainActivity : Activity() {
                     "widgets" -> if (!hub.touch || !gestures.widgetsOnPage()) rows.widgets() // else it's on the widget page
                     "apps" -> rows.apps()
                     "ha" -> if (BuildConfig.HA_LOCAL.isNotEmpty() || BuildConfig.HA_REMOTE.isNotEmpty()) rows.homeAssistant()
+                    // TV: your Jellyfin channels, favourites first, in a section of their own instead of among To Watch
+                    "live" -> catalog.homeRows(gen).filter { it.title.startsWith("Live TV") }.takeIf { it.isNotEmpty() }?.let { live ->
+                        rows.fold("live"); live.forEach { rows.content(it.title, it.fetchers, it.top10, Int.MAX_VALUE, cacheKey) } // every channel, not a taste
+                    }
                     else -> {
                         rows.connect(actions.connectEntries())
-                        rows.fold()
-                        catalog.homeRows(gen).filter(catalog::visible).forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
+                        rows.fold("watch")
+                        val liveSection = "live" in TabletSettings.sections(hub)
+                        catalog.homeRows(gen).filter(catalog::visible).filter { !liveSection || !it.title.startsWith("Live TV") }
+                            .forEach { rows.content(it.title, it.fetchers, it.top10, cap, cacheKey) }
                     }
                 }
             }
@@ -371,11 +380,13 @@ class MainActivity : Activity() {
             lateinit var tile: LinearLayout
             fun menu() =
                 MoveMode.holdMenu(this, tile, beside = false,
-                    listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
+                    listOf("Open" to { app.pkg?.let(actions::launch) ?: Unit }) +
                         (if (hub.touch || !favsOnly || desktopLocked()) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // Apps is A to Z; TV favorites: Move
                         (app.pkg?.let { pkg ->
-                            listOf(
+                            listOfNotNull(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
+                                // TV only for now: the tablet and phone have no Settings line to change the PIN
+                                if (hub.touch) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
                                 // back from Settings → Hidden apps
                                 "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
                                 // Android asks you to confirm; the Apps section updates when you come back
@@ -386,7 +397,7 @@ class MainActivity : Activity() {
                         ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshApps() } }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
-            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
+            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(actions::launch) }) {
                 // Favorites: hold and drag to put it somewhere else; hold and let go without moving for the menu
                 if (canDrag) { draggedMenu = ::menu; tile.startDragAndDrop(null, View.DragShadowBuilder(tile), tile, 0); tile.alpha = 0.3f } else menu()
             }
@@ -574,6 +585,7 @@ class MainActivity : Activity() {
         rows.retryFailed()
         if (hub.touch) HaWidget.refresh(this) // MauHome shows current states whenever you're back on Home
         if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
+        if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
         if (hub.touch) {
             apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
             if (backgrounds().isNotEmpty()) applyBackground() // takes in pictures dropped in the inbox

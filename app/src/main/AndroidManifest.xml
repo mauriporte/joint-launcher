@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- only takes effect if granted over adb; used solely to switch our Home button service back on after updates -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /> <!-- sleep timer: the TV's sleep setting back after a power cut -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
@@ -102,6 +103,18 @@
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_button_service" />
         </service>
 
+        <receiver android:name=".SleepTimer$Receiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <activity
+            android:name=".SleepTimer$Countdown"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+
         <receiver android:name=".HomeButtonService$Restorer" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
@@ -132,5 +145,14 @@
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+        <!-- screensavers (Settings > Screensaver): the flip clock on your background, and your Immich photos -->
+        <service android:name=".ClockDream" android:exported="true" android:label="Joint Launcher clock"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter><action android:name="android.service.dreams.DreamService" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </service>
+        <service android:name=".PhotoDream" android:exported="true" android:label="Joint Launcher photos (Immich)"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter><action android:name="android.service.dreams.DreamService" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </service>
     </application>
 </manifest>

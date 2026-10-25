@@ -372,3 +372,20 @@ class HaWidgetTest {
         assertEquals(4, HaWidget.TILES.count { it.kind == HaTile.Kind.CAMERA })
     }
 }
+
+class ImmichTest {
+    @org.junit.Test fun readsAlbumsAndPhotos() {
+        org.junit.Assert.assertEquals(listOf("a1" to "Family · 12 photos"),
+            Immich.parseAlbums("""[{"id":"a1","albumName":"Family","assetCount":12}]"""))
+        org.junit.Assert.assertEquals(listOf("p1", "p3"),
+            Immich.parseIds("""[{"id":"p1","type":"IMAGE"},{"id":"p2","type":"VIDEO"},{"id":"p3","type":"IMAGE"}]"""))
+        org.junit.Assert.assertEquals(listOf("p9"), Immich.parseAlbumPhotos("""{"id":"a1","assets":[{"id":"p9","type":"IMAGE"}]}"""))
+    }
+}
+
+class ProfilesTest {
+    @org.junit.Test fun readsJellyfinUsersSkippingDisabledOnes() {
+        val p = Profiles.parse("""[{"Id":"u1","Name":"Mau","Policy":{"IsDisabled":false}},{"Id":"u2","Name":"Old","Policy":{"IsDisabled":true}},{"Id":"u3","Name":"Guest"}]""")
+        org.junit.Assert.assertEquals(listOf("u1" to "Mau", "u3" to "Guest"), p.map { it.id to it.name })
+    }
+}

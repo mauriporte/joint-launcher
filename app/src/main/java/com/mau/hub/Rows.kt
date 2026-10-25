@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 sealed class RowModel(val id: Long)
 
 /** A titled row filled in the background; disappears if every source comes back empty. */
-class ContentRow(id: Long, val title: String, val top10: Boolean, val cap: Int) : RowModel(id) {
+class ContentRow(id: Long, val title: String, val top10: Boolean, val cap: Int, val section: String?) : RowModel(id) {
     var items: List<Item> = emptyList()
     var error: String? = null
     var scroll: Parcelable? = null // how far you'd scrolled this row, kept while its view is reused by another row
@@ -30,8 +30,8 @@ class ContentRow(id: Long, val title: String, val top10: Boolean, val cap: Int) 
 class NowRow(id: Long, val label: String, val item: Item, val onClick: () -> Unit) : RowModel(id)
 class ConnectRow(id: Long, val entries: List<Pair<Item, () -> Unit>>) : RowModel(id)
 class AppsRow(id: Long) : RowModel(id)
-/** Tablet Home: the one button that folds all the video rows below it away. */
-class FoldRow(id: Long) : RowModel(id)
+/** Home: a section's header whose arrow folds its video rows away: To Watch ("watch"), or the TV's Live TV ("live"). */
+class FoldRow(id: Long, val key: String) : RowModel(id)
 /** Tablet Home: your widgets, foldable, with add and remove buttons in the header. */
 class WidgetsRow(id: Long) : RowModel(id)
 /** Tablet: your Home Assistant dashboard, foldable like the other sections. */
@@ -61,15 +61,17 @@ class Rows(private val a: MainActivity) {
 
     private val adapter get() = view.adapter as RowsAdapter
 
-    // What's on screen: every row, or without the video rows while they're folded away (tablet Home). Folded rows keep
-    // loading in the background, so unfolding is instant. Positions below are positions in this list.
+    // What's on screen: every row, without the video rows of a folded section (Home). Folded rows keep loading in the
+    // background, so unfolding is instant. Positions below are positions in this list.
     private var shown: List<RowModel> = emptyList()
-    private val folded get() = models.any { it is FoldRow } && a.hub.prefs.getBoolean("videos_folded", false)
-    private fun sync() { shown = if (folded) models.filter { it !is ContentRow } else models.toList() }
+    private var section: String? = null // the section the next video rows belong to (the last fold() header)
+    private fun foldKey(section: String) = if (section == "watch") "videos_folded" else "${section}_folded"
+    private fun folded(section: String?) = section != null && a.hub.prefs.getBoolean(foldKey(section), false)
+    private fun sync() { shown = models.filter { it !is ContentRow || !folded(it.section) } }
     private fun indexOf(id: Long) = shown.indexOfFirst { it.id == id }
 
     fun clear() {
-        models.clear(); failed.clear(); sync()
+        models.clear(); failed.clear(); section = null; sync()
         adapter.notifyDataSetChanged()
     }
 
@@ -84,9 +86,9 @@ class Rows(private val a: MainActivity) {
         if (i >= 0) adapter.notifyItemRemoved(i)
     }
 
-    /** Fold or unfold all the video rows (remembered). */
-    private fun toggleFold() {
-        a.hub.prefs.edit().putBoolean("videos_folded", !folded).apply()
+    /** Fold or unfold a section's video rows (remembered). */
+    private fun toggleFold(section: String) {
+        a.hub.prefs.edit().putBoolean(foldKey(section), !folded(section)).apply()
         sync(); adapter.notifyDataSetChanged()
     }
 
@@ -108,11 +110,13 @@ class Rows(private val a: MainActivity) {
      * cacheKey = null for rows that shouldn't be cached (search results).
      */
     fun content(title: String, fetchers: List<() -> List<Item>>, top10: Boolean, cap: Int, cacheKey: String?) {
-        val row = ContentRow(nextId++, title, top10, if (top10) 10 else cap)
+        val row = ContentRow(nextId++, title, top10, if (top10) 10 else cap, section)
         add(row)
         val myGen = a.gen
         val hub = a.hub
-        val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + ".json") }
+        // per profile: another Jellyfin user's Continue watching never flashes up after switching
+        val profile = hub.prefs.getString("uid", "").orEmpty().take(8)
+        val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + profile + ".json") }
         var cached: String? = null // the JSON on screen; only touched on the UI thread
         fun show(items: List<Item>) {
             row.items = items.take(row.cap); row.error = null
@@ -169,7 +173,8 @@ class Rows(private val a: MainActivity) {
 
     fun connect(entries: List<Pair<Item, () -> Unit>>) { if (entries.isNotEmpty()) add(ConnectRow(nextId++, entries)) }
     fun apps() = add(AppsRow(nextId++))
-    fun fold() = add(FoldRow(nextId++))
+    /** A section's header; the video rows added after it fold with it. */
+    fun fold(key: String) { section = key; add(FoldRow(nextId++, key)) }
     fun widgets() = add(WidgetsRow(nextId++))
     fun homeAssistant() = add(HaRow(nextId++))
 
@@ -397,7 +402,7 @@ class Rows(private val a: MainActivity) {
                 }
                 is FoldRow -> (holder.itemView as LinearLayout).apply {
                     removeAllViews()
-                    addView(foldHeader("watch", folded) { toggleFold() }, LinearLayout.LayoutParams(-1, -2))
+                    addView(foldHeader(m.key, folded(m.key)) { toggleFold(m.key) }, LinearLayout.LayoutParams(-1, -2))
                 }
                 is WidgetsRow -> fillWidgets(holder.itemView as LinearLayout, onPage = false)
             }

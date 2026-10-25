@@ -290,8 +290,9 @@ object Sources {
 
     // ---- Jellyfin Live TV ----
 
+    /** Your Live TV channels; [limit] 0 = all of them. */
     fun jellyfinLive(server: String, key: String, userId: String, limit: Int, favouritesOnly: Boolean = false) = parseLiveChannels(
-        get("$server/LiveTv/Channels?userId=$userId&addCurrentProgram=true&enableImages=true&limit=$limit" +
+        get("$server/LiveTv/Channels?userId=$userId&addCurrentProgram=true&enableImages=true" + (if (limit > 0) "&limit=$limit" else "") +
             if (favouritesOnly) "&isFavorite=true" else "", Links.jfAuth(key)),
         server,
     )

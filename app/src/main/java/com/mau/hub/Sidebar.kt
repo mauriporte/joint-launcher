@@ -60,6 +60,8 @@ class Sidebar(private val a: MainActivity) {
         }
         rail.addView(View(a), LinearLayout.LayoutParams(0, a.dp(8), 1f))
         item(a.getDrawable(R.drawable.ic_rows), "Rows", "$HOME:rows", tint = true) { hide(); a.chooseRows() }
+        // TV: also here, as the gear is gone while the top bar is folded
+        if (!a.hub.touch) item(a.getDrawable(R.drawable.ic_tune), "Quick settings", "$HOME:quick", tint = true) { hide(); QuickPanel(a).show() }
         // tablet: pen and paper, so it isn't confused with the corner gear (the tablet's own settings)
         item(a.getDrawable(if (a.hub.touch) R.drawable.ic_edit_note else R.drawable.ic_settings), "Settings", "$HOME:settings", tint = true) { hide(); a.actions.settings() }
     }

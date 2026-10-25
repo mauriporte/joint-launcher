@@ -143,7 +143,7 @@ class Catalog(private val hub: Hub, private val apps: Apps) {
         if (cw.isNotEmpty()) add(RowDef("Continue watching", true, listOf { Catalog.oneEach(cw.map { runCatching(it) }) }))
         if (jellyfin) {
             opt("Live TV favourites · Jellyfin", Links.JELLYFIN) { Sources.jellyfinLive(hub.server, hub.jfKey, hub.jfUser(), 50, favouritesOnly = true) }
-            opt("Live TV · Jellyfin", Links.JELLYFIN) { Sources.jellyfinLive(hub.server, hub.jfKey, hub.jfUser(), 40) }
+            opt("Live TV · Jellyfin", Links.JELLYFIN) { Sources.jellyfinLive(hub.server, hub.jfKey, hub.jfUser(), 0) } // every channel
         }
         // the first service you have gets a Netflix-style Top 10 row; the others a normal row
         val topPick = PROVIDERS.firstOrNull { hub.installed(it.pkg) }
