@@ -132,18 +132,19 @@ class HomeButtonService : AccessibilityService() {
             if (!prefs(c).getBoolean("wanted", false)) return
             val me = ComponentName(c, HomeButtonService::class.java).flattenToString()
             val cr = c.contentResolver
-            val enabled = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            // read again right before each write: Joint Remote repairs its own entry in this same list, and a stale copy would erase it
+            fun enabled() = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
                 .split(':').filter { it.isNotEmpty() }
             // listed but not running (Android stops it when the app is force-stopped and marks it crashed): taking it off the
             // list and, a moment later, putting it back makes Android start it again (both at once read as no change)
             fun add() = runCatching {
-                Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, ((enabled - me) + me).joinToString(":"))
+                Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, ((enabled() - me) + me).joinToString(":"))
                 Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
                 restoring = false
             }
-            if (me !in enabled) { add(); return }
+            if (me !in enabled()) { add(); return }
             restoring = true
-            runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled - me).joinToString(":")) }
+            runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled() - me).joinToString(":")) }
             Thread.sleep(800) // both at once read as no change
             add()
         }
