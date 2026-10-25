@@ -598,6 +598,10 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
     private val facts = a.text(13f, TEXT_SOFT).apply { setLineSpacing(0f, 1.2f) }
     private val hours = LinearLayout(a)
     private val days = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
+    private val more: TextView = a.text(20f, TEXT_SOFT).apply {
+        text = "▾"; gravity = Gravity.CENTER; isClickable = true; contentDescription = "Next days"
+        setOnClickListener { showDays(days.visibility != View.VISIBLE) }
+    }
 
     init {
         panel.orientation = LinearLayout.VERTICAL
@@ -612,13 +616,23 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
         panel.addView(android.widget.HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(hours) },
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(12) })
         panel.addView(days, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
-        panel.addView(a.text(13f, TEXT_MUTED).apply {
-            text = "Weather app ›"; gravity = Gravity.END; setPadding(0, a.dp(8), 0, 0); isClickable = true
-            setOnClickListener { a.hub.prefs.getString("opens_weather", null)?.takeIf(a.hub::installed)?.let { a.apps.launch(it); close() } ?: a.toast("Hold the weather on Home to pick its app") }
-        }, LinearLayout.LayoutParams(-1, -2))
+        // two steps: the card opens with now and the hours; the arrow drops the next days down (and folds them back)
+        panel.addView(FrameLayout(a).apply {
+            addView(more, FrameLayout.LayoutParams(a.dp(48), a.dp(36), Gravity.CENTER))
+            addView(a.text(13f, TEXT_MUTED).apply {
+                text = "Weather app ›"; isClickable = true
+                setOnClickListener { a.hub.prefs.getString("opens_weather", null)?.takeIf(a.hub::installed)?.let { a.apps.launch(it); close() } ?: a.toast("Hold the weather on Home to pick its app") }
+            }, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(4) })
+    }
+
+    private fun showDays(on: Boolean) {
+        days.visibility = if (on) View.VISIBLE else View.GONE
+        more.text = if (on) "▴" else "▾"; more.contentDescription = if (on) "Hide the next days" else "Next days"
     }
 
     override fun update() {
+        showDays(false) // every open starts folded
         if (now.text.isNullOrEmpty()) what.text = "Loading the forecast…"
         val hub = a.hub
         hub.pool.execute {
