@@ -463,3 +463,12 @@ class JarvisLanguageTest {
         assertTrue(!Jarvis.spanish("Done: I turned off the TV for you."))
     }
 }
+
+class IconColourTest {
+    @Test fun aPickCanCarryItsOwnColour() {
+        assertEquals(0xFF9E9E9E.toInt(), IconPacks.fixedColour("#9E9E9E")) // Lords Mobile's grey target
+        assertEquals(null, IconPacks.fixedColour("auto"))
+        assertEquals(null, IconPacks.fixedColour(null))
+        assertEquals(null, IconPacks.fixedColour("#12345")) // not a colour: shown in the pack's own
+    }
+}
