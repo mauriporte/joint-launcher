@@ -205,7 +205,7 @@ row order and the content parsers.
 
 - 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
 - Not yet tried on screen: the remote cards upright (one at a time), and press-and-hold on a remote button.
-- MauHome tiles: to set up together with Mau in the tile editor.
+- MauHome tiles: HA admin helps Mau set them up in the tile editor when Mau brings it up (no reminders).
 - The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
 
