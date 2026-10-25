@@ -76,7 +76,10 @@ class IconPacks(private val hub: Hub) {
      */
     fun ownIcon(pkg: String): Drawable? = if (pkg !in OWN) null else runCatching {
         val info = ctx.packageManager.getApplicationInfo(pkg, 0)
-        ctx.packageManager.getResourcesForApplication(info).getDrawable(info.icon, null)
+        val res = ctx.packageManager.getResourcesForApplication(info)
+        // the plain drawing (drawable/icon); its adaptive app icon reads back on a black square
+        @Suppress("DiscouragedApi") val plain = res.getIdentifier("icon", "drawable", pkg)
+        res.getDrawable(if (plain != 0) plain else info.icon, null)
     }.getOrNull()
 
     /** Every app here by name, with the icon it gets: what another device (the TV) copies to show the same icons. */
