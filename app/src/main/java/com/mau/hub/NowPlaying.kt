@@ -63,6 +63,18 @@ class NowPlaying(private val a: MainActivity, private val onChange: (NowRow?) ->
         val item = Item(source, title, Play.App(c.packageName), subtitle = artist, wide = true,
             icon = art?.let { BitmapDrawable(a.resources, it) } ?: runCatching { a.packageManager.getApplicationIcon(c.packageName) }.getOrNull())
         // tap = back to the app that's playing; play/pause keys on the remote still work from here
-        onChange(NowRow(-1, label, item) { runCatching { c.sessionActivity?.send() ?: a.apps.launch(c.packageName) } })
+        onChange(NowRow(-1, label, item) { openPlayer(c) })
+    }
+
+    /**
+     * Opens the app that's playing, on its player screen when it offers one. Android 14+ blocks a PendingIntent from
+     * starting another app's screen unless the sender allows it (and then says nothing), so we allow it; the app's own
+     * launch screen if that fails.
+     */
+    fun openPlayer(c: MediaController) {
+        val opts = if (android.os.Build.VERSION.SDK_INT >= 34) android.app.ActivityOptions.makeBasic()
+            .setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle() else null
+        val pi = c.sessionActivity
+        if (pi == null || runCatching { pi.send(a, 0, null, null, null, null, opts) }.isFailure) a.apps.launch(c.packageName)
     }
 }

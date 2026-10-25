@@ -203,7 +203,20 @@ class TopBar(private val a: MainActivity) {
      * remembered); press and hold to pick another. Apps whose names suggest the job (a clock app, a weather app) come first.
      */
     fun opensApp(v: View, key: String, what: String, hints: List<String>) {
-        fun choose() = a.hub.diskPool.execute {
+        v.isClickable = true
+        v.background = a.bareButton()
+        v.setOnClickListener { openApp(key, what, hints) }
+        v.setOnLongClickListener { chooseApp(key, what, hints); true }
+    }
+
+    /** Opens the app you picked for the clock / weather / date; asks which the first time. */
+    fun openApp(key: String, what: String, hints: List<String>) {
+        val pkg = a.hub.prefs.getString("opens_$key", null)?.takeIf(a.hub::installed)
+        if (pkg != null) a.apps.launch(pkg) else chooseApp(key, what, hints)
+    }
+
+    /** Which app the clock / weather / date opens: likely ones (by name) first, then every app. */
+    fun chooseApp(key: String, what: String, hints: List<String>) = a.hub.diskPool.execute {
             val all = a.apps.all().sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
             val (likely, rest) = all.partition { app -> hints.any { h -> app.label.contains(h, true) || app.key.contains(h, true) } }
             val list = likely + rest
@@ -214,14 +227,6 @@ class TopBar(private val a: MainActivity) {
                     }.setNegativeButton("Cancel", null).show()
             }
         }
-        v.isClickable = true
-        v.background = a.bareButton()
-        v.setOnClickListener {
-            val pkg = a.hub.prefs.getString("opens_$key", null)?.takeIf(a.hub::installed)
-            if (pkg != null) a.apps.launch(pkg) else choose()
-        }
-        v.setOnLongClickListener { choose(); true }
-    }
 
     /** The phone's Home shows the weather itself: takes it out of this bar (which the phone doesn't show). */
     fun takeWeather(): View? = weather.also { (it.parent as? android.view.ViewGroup)?.removeView(it) }

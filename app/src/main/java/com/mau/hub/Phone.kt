@@ -561,7 +561,7 @@ class NowPanel(a: MainActivity) : PopPanel(a) {
             addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(6) })
             addView(access, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        art.setOnClickListener { a.nowPlaying.current?.let { c -> runCatching { c.sessionActivity?.send() ?: a.apps.launch(c.packageName) } } }
+        panel.setOnClickListener { a.nowPlaying.current?.let { c -> close(); a.nowPlaying.openPlayer(c) } } // the whole card opens what's playing
     }
 
     /** Fills it from the playing session; called on open and whenever playback changes. */
@@ -621,7 +621,7 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
             addView(more, FrameLayout.LayoutParams(a.dp(48), a.dp(36), Gravity.CENTER))
             addView(a.text(13f, TEXT_MUTED).apply {
                 text = "Weather app ›"; isClickable = true
-                setOnClickListener { a.hub.prefs.getString("opens_weather", null)?.takeIf(a.hub::installed)?.let { a.apps.launch(it); close() } ?: a.toast("Hold the weather on Home to pick its app") }
+                setOnClickListener { close(); a.topBar.openApp("weather", "weather", listOf("weather", "clima", "tiempo")) } // asks which the first time
             }, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(4) })
     }
