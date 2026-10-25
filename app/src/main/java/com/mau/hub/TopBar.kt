@@ -8,7 +8,9 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 
 /** Google TV-style top bar: search, content-type tabs, TV settings gear, then weather and clock on the right. */
 class TopBar(private val a: MainActivity) {
@@ -26,6 +28,18 @@ class TopBar(private val a: MainActivity) {
     }
     private val weatherTimer = Runnable { refreshWeather() }
     private val weather = a.text(14f, TEXT_SOFT).apply { setPadding(0, 0, a.dp(16), 0) }
+    /** Remote 1 and 2's buttons (tablet): the remote icon and the name you gave it. */
+    private val remoteButtons by lazy { listOf(1, 2).map { n ->
+        LinearLayout(a).apply {
+            gravity = Gravity.CENTER_VERTICAL; background = a.bareButton(); setPadding(a.dp(10), 0, a.dp(10), 0); isClickable = true
+            addView(ImageView(a).apply { setImageResource(R.drawable.ic_remote); setColorFilter(Color.WHITE) }, LinearLayout.LayoutParams(a.dp(24), a.dp(24)))
+            addView(a.text(13f, TEXT_SOFT), LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(6) })
+            setOnClickListener { (if (n == 1) a.remote1 else a.remote2).toggle(this) }
+            // press and hold: choose which device this remote controls (Joint Remote's own picker)
+            setOnLongClickListener { (if (n == 1) a.remote1 else a.remote2).close(); a.widgets.pick(remote = n); true }
+        }
+    } }
+
     private val search = a.iconButton(R.drawable.ic_search, "Search") { a.searchBar.open() }.apply {
         layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
         setPadding(a.dp(7), a.dp(7), a.dp(7), a.dp(7))
@@ -108,6 +122,8 @@ class TopBar(private val a: MainActivity) {
             // the corner, right to left: flip clock, weather, settings gear, then the button that shows/hides Home's section titles
             addView(titlesButton.also { touchSize(it); it.background = a.bareButton(); applyTitlesButton() })
             addView(gear.also { touchSize(it) })
+            // the two remote cards: each button pops its remote out (see RemotePanel); named in Settings → Remotes
+            remoteButtons.forEach { addView(it, LinearLayout.LayoutParams(-2, a.dp(48)).apply { marginStart = a.dp(4) }) }
             // same height as the clock; temperature first at half the size (the clock is what matters), then the icon
             addView(weather.apply {
                 textSize = 13f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -118,7 +134,7 @@ class TopBar(private val a: MainActivity) {
             addView(corner.apply { addView(flipClock().apply { opensApp(this, "clock", "Clock", listOf("clock", "alarm", "time")) }) })
             // three steps: 0 everything, 1 just the weather and clock (tabs and buttons folded away), 2 nothing
             val folding = (indexOfChild(tabs) until childCount).map(::getChildAt)
-            val keepAtStep1 = setOf<View>(weather, getChildAt(childCount - 1)) // the weather and the flip clock
+            val keepAtStep1 = setOf<View>(weather, getChildAt(childCount - 1)) + remoteButtons // the weather, the flip clock and the remotes
             fun step() = a.hub.prefs.getInt("topbar_fold", if (a.hub.prefs.getBoolean("topbar_folded", false)) 2 else 0)
             fun applyFold() {
                 val s = step()
@@ -203,7 +219,20 @@ class TopBar(private val a: MainActivity) {
      * remembered); press and hold to pick another. Apps whose names suggest the job (a clock app, a weather app) come first.
      */
     fun opensApp(v: View, key: String, what: String, hints: List<String>) {
-        fun choose() = a.hub.diskPool.execute {
+        v.isClickable = true
+        v.background = a.bareButton()
+        v.setOnClickListener { openApp(key, what, hints) }
+        v.setOnLongClickListener { chooseApp(key, what, hints); true }
+    }
+
+    /** Opens the app you picked for the clock / weather / date; asks which the first time. */
+    fun openApp(key: String, what: String, hints: List<String>) {
+        val pkg = a.hub.prefs.getString("opens_$key", null)?.takeIf(a.hub::installed)
+        if (pkg != null) a.apps.launch(pkg) else chooseApp(key, what, hints)
+    }
+
+    /** Which app the clock / weather / date opens: likely ones (by name) first, then every app. */
+    fun chooseApp(key: String, what: String, hints: List<String>) = a.hub.diskPool.execute {
             val all = a.apps.all().sortedWith(compareBy(java.text.Collator.getInstance()) { it.label })
             val (likely, rest) = all.partition { app -> hints.any { h -> app.label.contains(h, true) || app.key.contains(h, true) } }
             val list = likely + rest
@@ -214,13 +243,12 @@ class TopBar(private val a: MainActivity) {
                     }.setNegativeButton("Cancel", null).show()
             }
         }
-        v.isClickable = true
-        v.background = a.bareButton()
-        v.setOnClickListener {
-            val pkg = a.hub.prefs.getString("opens_$key", null)?.takeIf(a.hub::installed)
-            if (pkg != null) a.apps.launch(pkg) else choose()
-        }
-        v.setOnLongClickListener { choose(); true }
+
+    /** After a remote is renamed: its button shows the new name. */
+    fun refreshRemotes() = remoteButtons.forEachIndexed { i, b ->
+        val p = if (i == 0) a.remote1 else a.remote2
+        ((b as LinearLayout).getChildAt(1) as TextView).text = p.name
+        b.contentDescription = p.name
     }
 
     /** The phone's Home shows the weather itself: takes it out of this bar (which the phone doesn't show). */
@@ -252,6 +280,14 @@ class TopBar(private val a: MainActivity) {
     private val tabSwitch = Runnable { pendingTab?.let(a::selectTab) }
 
     init { refreshWeather(); if (!a.hub.touch) applyClock() }
+
+    /** "⛅  17°" -> the icon, large, with "17°" under it: the phone's weather beside the clock. */
+    private fun phoneWeather(text: String?): CharSequence {
+        val icon = text?.substringBefore("  ")?.takeIf { "  " in text } ?: return text.orEmpty()
+        return android.text.SpannableString("$icon\n${text.substringAfter("  ")}").apply {
+            setSpan(android.text.style.RelativeSizeSpan(2.7f), 0, icon.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
 
     /** "⛅  17°" -> "17°  ⛅" with the icon larger, for the tablet corner card. */
     private fun tabletWeather(text: String?): CharSequence {
@@ -325,7 +361,7 @@ class TopBar(private val a: MainActivity) {
                 }
                 Sources.weather(la, lo)
             }.getOrNull()
-            hub.main.post { weather.text = if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
+            hub.main.post { weather.text = if (a.hub.phone) phoneWeather(text) else if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
         }
         hub.main.removeCallbacks(weatherTimer) // Settings refreshes it right away; keep one timer
         hub.main.postDelayed(weatherTimer, 30 * 60_000L)

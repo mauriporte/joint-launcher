@@ -19,7 +19,12 @@ class HomeButtonService : AccessibilityService() {
     // the app asks for a system action (lock the screen) by broadcast: this service runs in its own process
     private val asked = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (i.hasExtra("watch")) watched = i.getStringExtra("watch") else performGlobalAction(i.getIntExtra("action", 0))
+            if (!i.hasExtra("watch")) { performGlobalAction(i.getIntExtra("action", 0)); return }
+            // the launcher says this just before it opens the app, and the app's window can be reported before this arrives:
+            // put the strip up now (any other app coming up takes it down). Remembered for when Android restarts the service.
+            watched = i.getStringExtra("watch")
+            prefs(this@HomeButtonService).edit().putString("watched", watched).apply()
+            showStrip()
         }
     }
 
@@ -55,6 +60,7 @@ class HomeButtonService : AccessibilityService() {
 
     override fun onServiceConnected() {
         wanted(this, true)
+        watched = prefs(this).getString("watched", null)
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(asked, android.content.IntentFilter(ACTION), RECEIVER_NOT_EXPORTED)
         else registerReceiver(asked, android.content.IntentFilter(ACTION))
     }
@@ -81,6 +87,8 @@ class HomeButtonService : AccessibilityService() {
         // the shade or the keyboard opening over the app isn't leaving it
         val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty().substringBefore('/')
         if (pkg == "com.android.systemui" || pkg == ime) return
+        // our own strip appearing is a window of this app too: only Joint Launcher's Home screen counts as leaving the app
+        if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
         if (pkg == watched) showStrip() else hideStrip()
     }
     override fun onInterrupt() = Unit
@@ -108,7 +116,14 @@ class HomeButtonService : AccessibilityService() {
          * once over adb (`adb shell pm grant <package> android.permission.WRITE_SECURE_SETTINGS`), switch it back on.
          * Touches only this app's own entry in the enabled-services list.
          */
-        fun restore(c: Context) {
+        /** done: an update receiver's goAsync(), finished once the service is back on the list (see the off/on below). */
+        fun restore(c: Context, done: BroadcastReceiver.PendingResult? = null) {
+            try { restoreNow(c) } finally { done?.finish() }
+        }
+
+        // Runs on a background thread when it has to wait, so the off/on below survives the process being torn down
+        // right after an update (a delayed re-add on the main thread was lost with it, leaving the service off).
+        private fun restoreNow(c: Context) {
             // asked of Android: the service lives in its own process (":home"), so `running` here never sees it
             val am = c.getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
             if (am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
@@ -117,24 +132,30 @@ class HomeButtonService : AccessibilityService() {
             if (!prefs(c).getBoolean("wanted", false)) return
             val me = ComponentName(c, HomeButtonService::class.java).flattenToString()
             val cr = c.contentResolver
-            val enabled = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            // read again right before each write: Joint Remote repairs its own entry in this same list, and a stale copy would erase it
+            fun enabled() = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
                 .split(':').filter { it.isNotEmpty() }
             // listed but not running (Android stops it when the app is force-stopped and marks it crashed): taking it off the
             // list and, a moment later, putting it back makes Android start it again (both at once read as no change)
             fun add() = runCatching {
-                Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, ((enabled - me) + me).joinToString(":"))
+                Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, ((enabled() - me) + me).joinToString(":"))
                 Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
                 restoring = false
             }
-            if (me !in enabled) { add(); return }
+            if (me !in enabled()) { add(); return }
             restoring = true
-            runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled - me).joinToString(":")) }
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ add() }, 800)
+            runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled() - me).joinToString(":")) }
+            Thread.sleep(800) // both at once read as no change
+            add()
         }
     }
 
     /** Runs right after an update installs, so Home works again without opening the app first. */
     class Restorer : BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) { if (i.action == Intent.ACTION_MY_PACKAGE_REPLACED) restore(c) }
+        override fun onReceive(c: Context, i: Intent) {
+            if (i.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+            val done = goAsync() // keeps the process alive until the service is back on
+            Thread { restore(c, done) }.start()
+        }
     }
 }

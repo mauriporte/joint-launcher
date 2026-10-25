@@ -72,6 +72,8 @@ class Gestures(private val a: MainActivity) {
         val page = a.widgetPage
         when {
             drawerOpen() -> Unit // the drawer's own lists
+            a.hub.phone && a.phoneHome.nowPanel.isOpen -> if (!right) a.phoneHome.nowPanel.close() // it came from the left
+            a.hub.phone && a.phoneHome.weatherPanel.isOpen -> if (right) a.phoneHome.weatherPanel.close() // it came from the right
             page.isOpen -> if (!right) page.close() // the page is to the left of Home: finger left goes back
             else -> run(action(if (right) SWIPE_RIGHT else SWIPE_LEFT))
         }

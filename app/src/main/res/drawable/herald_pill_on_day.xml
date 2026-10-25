@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the chosen half of a Herald switch (day): filled with the ink colour, like the page's aria-pressed button -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="999dp" />
+    <solid android:color="#FF000000" />
+</shape>

@@ -158,7 +158,28 @@ Opened from the sidebar's Settings; a panel down the right side so Home stays vi
 The HA dashboard inside Home. It uses the home address when it answers (on the home Wi-Fi) and the public one
 otherwise; both come from `local.properties`. You sign in once inside the section.
 
+### MauHome widget
+
+Mau's Google Home widget, button for button, run by Home Assistant (`HaWidget.kt`): see-through tiles with coloured
+outlines, padlocked server plugs ask before turning off, columns follow the widget's width. It reads HA's REST API
+with a long-lived token saved on the Connect page (Home Assistant section). Tiles without a sure HA match are grey
+"Sin asignar" placeholders. A.R.T. Phone extended it to 36 tiles with cameras.
+
+**Tile editor** (`HaTiles.kt`): the widget's pencil, or Settings → Home → MauHome widget. Add a tile by picking any HA
+device from a searchable list (accents ignored), rename it, change its icon and what a tap does, ask before turning it
+off, reorder, remove, or go back to the original tiles. Saved in prefs `ha_tiles`; the widget redraws at once.
+
+### Home Herald widget
+
+The house's daily paper from HA's `sensor.home_herald` (`HeraldWidget.kt`), read-only with MauHome's token, laid
+out like its HA page and in the same font (Gelasio, Georgia's free twin, also embedded in the page): masthead with
+the round logo, night/day and EN/ES switches, numbers 4 across, watch box, briefs. Keeps the last edition when HA is
+away; a tap opens it in the HA app. Mau approved the look (no blackletter masthead).
+
 ### Other details
+
+- Settings → Background → **Lock screen** puts the current background picture on the lock screen too.
+- **Lock app** (hold menu) and Settings → **App lock** (PIN), from the TV merge; the phone doesn't have them.
 
 - The launcher is the tablet's default Home app and is declared non-resizable (no split-screen handle on it).
 - More football leagues in the GeeSports row: Premier League, Ligue 1, Bundesliga, Champions League, Europa League,
@@ -182,10 +203,28 @@ row order and the content parsers.
 
 ## Not done / known gaps
 
-- Widgets need adding again in the new app (Mau will do it).
-- The pull request into `main` is open, not merged; the version is still 2.0 (build 6).
+- 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
+- Not yet tried on screen: the remote cards upright (one at a time), and press-and-hold on a remote button.
+- MauHome tiles: HA admin helps Mau set them up in the tile editor when Mau brings it up (no reminders).
+- The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
-- The flip animation hasn't been watched on screen at the moment a minute changes.
+
+## Day log, 25/10/2026
+
+- Joint Remote's icon: LineX `ir_remote` in the launcher orange, the remote's icon everywhere.
+- MauHome widget (Google Home buttons through HA), then A.R.T. Phone's 36 tiles with cameras; HA token on the Connect page.
+- Phone flavor and the TV work merged into `redesign`; the tablet checked after each merge.
+- Lock screen picture from the background; Lock app and App lock on the tablet.
+- Home Herald widget, matched to its HA page in the same font; HA admin made the page use the same fonts.
+- MauHome tile editor. The corner flip clock now flips even with the tablet's animations switched off (it times
+  itself instead of relying on Android's animation setting, which is at 0 on the tablet).
+- Joint Remote keeps its own (v0.6) icon in the launcher, any pack.
+- Joint Remote's icon read from its plain drawing (no HyperOS white or black box); the tile editor hides the bars too.
+- Opened as an app while it's Home, the launcher hands over to Home (no stray copy with HyperOS's "•••" handle).
+- Wallpaper top-edge line cleaned; the same picture on the lock screen.
+- Two remote cards (Joint Remote's widget each) from top-bar buttons named after their device: side by side when
+  turned, one at a time upright; pin, outer-edge close arrow, own % solid; press and hold a button to change device.
+- Home button service restore made safe right after updates (shared code; matters on the TV).
 
 ## Decisions Mau made along the way
 

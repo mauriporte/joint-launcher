@@ -35,7 +35,7 @@ class MainActivity : Activity() {
     lateinit var detail: DetailScreen
     lateinit var searchBar: SearchBar
     lateinit var moveMode: MoveMode
-    private lateinit var nowPlaying: NowPlaying
+    lateinit var nowPlaying: NowPlaying // the phone's Now Playing panel reads it too
     lateinit var page: LinearLayout // top bar + header + rows: blocked from focus while the detail screen covers it
 
     var gen = 0 // bumps on reload/search so stale async rows are dropped
@@ -62,7 +62,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        HomeButtonService.restore(this)
+        if (openedAsAppWhileHome()) return
+        Thread { HomeButtonService.restore(this) }.start() // may wait a moment (see restore)
         heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD); letterSpacing = -0.01f
@@ -85,6 +86,7 @@ class MainActivity : Activity() {
         sidebar = Sidebar(this)
         topBar = TopBar(this)
         topBar.refreshAvatar()
+        if (hub.touch) topBar.refreshRemotes() // the remote buttons show their names
         detail = DetailScreen(this)
         rows = Rows(this)
         moveMode = MoveMode(this, hub.touch) { container, order ->
@@ -94,7 +96,7 @@ class MainActivity : Activity() {
             if (container === sidebar.rail) rowsDirty = true // Home rows follow the sidebar: reorder them when it closes
             else sidebar.dirty = true // the sidebar picks the new order up next time it opens
         }
-        nowPlaying = NowPlaying(this) { rows.nowPlaying(it) }
+        nowPlaying = NowPlaying(this) { rows.nowPlaying(it); if (hub.phone) phoneHome.nowPanel.update() }
 
         // Layout budget (960x540dp): 46dp top bar + 136dp header + two ~178dp rows still fit without scrolling.
         // Touchscreens: no header (it follows the remote's focus, and a tap opens the title straight away), so more rows fit.
@@ -127,8 +129,11 @@ class MainActivity : Activity() {
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
+            if (touch) { addView(remote1.view, FrameLayout.LayoutParams(-1, -1)); addView(remote2.view, FrameLayout.LayoutParams(-1, -1)) }
             addView(detail.view)
         })
+        // pinned remote cards come back out (posted: they size themselves from the laid-out screen)
+        if (touch) root.post { listOf(remote1, remote2).filter { it.pinned }.forEach { it.open() } }
         // focus leaving the sidebar any other way (e.g. Up past its top) closes it too
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
             if (!moveMode.active && sidebar.isOpen && now != null && !isInside(now, sidebar.rail)) sidebar.hide()
@@ -146,13 +151,20 @@ class MainActivity : Activity() {
     val widgets by lazy { Widgets(this) }
     val widgetPage by lazy { WidgetPage(this) }
     val phoneHome by lazy { PhoneHome(this) }
+    // the two remote cards (Joint Remote's widget each); the buttons: the tablet's top bar, the phone's Home
+    val remote1 by lazy { RemotePanel(this, 1) }
+    val remote2 by lazy { RemotePanel(this, 2).also { remote1.other = it; it.other = remote1 } }
     val gestures by lazy { Gestures(this) }
 
     override fun dispatchTouchEvent(e: android.view.MotionEvent): Boolean =
         (hub.touch && gestures.onTouch(e) { super.dispatchTouchEvent(it) }) || super.dispatchTouchEvent(e)
 
     // widgets only update while the screen is showing
-    override fun onStart() { super.onStart(); if (hub.touch) { widgets.start(); topBar.applyCornerClock() } }
+    override fun onStart() {
+        super.onStart()
+        if (hub.touch) { widgets.start(); topBar.applyCornerClock() }
+        if (hub.touch && !hub.phone) topBar.refreshRemotes() // the remotes' devices may have changed in Joint Remote
+    }
     override fun onStop() { super.onStop(); if (hub.touch) widgets.stop() }
 
     /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
@@ -386,7 +398,7 @@ class MainActivity : Activity() {
                             listOfNotNull(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
                                 // TV only for now: the tablet and phone have no Settings line to change the PIN
-                                if (hub.touch) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
+                                if (hub.phone) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
                                 // back from Settings → Hidden apps
                                 "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
                                 // Android asks you to confirm; the Apps section updates when you come back
@@ -449,7 +461,11 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             detail.isShown -> detail.close()
+            hub.touch && remote2.isOpen && !remote2.pinned -> remote2.close()
+            hub.touch && remote1.isOpen && !remote1.pinned -> remote1.close()
             hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
+            hub.phone && phoneHome.nowPanel.isOpen -> phoneHome.nowPanel.close()
+            hub.phone && phoneHome.weatherPanel.isOpen -> phoneHome.weatherPanel.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
             hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
@@ -470,7 +486,8 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
-        if (hub.phone) { phoneHome.drawer.close(); return }
+        if (hub.touch) listOf(remote1, remote2).filter { !it.pinned }.forEach { it.close() } // pinned ones stay out
+        if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
     }
@@ -523,6 +540,21 @@ class MainActivity : Activity() {
     // tablet: Android's status bar (clock, Wi-Fi, battery) and navigation bar (back, home, recents) stay hidden while
     // Joint Launcher is on screen; a swipe in from the top or bottom edge shows them for a moment. Re-applied on focus
     // because dialogs and other apps bring them back.
+    /**
+     * Opened like any app (from an app list, or by another app) while we're the touch device's Home: hand over to Home
+     * and close this copy. Kept, it would sit in its own task, come back when the next app closes, and get HyperOS's
+     * split-screen "•••" handle over a black strip.
+     */
+    private fun openedAsAppWhileHome(): Boolean {
+        if (packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return false // the TV has its own Home handling
+        if (intent?.hasCategory(Intent.CATEGORY_HOME) == true) return false
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        if (packageManager.resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName != packageName) return false
+        startActivity(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        finishAndRemoveTask()
+        return true
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) applySystemBars()
@@ -549,6 +581,7 @@ class MainActivity : Activity() {
         super.onConfigurationChanged(newConfig)
         applyBackground()
         if (hub.touch) rows.refreshWidgets() // the widget grid has its own size and spots per orientation
+        if (hub.touch) RemotePanel.relayout(remote1, remote2)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -583,8 +616,9 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
-        if (hub.touch) HaWidget.refresh(this) // MauHome shows current states whenever you're back on Home
-        if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
+        if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
+        if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min
+        if (!hub.touch) Thread { HomeButtonService.restore(this) }.start() // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
         if (hub.touch) {
             apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
@@ -593,8 +627,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        nowPlaying.stop()
-        hub.shutdown()
+        if (::nowPlaying.isInitialized) { nowPlaying.stop(); hub.shutdown() } // not when onCreate only handed over to Home
+        else hub.shutdown()
         super.onDestroy()
     }
 

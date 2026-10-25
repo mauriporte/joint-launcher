@@ -44,7 +44,7 @@ class IconPacks(private val hub: Hub) {
     fun pickFor(pkg: String, label: String): String? {
         val pack = active() ?: return null
         override(pkg)?.let { return it.joinToString("|") }
-        if (pack == LINEX) OWN[pkg]?.let { return "$pack|${it.first}" }
+        if (pkg in OWN) return null
         copiedPicks()[plain(label)]?.let { return it }
         val map = map(pack)
         val component = ctx.packageManager.getLaunchIntentForPackage(pkg)?.component
@@ -60,16 +60,27 @@ class IconPacks(private val hub: Hub) {
 
     /** The pack icon for an app (see [pickFor]); null = use the app's own. brand: the colour for a service that isn't installed. */
     fun packIcon(pkg: String, label: String, brand: Int? = null): Drawable? {
+        if (pkg in OWN && override(pkg) == null) return ownIcon(pkg)
         val pick = pickFor(pkg, label)?.split('|') ?: return null
         val d = drawable(pick[0], pick[1]) ?: return null
         // hand-picked and guessed icons take the app's colour (GeeSports' G stays yellow); a service that isn't
         // installed takes its brand colour (Filmin's F in green)
         if (pick.getOrNull(2) == "auto") (if (hub.installed(pkg)) appColour(pkg) else brand)
             ?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
-        OWN[pkg]?.takeIf { pick[1] == it.first && pick.size == 2 }
-            ?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it.second, android.graphics.PorterDuff.Mode.SRC_IN) }
         return d
     }
+
+    /**
+     * One of our own apps' icon as drawn, straight from its resources: asking Android for it (getApplicationIcon) gets
+     * it in HyperOS's white rounded box, because it isn't an adaptive icon.
+     */
+    fun ownIcon(pkg: String): Drawable? = if (pkg !in OWN) null else runCatching {
+        val info = ctx.packageManager.getApplicationInfo(pkg, 0)
+        val res = ctx.packageManager.getResourcesForApplication(info)
+        // the plain drawing (drawable/icon); its adaptive app icon reads back on a black square
+        @Suppress("DiscouragedApi") val plain = res.getIdentifier("icon", "drawable", pkg)
+        res.getDrawable(if (plain != 0) plain else info.icon, null)
+    }.getOrNull()
 
     /** Every app here by name, with the icon it gets: what another device (the TV) copies to show the same icons. */
     fun exportPicks(): String = org.json.JSONObject().apply {
@@ -139,8 +150,8 @@ class IconPacks(private val hub: Hub) {
         const val LINEX = "com.jndapp.line.x.iconpack"
         const val NONE = "none" // icon_pack value for "the apps' own icons"
 
-        /** Our own apps LineX doesn't know: its icon and the colour it's drawn in. A pick made with Change icon still wins. */
-        private val OWN = mapOf("com.mau.remote" to ("ir_remote" to ACCENT)) // Joint Remote: the D-pad keypad in orange
+        /** Our own apps keep their own icon with any pack (Joint Remote's is drawn in our style). A Change icon pick still wins. */
+        private val OWN = setOf("com.mau.remote")
 
         /** An app name reduced to letters and digits, for matching the same app across devices (TV and tablet). */
         fun plain(label: String) = label.lowercase().filter(Char::isLetterOrDigit)

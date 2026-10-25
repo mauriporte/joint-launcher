@@ -75,7 +75,9 @@ internal fun View.tvFocus(radiusDp: Int = 10) {
 }
 
 /** Tablet buttons: just the icon's lines, nothing around them; a soft round ripple shows the touch. */
-internal fun Context.bareButton() = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null, null)
+// the phone: no touch ripple at all (Mau: a big circle on every press, not clean)
+internal fun Context.bareButton(): android.graphics.drawable.Drawable? =
+    if (BuildConfig.FLAVOR == "phone") null else android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x40FFFFFF), null, null)
 
 internal fun Context.iconButton(icon: Int, label: String, onClick: () -> Unit) = ImageView(this).apply {
     setImageResource(icon)

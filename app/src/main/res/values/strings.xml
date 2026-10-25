@@ -2,5 +2,6 @@
 <resources>
     <string name="home_button_service_label">Joint Launcher Home button</string>
     <string name="home_button_service_description">Makes the remote\'s Home button open Joint Launcher instead of Google TV. It only listens for the Home button and reads nothing on screen. Turn it off to give Home back to Google TV.</string>
+    <string name="herald_widget_description">The house\'s daily newspaper, from Home Assistant</string>
     <string name="ha_widget_description">Your Google Home buttons, run by Home Assistant</string>
 </resources>

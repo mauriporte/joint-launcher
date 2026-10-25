@@ -29,18 +29,54 @@ import java.text.Collator
 class PhoneHome(private val a: MainActivity) {
     private val p get() = a.hub.prefs
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
-    private val dock = LinearLayout(a).apply { gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), a.dp(10)) }
+    // the shortcuts: up to 5 pages side by side; swipe the row sideways for the next one (it snaps to a page)
+    private val dock = LinearLayout(a)
+    private val dockScroll = object : HorizontalScrollView(a) {
+        private var flung = false
+        override fun fling(velocityX: Int) { flung = true; snap(page() + if (velocityX > 0) 1 else -1) }
+        override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+            flung = false
+            val handled = super.onTouchEvent(e) // a quick swipe calls fling() from in here
+            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) snap(page())
+            return handled
+        }
+        fun page() = (scrollX + width / 2) / maxOf(1, width)
+        fun snap(p: Int) {
+            val target = p.coerceIn(0, maxOf(0, dock.childCount - 1))
+            smoothScrollTo(target * width, 0)
+        }
+    }.apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(dock) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
-    private val clock = FlipClock(a, 72)
+    private val clock = FlipClock(a, 144) // big: two cards fill most of the phone's width
+    private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { icons = !icons; render() }.apply {
+        setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
+    }
     val drawer = AllApps(a)
+    val nowPanel = NowPanel(a)
+    val weatherPanel = WeatherPanel(a)
+    private val musicButton: ImageView = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open(from = musicButton) }.apply {
+        setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
+    }
 
     val view: View = FrameLayout(a).apply {
         addView(LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
-            // top: weather on the right, the flip clock in the middle, the date under it; each opens its app (hold: pick another)
+            // top: the big flip clock in the middle, the date and weather under it; each opens its app (hold: pick another)
             addView(FrameLayout(a).apply {
                 addView(clock, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-                a.topBar.takeWeather()?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL)) }
+                // top left, in the clock's margin: names/icons (like the tablet's and TV's button), and under it the music
+                // note that pops out Now Playing
+                addView(LinearLayout(a).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(iconsButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
+                    addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
+                }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
+                // right, in the clock's other margin: the weather; a tap pops out the forecast (hold still picks the weather app)
+                a.topBar.takeWeather()?.let { w ->
+                    (w as? TextView)?.apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) } // icon over the degrees
+                    addView(w, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
+                    w.setOnClickListener { weatherPanel.open(from = w) }
+                }
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -50,12 +86,15 @@ class PhoneHome(private val a: MainActivity) {
                     setOnLongClickListener { a.actions.settings(); true } // hold empty space: Settings, as in Pro Launcher
                 })
             }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(dock, LinearLayout.LayoutParams(-1, a.dp(64)))
+            addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)).apply { bottomMargin = a.dp(10) })
         }, FrameLayout.LayoutParams(-1, -1))
+        addView(nowPanel.view, FrameLayout.LayoutParams(-1, -1))
+        addView(weatherPanel.view, FrameLayout.LayoutParams(-1, -1))
         addView(drawer.view, FrameLayout.LayoutParams(-1, -1))
     }
 
     init {
+        nowPanel.coverTo = date; weatherPanel.coverTo = date
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
     }
@@ -67,10 +106,27 @@ class PhoneHome(private val a: MainActivity) {
     /** Home: "pkg" or "cat:<category>", one per line. */
     fun home(): List<String> = p.getString("phone_home", "").orEmpty().split('\n').filter { it.isNotEmpty() }
     fun setHome(keys: List<String>) = p.edit().putString("phone_home", keys.distinct().joinToString("\n")).apply()
-    fun dockApps(): List<String> = p.getString("phone_dock", "").orEmpty().split('\n').filter { it.isNotEmpty() }
-    fun setDock(keys: List<String>) = p.edit().putString("phone_dock", keys.distinct().joinToString("\n")).apply()
+    fun dockApps(): List<String> = (0 until DOCK_PAGES).flatMap(::dockPage)
+    /** Shortcut page i (0-4), left to right. Page 0 keeps the name the Pro Launcher import writes. */
+    fun dockPage(i: Int): List<String> = p.getString(dockKey(i), "").orEmpty().split('\n').filter { it.isNotEmpty() }
+    fun setDockPage(i: Int, keys: List<String>) = p.edit().putString(dockKey(i), keys.distinct().joinToString("\n")).apply()
+    private fun dockKey(i: Int) = if (i == 0) "phone_dock" else "phone_dock_$i"
+    fun removeFromDock(pkg: String) = (0 until DOCK_PAGES).forEach { i -> dockPage(i).let { if (pkg in it) setDockPage(i, it - pkg) } }
+
+    /** Asks which shortcut page to put an app on (the ones in use, plus the next empty one). */
+    fun addToDock(pkg: String) {
+        val used = (0 until DOCK_PAGES).count { dockPage(it).isNotEmpty() }
+        val pages = (0 until minOf(DOCK_PAGES, used + 1)).toList()
+        android.app.AlertDialog.Builder(a).setTitle("Add to which shortcut page?")
+            .setItems(pages.map { i -> "Page ${i + 1}" + dockPage(i).size.let { if (it == 0) " (new)" else " · $it apps" } }.toTypedArray()) { _, w ->
+                removeFromDock(pkg); setDockPage(pages[w], dockPage(pages[w]) + pkg); render()
+            }.show()
+    }
 
     fun render() {
+        // the button shows what a tap switches to
+        iconsButton.setImageResource(if (icons) R.drawable.ic_text_fields else R.drawable.ic_apps)
+        iconsButton.contentDescription = if (icons) "Names only on Home" else "Icons on Home"
         val cal = java.util.Calendar.getInstance()
         date.text = android.text.format.DateFormat.format("EEE d MMM", cal).toString().replaceFirstChar { it.uppercase() }
         clock.timeZone = p.getString("clock_tz", null)
@@ -80,8 +136,11 @@ class PhoneHome(private val a: MainActivity) {
             val entries = home().mapNotNull { k ->
                 if (k.startsWith("cat:")) k to k.removePrefix("cat:") else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
-            val shortcuts = dockApps().filter { it in byKey }
-            a.hub.main.post { fill(entries, byKey); fillDock(shortcuts) }
+            // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
+            // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
+            // changes shortcut page and never Home's (widgets, Beeper)
+            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey } }.let { all -> all.take(minOf(DOCK_PAGES, all.indexOfLast { it.isNotEmpty() } + 2)) }
+            a.hub.main.post { fill(entries, byKey); fillDock(pages) }
         }
     }
 
@@ -107,13 +166,12 @@ class PhoneHome(private val a: MainActivity) {
         }
     }
 
-    /** One line on Home: the name, with its LineX icon before it in icon mode. */
+    /** One line on Home: the name, or in icon mode the app's LineX icon instead of it (categories keep their name). */
     private fun entry(label: String, iconPkg: String?, category: Boolean) = LinearLayout(a).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(a.dp(20), a.dp(8), a.dp(20), a.dp(8))
-        background = a.bareButton(); isClickable = true
-        if (iconPkg != null) addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) },
-            LinearLayout.LayoutParams(a.dp(30), a.dp(30)).apply { marginEnd = a.dp(12) })
+        gravity = Gravity.CENTER // the row is as wide as the screen: centre the name (or icon) in it
+        setPadding(a.dp(20), a.dp(6), a.dp(20), a.dp(6))
+        background = a.bareButton(); isClickable = true; contentDescription = label // TalkBack still says the name
+        if (iconPkg != null) { addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40))); return@apply }
         addView(a.text(if (category) 22f else 21f, Color.WHITE).apply {
             text = label; letterSpacing = 0.03f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
@@ -121,24 +179,43 @@ class PhoneHome(private val a: MainActivity) {
         })
     }
 
-    private fun fillDock(keys: List<String>) {
+    private fun fillDock(pages: List<List<String>>) {
         dock.removeAllViews()
-        keys.forEach { pkg ->
-            dock.addView(ImageView(a).apply {
-                a.apps.iconInto(pkg, this)
-                setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
-                background = a.bareButton()
-                setOnClickListener { a.apps.launch(pkg) }
-                setOnLongClickListener {
-                    MoveMode.holdMenu(a, this, beside = false, listOf(
-                        "Move left" to { setDock(dockApps().toMutableList().apply { val i = indexOf(pkg); if (i > 0) { removeAt(i); add(i - 1, pkg) } }); render() },
-                        "Move right" to { setDock(dockApps().toMutableList().apply { val i = indexOf(pkg); if (i in 0 until size - 1) { removeAt(i); add(i + 1, pkg) } }); render() },
-                        "Remove from the shortcuts" to { setDock(dockApps() - pkg); render() },
-                    )); true
-                }
-            }, LinearLayout.LayoutParams(0, a.dp(52), 1f))
+        val w = dockScroll.width.takeIf { it > 0 } ?: a.resources.displayMetrics.widthPixels
+        pages.forEachIndexed { i, keys ->
+            dock.addView(LinearLayout(a).apply {
+                gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), 0)
+                keys.forEach { pkg -> addView(dockIcon(i, pkg), LinearLayout.LayoutParams(0, a.dp(52), 1f)) }
+                // an empty page: + opens the app list, where holding an app offers "Add to the shortcuts"
+                if (keys.isEmpty()) addView(a.text(26f, TEXT_SOFT).apply {
+                    text = "+"; gravity = Gravity.CENTER; background = a.bareButton(); contentDescription = "Add shortcuts to page ${i + 1}"
+                    setOnClickListener { drawer.open(); a.toast("Hold an app → Add to the shortcuts → Page ${i + 1}") }
+                }, LinearLayout.LayoutParams(a.dp(52), a.dp(52)))
+            }, LinearLayout.LayoutParams(w, -1))
+        }
+        val now = dockScroll.page().coerceIn(0, pages.size - 1)
+        dockScroll.post { dockScroll.scrollTo(now * dockScroll.width, 0) }
+    }
+
+    private fun dockIcon(page: Int, pkg: String) = ImageView(a).apply {
+        a.apps.iconInto(pkg, this)
+        setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
+        background = a.bareButton()
+        setOnClickListener { a.apps.launch(pkg) }
+        setOnLongClickListener {
+            fun move(by: Int) = setDockPage(page, dockPage(page).toMutableList().apply {
+                val i = indexOf(pkg); if (i + by in indices) { removeAt(i); add(i + by, pkg) }
+            })
+            MoveMode.holdMenu(a, this, beside = false, listOf(
+                "Move left" to { move(-1); render() },
+                "Move right" to { move(1); render() },
+                "Move to another page" to { addToDock(pkg) },
+                "Remove from the shortcuts" to { removeFromDock(pkg); render() },
+            )); true
         }
     }
+
+    companion object { const val DOCK_PAGES = 5 }
 
     fun appInfo(pkg: String) {
         runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))) }
@@ -201,10 +278,11 @@ class AllApps(private val a: MainActivity) {
         refresh()
         if (isOpen) return
         // see-through as much as Settings says (0 = clear, the wallpaper shows; 100 = black)
-        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 94) * 255 / 100, 5, 5, 5))
+        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 40) * 255 / 100, 5, 5, 5))
         view.visibility = View.VISIBLE
         view.translationY = a.window.decorView.height * 0.3f; view.alpha = 0f
         view.animate().translationY(0f).alpha(1f).setDuration(200).start()
+        homeContent.animate().alpha(0f).setDuration(200).start() // only the wallpaper behind the list, not Home's names too
         recycler.scrollToPosition(0)
         if (typing || a.hub.prefs.getBoolean("phone_keyboard", false)) { search.requestFocus(); keyboard(true) }
     }
@@ -213,7 +291,10 @@ class AllApps(private val a: MainActivity) {
         if (!isOpen) return
         keyboard(false); search.clearFocus()
         view.animate().translationY(a.window.decorView.height * 0.3f).alpha(0f).setDuration(180).withEndAction { view.visibility = View.GONE }.start()
+        homeContent.animate().alpha(1f).setDuration(180).start()
     }
+
+    private val homeContent get() = (home.view as ViewGroup).getChildAt(0) // Home's clock, list and shortcuts, under this list
 
     /** Is the list at its top (so a swipe down closes the drawer instead of scrolling)? */
     fun atTop() = !recycler.canScrollVertically(-1)
@@ -259,7 +340,7 @@ class AllApps(private val a: MainActivity) {
         MoveMode.holdMenu(a, anchor, beside = false, listOf(
             (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - pkg else home.home() + pkg); home.render() },
             (if (pkg in home.dockApps()) "Remove from the shortcuts" else "Add to the shortcuts") to {
-                home.setDock(home.dockApps().let { if (pkg in it) it - pkg else it + pkg }); home.render()
+                if (pkg in home.dockApps()) { home.removeFromDock(pkg); home.render() } else home.addToDock(pkg)
             },
             "Category" to { pickCategory(app) },
             "Rename" to { a.apps.rename(a, app) { refresh(); home.render() } },
@@ -311,9 +392,10 @@ class AllApps(private val a: MainActivity) {
         override fun onBindViewHolder(h: Holder, i: Int) {
             val app = shown[i]
             h.label.text = app.label
-            h.icon.visibility = if (home.icons) View.VISIBLE else View.GONE
+            val icons = a.hub.prefs.getBoolean("drawer_icons", false) // the app list's own choice; Home's button doesn't change it
+            h.icon.visibility = if (icons) View.VISIBLE else View.GONE
             h.icon.setImageDrawable(null)
-            if (home.icons) app.pkg?.let { a.apps.iconInto(it, h.icon) }
+            if (icons) app.pkg?.let { a.apps.iconInto(it, h.icon) }
             h.itemView.setOnClickListener { launch(app) }
             h.itemView.setOnLongClickListener { menu(it, app); true }
         }

@@ -70,6 +70,19 @@ class TabletSettings(private val a: MainActivity) {
                 }.show()
         }
         if (a.bgMode() == "picture") gallery()
+        if (hub.touch && a.bgMode() == "picture") a.currentBackground()?.let { id ->
+            line("Lock screen", "Use this picture there too") {
+                runCatching { a.bgFile(id, false).inputStream().use { android.app.WallpaperManager.getInstance(a).setStream(it, null, true, android.app.WallpaperManager.FLAG_LOCK) } }
+                    .onSuccess { a.toast("Lock screen picture set") }.onFailure { a.toast("Couldn't set the lock screen: ${it.message}") }
+            }
+        }
+        // with the device's own wallpaper (the phone's black wood + M) there's no picture of ours to reuse: pick one for the lock screen
+        if (hub.touch && a.bgMode() != "picture") line("Lock screen", "Pick a picture for it") {
+            a.openBytes { bytes ->
+                runCatching { android.app.WallpaperManager.getInstance(a).setStream(bytes.inputStream(), null, true, android.app.WallpaperManager.FLAG_LOCK) }
+                    .onSuccess { a.toast("Lock screen picture set") }.onFailure { a.toast("Couldn't set the lock screen: ${it.message}") }
+            }
+        }
         val dimLabel = a.text(15f, TEXT_SOFT)
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
@@ -105,12 +118,13 @@ class TabletSettings(private val a: MainActivity) {
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
         if (!hub.phone) line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
         line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
-        if (!hub.touch) line("App lock", a.appLock.locked().size.let { n ->
+        if (!hub.phone) line("App lock", a.appLock.locked().size.let { n ->
             (if (a.appLock.hasPin()) "PIN set" else "No PIN yet") + " · " + if (n == 0) "no apps locked: hold an app and choose Lock app" else "$n locked"
         }) { a.appLock.changePin { a.toast("PIN saved"); draw() } }
 
         if (!hub.phone) {
         heading("Home")
+        if (hub.touch) line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(android.widget.Switch(a).apply {
             text = "Show section titles (off: their icons instead)"; textSize = 16f; setTextColor(Color.WHITE)
             isChecked = p.getBoolean("section_titles", true)
@@ -205,6 +219,58 @@ class TabletSettings(private val a: MainActivity) {
         heading("Weather")
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
 
+        // the two remote cards (Joint Remote's widget each, see RemotePanel): which remote, its button's name, how solid
+        if (hub.touch) {
+            heading("Remotes")
+            listOf(a.remote1, a.remote2).forEach { r ->
+                val chosen = p.getInt("remote_widget_${r.n}", -1) >= 0
+                line("Remote ${r.n}", r.name + if (chosen) "" else " · not chosen yet") {
+                    AlertDialog.Builder(a).setTitle("Remote ${r.n}").setItems(arrayOf("Choose its remote (device)", "Rename its button")) { _, i ->
+                        if (i == 0) a.widgets.pick(remote = r.n)
+                        else {
+                            val field = EditText(a).apply { setText(r.name); isSingleLine = true; setTextColor(Color.WHITE) }
+                            AlertDialog.Builder(a).setTitle("Button name").setView(field)
+                                .setPositiveButton("Save") { _, _ -> p.edit().putString("remote_name_${r.n}", field.text.toString().trim()).apply(); a.topBar.refreshRemotes(); draw() }
+                                .setNegativeButton("Cancel", null).show()
+                        }
+                    }.show()
+                }
+                val label = a.text(15f, TEXT_SOFT)
+                fun solidText(v: Int) { label.text = "${r.name}: $v % solid" + if (v == 100) " (no see-through)" else "" }
+                list.addView(label, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(4) })
+                list.addView(SeekBar(a).apply {
+                    // its own; like the music and weather cards until it's moved
+                    max = 60; progress = p.getInt("remote_solid_${r.n}", PopPanel.solid(hub)).coerceIn(40, 100) - 40; solidText(progress + 40)
+                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { solidText(v + 40); if (user) p.edit().putInt("remote_solid_${r.n}", v + 40).apply() }
+                        override fun onStartTrackingTouch(s: SeekBar) = Unit
+                        override fun onStopTrackingTouch(s: SeekBar) = Unit
+                    })
+                }, LinearLayout.LayoutParams(-1, a.dp(48)))
+            }
+        }
+
+        // the music and weather cards (phone; tablet and TV as they get them), and the launcher's language
+        heading("Cards and language")
+        val cardLabel = a.text(15f, TEXT_SOFT)
+        fun cardText(v: Int) { cardLabel.text = "Music and weather cards: $v % solid" + if (v == 100) " (no see-through)" else "" }
+        list.addView(cardLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 60; progress = PopPanel.solid(hub) - 40; cardText(progress + 40) // 40-100 %: below that the text gets lost
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { cardText(v + 40); p.edit().putInt("pop_opacity", v + 40).apply() }
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                override fun onStopTrackingTouch(s: SeekBar) = Unit
+            })
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val langs = linkedMapOf("auto" to "Automatic (like the $device)", "en" to "English", "es" to "Español")
+        line("Language", langs.getValue(p.getString("lang", "auto")!!.takeIf { it in langs } ?: "auto")) {
+            AlertDialog.Builder(a).setTitle("Language")
+                .setSingleChoiceItems(langs.values.toTypedArray(), langs.keys.indexOf(p.getString("lang", "auto"))) { d, i ->
+                    p.edit().putString("lang", langs.keys.elementAt(i)).apply(); d.dismiss(); draw()
+                }.show()
+        }
+
         if (!hub.touch) { // the TV's screensavers; not offered on the tablet and phone (yet)
             heading("Screensaver")
             val savers = linkedMapOf<String?, String>(null to "Android's own", ClockDream::class.java.name to "Flip clock on your background",
@@ -226,8 +292,12 @@ class TabletSettings(private val a: MainActivity) {
     private fun phone() {
         val home = a.phoneHome
         heading("Home")
-        line("Apps on Home and in the list", if (home.icons) "Icons (from the icon pack) and names" else "Names only") {
+        line("Apps on Home", if (home.icons) "Icons (from the icon pack)" else "Names only (also the button at the top left of Home)") {
             home.icons = !home.icons; a.refreshApps(); draw()
+        }
+        val drawerIcons = p.getBoolean("drawer_icons", false)
+        line("Apps in the list (swipe up)", if (drawerIcons) "Icons and names" else "Names only") {
+            p.edit().putBoolean("drawer_icons", !drawerIcons).apply(); a.refreshApps(); draw()
         }
         list.addView(android.widget.Switch(a).apply {
             text = "Keyboard up when the app list opens"; textSize = 16f; setTextColor(Color.WHITE)
@@ -238,7 +308,7 @@ class TabletSettings(private val a: MainActivity) {
         fun drawerText(v: Int) { drawerLabel.text = "App list (swipe up): darken $v %" + when (v) { 0 -> " (see-through)"; 100 -> " (black)"; else -> "" } }
         list.addView(drawerLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
         list.addView(SeekBar(a).apply {
-            max = 100; progress = p.getInt("drawer_dim", 94); drawerText(progress)
+            max = 100; progress = p.getInt("drawer_dim", 40); drawerText(progress)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { drawerText(v); p.edit().putInt("drawer_dim", v).apply() }
                 override fun onStartTrackingTouch(s: SeekBar) = Unit
@@ -248,6 +318,7 @@ class TabletSettings(private val a: MainActivity) {
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
         // the MauHome widget's Home Assistant token: typed here on the phone (the Connect page is for setting up another device)
         heading("Home Assistant")
+        line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "For the MauHome widget: paste a long-lived token (HA → your profile → Security → Long-lived access tokens). " +
             if (p.contains("ha_token")) "A token is saved." else "No token yet." })
         val token = EditText(a).apply {
@@ -259,7 +330,7 @@ class TabletSettings(private val a: MainActivity) {
         buttons("Save token" to {
             val t = token.text.toString().replace(Regex("\\s+"), "").removePrefix("Bearer") // pasted with spaces or as a header
             if (t.isEmpty()) a.toast("Paste the token first")
-            else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); a.toast("Token saved"); draw() }
+            else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); HeraldWidget.refresh(a, force = true); a.toast("Token saved"); draw() }
         })
 
         heading("Pro Launcher")

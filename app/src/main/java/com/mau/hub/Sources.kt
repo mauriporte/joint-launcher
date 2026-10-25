@@ -276,6 +276,58 @@ object Sources {
         return "${weatherIcon(c.getInt("weather_code"), c.optInt("is_day", 1) == 1)}  ${Math.round(c.getDouble("temperature_2m"))}°"
     }
 
+    /** The phone's weather panel: now, today, the next 12 hours and 5 days (Open-Meteo, the place's own time zone). */
+    class Forecast(
+        val temp: Int, val feels: Int, val humidity: Int, val wind: Int, val icon: String, val summary: String,
+        val high: Int, val low: Int, val rain: Int, val sunrise: String, val sunset: String,
+        val hours: List<Hour>, val days: List<Day>,
+    )
+    class Hour(val time: String, val icon: String, val temp: Int, val rain: Int)
+    class Day(val name: String, val icon: String, val high: Int, val low: Int, val rain: Int)
+
+    fun forecast(lat: Double, lon: Double, locale: Locale = Locale.getDefault()) = parseForecast(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+        "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day" +
+        "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=auto&forecast_days=6"), locale)
+
+    fun parseForecast(json: String, locale: Locale = Locale.getDefault()): Forecast {
+        val o = JSONObject(json)
+        val c = o.getJSONObject("current"); val h = o.getJSONObject("hourly"); val d = o.getJSONObject("daily")
+        fun JSONObject.ints(k: String) = optJSONArray(k)?.let { a -> (0 until a.length()).map { Math.round(a.optDouble(it, 0.0)).toInt() } }.orEmpty()
+        fun JSONObject.strs(k: String) = optJSONArray(k)?.let { a -> (0 until a.length()).map(a::getString) }.orEmpty()
+        val code = c.getInt("weather_code")
+        // the next 12 hours from now (times are local ISO strings, so they compare as text)
+        val times = h.strs("time"); val hTemp = h.ints("temperature_2m"); val hCode = h.ints("weather_code")
+        val hRain = h.ints("precipitation_probability"); val hDay = h.ints("is_day")
+        val from = times.indexOfFirst { it > c.getString("time") }.coerceAtLeast(0)
+        val hours = (from until minOf(times.size, from + 12)).map { i ->
+            Hour(times[i].substringAfter('T').substringBefore(':') + "h", weatherIcon(hCode.getOrElse(i) { 0 }, hDay.getOrElse(i) { 1 } == 1), hTemp.getOrElse(i) { 0 }, hRain.getOrElse(i) { 0 })
+        }
+        val dates = d.strs("time"); val dCode = d.ints("weather_code"); val hi = d.ints("temperature_2m_max"); val lo = d.ints("temperature_2m_min")
+        val dRain = d.ints("precipitation_probability_max")
+        val parse = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT); val dayName = SimpleDateFormat("EEEE", locale)
+        val days = (1 until dates.size).take(5).map { i ->
+            Day(runCatching { dayName.format(parse.parse(dates[i])!!).replaceFirstChar { it.uppercase(locale) } }.getOrDefault(dates[i]),
+                weatherIcon(dCode.getOrElse(i) { 0 }, true), hi.getOrElse(i) { 0 }, lo.getOrElse(i) { 0 }, dRain.getOrElse(i) { 0 })
+        }
+        return Forecast(
+            Math.round(c.getDouble("temperature_2m")).toInt(), Math.round(c.optDouble("apparent_temperature")).toInt(),
+            c.optInt("relative_humidity_2m"), Math.round(c.optDouble("wind_speed_10m")).toInt(), weatherIcon(code, c.optInt("is_day", 1) == 1), weatherText(code, locale.language == "es"),
+            hi.firstOrNull() ?: 0, lo.firstOrNull() ?: 0, dRain.firstOrNull() ?: 0,
+            d.strs("sunrise").firstOrNull()?.substringAfter('T').orEmpty(), d.strs("sunset").firstOrNull()?.substringAfter('T').orEmpty(),
+            hours, days,
+        )
+    }
+
+    /** WMO weather codes -> a few words, in English or Spanish (the cards' language, Settings). */
+    fun weatherText(code: Int, es: Boolean = false) = when (code) {
+        0 -> if (es) "Despejado" else "Clear"; 1 -> if (es) "Mayormente despejado" else "Mostly clear"
+        2 -> if (es) "Parcialmente nublado" else "Partly cloudy"; 3 -> if (es) "Nublado" else "Cloudy"; 45, 48 -> if (es) "Niebla" else "Fog"
+        in 51..57 -> if (es) "Llovizna" else "Drizzle"; in 61..67 -> if (es) "Lluvia" else "Rain"; in 71..77 -> if (es) "Nieve" else "Snow"
+        in 80..82 -> if (es) "Chubascos" else "Showers"; 85, 86 -> if (es) "Chubascos de nieve" else "Snow showers"
+        in 95..99 -> if (es) "Tormenta" else "Thunderstorm"; else -> ""
+    }
+
     /** WMO weather codes (what Open-Meteo returns) -> a small symbol. */
     fun weatherIcon(code: Int, day: Boolean) = when (code) {
         0 -> if (day) "☀️" else "🌙"
