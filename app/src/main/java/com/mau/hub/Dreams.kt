@@ -52,7 +52,7 @@ class ClockDream : DreamService() {
         weather = text(34f, Color.WHITE).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); gravity = Gravity.CENTER }
         block = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-            addView(clock); addView(weather, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(24) })
+            addView(clock, LinearLayout.LayoutParams(-2, -2)); addView(weather, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(24) })
         }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
