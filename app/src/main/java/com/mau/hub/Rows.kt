@@ -184,7 +184,7 @@ class Rows(private val a: MainActivity) {
             clipToOutline = true
             // a finger on the dashboard scrolls the dashboard, not Home
             setOnTouchListener { v, e -> if (e.action == android.view.MotionEvent.ACTION_DOWN) v.parent?.requestDisallowInterceptTouchEvent(true); false }
-            a.hub.pool.execute { val url = a.hub.haUrl(); a.hub.main.post { url?.let(::loadUrl) } }
+            a.hub.pool.execute { val url = Hub.haUrl(); a.hub.main.post { url?.let(::loadUrl) } }
         }
     }
 

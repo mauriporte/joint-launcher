@@ -21,18 +21,6 @@ class Hub(val ctx: Context) {
     val country = Locale.getDefault().country.ifEmpty { "US" }
     @Volatile var userId: String? = null
 
-    /** Home Assistant for the tablet's section: the home address when it answers (on the home Wi-Fi), else the public one. Off the UI thread. */
-    fun haUrl(): String? {
-        val local = BuildConfig.HA_LOCAL.takeIf { it.isNotEmpty() }
-        val answers = local != null && runCatching {
-            (java.net.URL(local).openConnection() as java.net.HttpURLConnection).run {
-                connectTimeout = 1500; readTimeout = 1500; requestMethod = "HEAD"
-                try { responseCode in 200..499 } finally { disconnect() }
-            }
-        }.getOrDefault(false)
-        return if (answers) local else BuildConfig.HA_REMOTE.takeIf { it.isNotEmpty() } ?: local
-    }
-
     fun jfUser() = userId ?: prefs.getString("uid", null) ?: Sources.jellyfinUser(server, jfKey).also { userId = it }
 
     // replace, not format(): search terms arrive URL-encoded ("%20h" would be read as a format specifier)
@@ -95,4 +83,18 @@ class Hub(val ctx: Context) {
         Sources.youtubeDiscover(youtubeSubs(gen).take(seeds).map { (it.play as Play.Link).uri.substringAfter("v=") }, subChannelIds().toSet(), country)
 
     fun shutdown() { pool.shutdownNow(); imagePool.shutdownNow(); diskPool.shutdownNow() }
+
+    companion object {
+        /** Home Assistant (HA section, MauHome widget): the home address when it answers (on the home Wi-Fi), else the public one. Off the UI thread. */
+        fun haUrl(): String? {
+            val local = BuildConfig.HA_LOCAL.takeIf { it.isNotEmpty() }
+            val answers = local != null && runCatching {
+                (java.net.URL(local).openConnection() as java.net.HttpURLConnection).run {
+                    connectTimeout = 1500; readTimeout = 1500; requestMethod = "HEAD"
+                    try { responseCode in 200..499 } finally { disconnect() }
+                }
+            }.getOrDefault(false)
+            return if (answers) local else BuildConfig.HA_REMOTE.takeIf { it.isNotEmpty() } ?: local
+        }
+    }
 }

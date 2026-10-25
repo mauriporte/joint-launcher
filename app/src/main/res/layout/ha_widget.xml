@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MauHome widget: title (tap to refresh), a problem line when HA can't be read, the tiles -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="6dp">
+    <TextView android:id="@+id/ha_title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:paddingStart="6dp" android:paddingTop="2dp" android:paddingBottom="8dp" android:paddingEnd="24dp"
+        android:text="MauHome" android:textColor="#FFF2F2F2" android:textSize="18sp" android:textStyle="bold" />
+    <TextView android:id="@+id/ha_msg" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:paddingStart="6dp" android:paddingBottom="6dp" android:textColor="#FFFF8A80" android:textSize="12sp"
+        android:visibility="gone" />
+    <GridView android:id="@+id/ha_grid" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:numColumns="4" android:stretchMode="columnWidth" android:horizontalSpacing="8dp"
+        android:verticalSpacing="8dp" android:scrollbars="none" />
+</LinearLayout>
