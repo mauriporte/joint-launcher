@@ -54,14 +54,10 @@ class PhoneHome(private val a: MainActivity) {
     val drawer = AllApps(a)
     val nowPanel = NowPanel(a)
     val weatherPanel = WeatherPanel(a)
-    // the remote icon with the name you gave it (Settings → Remotes) under it, small
-    private val remoteButtons = listOf(1, 2).map { n ->
-        LinearLayout(a).apply {
-            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; isClickable = true
-            addView(ImageView(a).apply { setImageResource(R.drawable.ic_remote); setColorFilter(Color.WHITE) }, LinearLayout.LayoutParams(a.dp(22), a.dp(22)))
-            addView(a.text(9f, TEXT_SOFT).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; gravity = Gravity.CENTER },
-                LinearLayout.LayoutParams(-1, -2))
-            setOnClickListener { (if (n == 1) a.remote1 else a.remote2).toggle(this) }
+    // one remote on each side of the clock, icon only (its name, from Settings → Remotes, is for TalkBack)
+    private val remoteButtons: List<ImageView> = listOf(1, 2).map { n ->
+        a.iconButton(R.drawable.ic_remote, "Remote $n") { (if (n == 1) a.remote1 else a.remote2).toggle(remoteButtons[n - 1]) }.apply {
+            setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
         }
     }
     private val musicButton: ImageView = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open(from = musicButton) }.apply {
@@ -75,15 +71,16 @@ class PhoneHome(private val a: MainActivity) {
             addView(FrameLayout(a).apply {
                 addView(clock, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
                 // top left, in the clock's margin: names/icons (like the tablet's and TV's button), and under it the music
-                // note that pops out Now Playing
+                // note that pops out Now Playing, then Remote 1
                 addView(LinearLayout(a).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(iconsButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                     addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
+                    addView(remoteButtons[0], LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                 }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
                 // right, in the clock's other margin: the weather; a tap pops out the forecast (hold still picks the weather app)
                 // right, in the clock's other margin: the weather (a tap pops out the forecast, hold picks the weather app)
-                // and under it the two remotes, each popping out its Joint Remote card
+                // and under it Remote 2 (Remote 1 is on the left), each popping out its Joint Remote card
                 addView(LinearLayout(a).apply {
                     orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
                     a.topBar.takeWeather()?.let { w ->
@@ -91,7 +88,7 @@ class PhoneHome(private val a: MainActivity) {
                         addView(w, LinearLayout.LayoutParams(-1, -2))
                         w.setOnClickListener { weatherPanel.open(from = w) }
                     }
-                    remoteButtons.forEach { addView(it, LinearLayout.LayoutParams(-1, a.dp(40))) }
+                    addView(remoteButtons[1], LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                 }, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
@@ -142,10 +139,7 @@ class PhoneHome(private val a: MainActivity) {
     fun render() {
         // the button shows what a tap switches to
         iconsButton.setImageResource(if (icons) R.drawable.ic_text_fields else R.drawable.ic_apps)
-        remoteButtons.forEachIndexed { i, b ->
-            val name = (if (i == 0) a.remote1 else a.remote2).name
-            ((b as LinearLayout).getChildAt(1) as TextView).text = name; b.contentDescription = name
-        }
+        remoteButtons.forEachIndexed { i, b -> b.contentDescription = (if (i == 0) a.remote1 else a.remote2).name }
         iconsButton.contentDescription = if (icons) "Names only on Home" else "Icons on Home"
         val cal = java.util.Calendar.getInstance()
         date.text = android.text.format.DateFormat.format("EEE d MMM", cal).toString().replaceFirstChar { it.uppercase() }
