@@ -29,7 +29,24 @@ import java.text.Collator
 class PhoneHome(private val a: MainActivity) {
     private val p get() = a.hub.prefs
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
-    private val dock = LinearLayout(a).apply { gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), a.dp(10)) }
+    // the shortcuts: up to 5 pages side by side; swipe the row sideways for the next one (it snaps to a page)
+    private val dock = LinearLayout(a)
+    private val dots = a.text(9f, TEXT_SOFT).apply { gravity = Gravity.CENTER; letterSpacing = 0.4f }
+    private val dockScroll = object : HorizontalScrollView(a) {
+        private var flung = false
+        override fun fling(velocityX: Int) { flung = true; snap(page() + if (velocityX > 0) 1 else -1) }
+        override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+            flung = false
+            val handled = super.onTouchEvent(e) // a quick swipe calls fling() from in here
+            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) snap(page())
+            return handled
+        }
+        fun page() = (scrollX + width / 2) / maxOf(1, width)
+        fun snap(p: Int) {
+            val target = p.coerceIn(0, maxOf(0, dock.childCount - 1))
+            smoothScrollTo(target * width, 0); showDots(target)
+        }
+    }.apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(dock) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
     private val clock = FlipClock(a, 72)
     private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { icons = !icons; render() }.apply {
@@ -55,7 +72,8 @@ class PhoneHome(private val a: MainActivity) {
                     setOnLongClickListener { a.actions.settings(); true } // hold empty space: Settings, as in Pro Launcher
                 })
             }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(dock, LinearLayout.LayoutParams(-1, a.dp(64)))
+            addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)))
+            addView(dots, LinearLayout.LayoutParams(-1, a.dp(14)).apply { bottomMargin = a.dp(6) })
         }, FrameLayout.LayoutParams(-1, -1))
         addView(drawer.view, FrameLayout.LayoutParams(-1, -1))
     }
@@ -72,8 +90,22 @@ class PhoneHome(private val a: MainActivity) {
     /** Home: "pkg" or "cat:<category>", one per line. */
     fun home(): List<String> = p.getString("phone_home", "").orEmpty().split('\n').filter { it.isNotEmpty() }
     fun setHome(keys: List<String>) = p.edit().putString("phone_home", keys.distinct().joinToString("\n")).apply()
-    fun dockApps(): List<String> = p.getString("phone_dock", "").orEmpty().split('\n').filter { it.isNotEmpty() }
-    fun setDock(keys: List<String>) = p.edit().putString("phone_dock", keys.distinct().joinToString("\n")).apply()
+    fun dockApps(): List<String> = (0 until DOCK_PAGES).flatMap(::dockPage)
+    /** Shortcut page i (0-4), left to right. Page 0 keeps the name the Pro Launcher import writes. */
+    fun dockPage(i: Int): List<String> = p.getString(dockKey(i), "").orEmpty().split('\n').filter { it.isNotEmpty() }
+    fun setDockPage(i: Int, keys: List<String>) = p.edit().putString(dockKey(i), keys.distinct().joinToString("\n")).apply()
+    private fun dockKey(i: Int) = if (i == 0) "phone_dock" else "phone_dock_$i"
+    fun removeFromDock(pkg: String) = (0 until DOCK_PAGES).forEach { i -> dockPage(i).let { if (pkg in it) setDockPage(i, it - pkg) } }
+
+    /** Asks which shortcut page to put an app on (the ones in use, plus the next empty one). */
+    fun addToDock(pkg: String) {
+        val used = (0 until DOCK_PAGES).count { dockPage(it).isNotEmpty() }
+        val pages = (0 until minOf(DOCK_PAGES, used + 1)).toList()
+        android.app.AlertDialog.Builder(a).setTitle("Add to which shortcut page?")
+            .setItems(pages.map { i -> "Page ${i + 1}" + dockPage(i).size.let { if (it == 0) " (new)" else " · $it apps" } }.toTypedArray()) { _, w ->
+                removeFromDock(pkg); setDockPage(pages[w], dockPage(pages[w]) + pkg); render()
+            }.show()
+    }
 
     fun render() {
         // the button shows what a tap switches to
@@ -88,8 +120,9 @@ class PhoneHome(private val a: MainActivity) {
             val entries = home().mapNotNull { k ->
                 if (k.startsWith("cat:")) k to k.removePrefix("cat:") else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
-            val shortcuts = dockApps().filter { it in byKey }
-            a.hub.main.post { fill(entries, byKey); fillDock(shortcuts) }
+            // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
+            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey } }.let { all -> all.take(maxOf(1, all.indexOfLast { it.isNotEmpty() } + 1)) }
+            a.hub.main.post { fill(entries, byKey); fillDock(pages) }
         }
     }
 
@@ -115,13 +148,12 @@ class PhoneHome(private val a: MainActivity) {
         }
     }
 
-    /** One line on Home: the name, with its LineX icon before it in icon mode. */
+    /** One line on Home: the name, or in icon mode the app's LineX icon instead of it (categories keep their name). */
     private fun entry(label: String, iconPkg: String?, category: Boolean) = LinearLayout(a).apply {
-        gravity = Gravity.CENTER // the row is as wide as the screen: centre the name (and icon) in it
-        setPadding(a.dp(20), a.dp(8), a.dp(20), a.dp(8))
-        background = a.bareButton(); isClickable = true
-        if (iconPkg != null) addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) },
-            LinearLayout.LayoutParams(a.dp(30), a.dp(30)).apply { marginEnd = a.dp(12) })
+        gravity = Gravity.CENTER // the row is as wide as the screen: centre the name (or icon) in it
+        setPadding(a.dp(20), a.dp(6), a.dp(20), a.dp(6))
+        background = a.bareButton(); isClickable = true; contentDescription = label // TalkBack still says the name
+        if (iconPkg != null) { addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40))); return@apply }
         addView(a.text(if (category) 22f else 21f, Color.WHITE).apply {
             text = label; letterSpacing = 0.03f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
@@ -129,24 +161,45 @@ class PhoneHome(private val a: MainActivity) {
         })
     }
 
-    private fun fillDock(keys: List<String>) {
+    private fun fillDock(pages: List<List<String>>) {
         dock.removeAllViews()
-        keys.forEach { pkg ->
-            dock.addView(ImageView(a).apply {
-                a.apps.iconInto(pkg, this)
-                setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
-                background = a.bareButton()
-                setOnClickListener { a.apps.launch(pkg) }
-                setOnLongClickListener {
-                    MoveMode.holdMenu(a, this, beside = false, listOf(
-                        "Move left" to { setDock(dockApps().toMutableList().apply { val i = indexOf(pkg); if (i > 0) { removeAt(i); add(i - 1, pkg) } }); render() },
-                        "Move right" to { setDock(dockApps().toMutableList().apply { val i = indexOf(pkg); if (i in 0 until size - 1) { removeAt(i); add(i + 1, pkg) } }); render() },
-                        "Remove from the shortcuts" to { setDock(dockApps() - pkg); render() },
-                    )); true
-                }
-            }, LinearLayout.LayoutParams(0, a.dp(52), 1f))
+        val w = dockScroll.width.takeIf { it > 0 } ?: a.resources.displayMetrics.widthPixels
+        pages.forEachIndexed { i, keys ->
+            dock.addView(LinearLayout(a).apply {
+                gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), 0)
+                keys.forEach { pkg -> addView(dockIcon(i, pkg), LinearLayout.LayoutParams(0, a.dp(52), 1f)) }
+            }, LinearLayout.LayoutParams(w, -1))
+        }
+        val now = dockScroll.page().coerceIn(0, pages.size - 1)
+        dockScroll.post { dockScroll.scrollTo(now * dockScroll.width, 0) }
+        showDots(now)
+    }
+
+    /** ● for the page shown, ○ for the others; nothing with a single page. */
+    private fun showDots(page: Int) {
+        val n = dock.childCount
+        dots.text = if (n < 2) "" else (0 until n).joinToString("") { if (it == page) "●" else "○" }
+    }
+
+    private fun dockIcon(page: Int, pkg: String) = ImageView(a).apply {
+        a.apps.iconInto(pkg, this)
+        setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
+        background = a.bareButton()
+        setOnClickListener { a.apps.launch(pkg) }
+        setOnLongClickListener {
+            fun move(by: Int) = setDockPage(page, dockPage(page).toMutableList().apply {
+                val i = indexOf(pkg); if (i + by in indices) { removeAt(i); add(i + by, pkg) }
+            })
+            MoveMode.holdMenu(a, this, beside = false, listOf(
+                "Move left" to { move(-1); render() },
+                "Move right" to { move(1); render() },
+                "Move to another page" to { addToDock(pkg) },
+                "Remove from the shortcuts" to { removeFromDock(pkg); render() },
+            )); true
         }
     }
+
+    companion object { const val DOCK_PAGES = 5 }
 
     fun appInfo(pkg: String) {
         runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))) }
@@ -267,7 +320,7 @@ class AllApps(private val a: MainActivity) {
         MoveMode.holdMenu(a, anchor, beside = false, listOf(
             (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - pkg else home.home() + pkg); home.render() },
             (if (pkg in home.dockApps()) "Remove from the shortcuts" else "Add to the shortcuts") to {
-                home.setDock(home.dockApps().let { if (pkg in it) it - pkg else it + pkg }); home.render()
+                if (pkg in home.dockApps()) { home.removeFromDock(pkg); home.render() } else home.addToDock(pkg)
             },
             "Category" to { pickCategory(app) },
             "Rename" to { a.apps.rename(a, app) { refresh(); home.render() } },

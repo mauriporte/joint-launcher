@@ -239,7 +239,7 @@ class TabletSettings(private val a: MainActivity) {
     private fun phone() {
         val home = a.phoneHome
         heading("Home")
-        line("Apps on Home", if (home.icons) "Icons (from the icon pack) and names" else "Names only (also the button at the top left of Home)") {
+        line("Apps on Home", if (home.icons) "Icons (from the icon pack)" else "Names only (also the button at the top left of Home)") {
             home.icons = !home.icons; a.refreshApps(); draw()
         }
         val drawerIcons = p.getBoolean("drawer_icons", false)
