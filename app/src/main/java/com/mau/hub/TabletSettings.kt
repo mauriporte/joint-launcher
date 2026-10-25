@@ -161,8 +161,10 @@ class TabletSettings(private val a: MainActivity) {
         buttons(
             "Back up to a file" to { a.saveFile("joint-launcher-backup.json", backup(p.all)) },
             "Restore from a file" to {
-                a.openFile { text ->
-                    runCatching { restore(text) }.onSuccess { values ->
+                a.openBytes { bytes ->
+                    // a .zip (it starts "PK") is Pro Launcher's backup, not ours: import it instead
+                    if (bytes.size > 1 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()) { importProLauncher(bytes); return@openBytes }
+                    runCatching { restore(bytes.toString(Charsets.UTF_8)) }.onSuccess { values ->
                         p.edit().apply {
                             values.forEach { (k, v) ->
                                 @Suppress("UNCHECKED_CAST")
@@ -207,15 +209,15 @@ class TabletSettings(private val a: MainActivity) {
         heading("Pro Launcher")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Pick its backup (.zip, from Pro Launcher → Settings → Backup): your Home list, app names, categories, hidden apps, shortcuts and swipe-left app come over." })
         buttons("Import from Pro Launcher" to {
-            a.openBytes { bytes ->
-                val r = runCatching { ProLauncherImport.read(bytes) }.getOrNull()
-                if (r == null) a.toast("That isn't a Pro Launcher backup")
-                else {
-                    ProLauncherImport.apply(a, r); a.refreshApps(); draw()
-                    a.toast("Imported: ${r.home.size} on Home, ${r.names.size} names, ${r.cats.size} apps in ${r.catOrder.size} categories")
-                }
-            }
+            a.openBytes(::importProLauncher)
         })
+    }
+
+    private fun importProLauncher(bytes: ByteArray) {
+        val r = runCatching { ProLauncherImport.read(bytes) }.getOrNull()
+        if (r == null) { a.toast("That isn't a Pro Launcher backup"); return }
+        ProLauncherImport.apply(a, r); a.refreshApps(); draw()
+        a.toast("Imported: ${r.home.size} on Home, ${r.names.size} names, ${r.cats.size} apps in ${r.catOrder.size} categories")
     }
 
     /** Your pictures side by side: tap one to use it, hold it for its portrait version or to remove it; + adds one. */
