@@ -352,8 +352,6 @@ class HaWidgetTest {
     private fun tile(name: String) = HaWidget.TILES.first { it.name == name }
 
     @Test fun tilesShowHomeAssistantStates() {
-        // a placeholder shows, grey, until it's wired to an entity
-        assertEquals("Sin asignar", HaWidget.look(tile("Regleta USB"), mapOf(st("switch.other", "on"))).status)
         val desk = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet_3"
         assertTrue(HaWidget.look(tile("Escritorio"), mapOf(st(desk, "on"))).on)
         assertEquals("Apagado", HaWidget.look(tile("Escritorio"), mapOf(st(desk, "off"))).status)
@@ -365,6 +363,12 @@ class HaWidgetTest {
         // not in HA, or unreachable: grey, never "on"
         assertEquals("No disponible", HaWidget.look(tile("TV"), mapOf(st("switch.other", "on"))).status)
         assertTrue(!HaWidget.look(tile("MauTV"), mapOf(st("media_player.mautv_2", "unavailable"))).on)
-        assertEquals(23, HaWidget.TILES.size)
+        // a single lamp, not a group
+        assertEquals("Encendida", HaWidget.look(tile("Lámpara Vestidor"), mapOf(st("light.salon_lampara_vestidor", "on"))).status)
+        // the servers and the strips feeding them ask before turning off; nothing else does
+        assertEquals(setOf("Regleta TV", "Regleta Oficina", "Server Mini", "PC Escritorio", "Regleta Monitor"), HaWidget.TILES.filter { it.guard != null }.map { it.name }.toSet())
+        // 20 Google Home favourites + 12 everyday + 4 cameras: 9 full rows of 4
+        assertEquals(36, HaWidget.TILES.size)
+        assertEquals(4, HaWidget.TILES.count { it.kind == HaTile.Kind.CAMERA })
     }
 }

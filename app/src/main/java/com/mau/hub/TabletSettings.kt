@@ -217,6 +217,21 @@ class TabletSettings(private val a: MainActivity) {
             })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
+        // the MauHome widget's Home Assistant token: typed here on the phone (the Connect page is for setting up another device)
+        heading("Home Assistant")
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "For the MauHome widget: paste a long-lived token (HA → your profile → Security → Long-lived access tokens). " +
+            if (p.contains("ha_token")) "A token is saved." else "No token yet." })
+        val token = EditText(a).apply {
+            hint = "Long-lived access token"; isSingleLine = true; textSize = 16f; setTextColor(Color.WHITE); setHintTextColor(TEXT_MUTED)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD // never shown on screen
+        }
+        list.addView(token)
+        buttons("Save token" to {
+            val t = token.text.toString().trim()
+            if (t.isEmpty()) a.toast("Paste the token first")
+            else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); a.toast("Token saved"); draw() }
+        })
+
         heading("Pro Launcher")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Pick its backup (.zip, from Pro Launcher → Settings → Backup): your Home list, app names, categories, hidden apps, shortcuts and swipe-left app come over." })
         buttons("Import from Pro Launcher" to {
