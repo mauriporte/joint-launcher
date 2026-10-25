@@ -253,6 +253,14 @@ class TopBar(private val a: MainActivity) {
 
     init { refreshWeather(); if (!a.hub.touch) applyClock() }
 
+    /** "⛅  17°" -> the icon, large, with "17°" under it: the phone's weather beside the clock. */
+    private fun phoneWeather(text: String?): CharSequence {
+        val icon = text?.substringBefore("  ")?.takeIf { "  " in text } ?: return text.orEmpty()
+        return android.text.SpannableString("$icon\n${text.substringAfter("  ")}").apply {
+            setSpan(android.text.style.RelativeSizeSpan(2.7f), 0, icon.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
     /** "⛅  17°" -> "17°  ⛅" with the icon larger, for the tablet corner card. */
     private fun tabletWeather(text: String?): CharSequence {
         val icon = text?.substringBefore("  ")?.takeIf { "  " in text } ?: return text.orEmpty()
@@ -325,7 +333,7 @@ class TopBar(private val a: MainActivity) {
                 }
                 Sources.weather(la, lo)
             }.getOrNull()
-            hub.main.post { weather.text = if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
+            hub.main.post { weather.text = if (a.hub.phone) phoneWeather(text) else if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
         }
         hub.main.removeCallbacks(weatherTimer) // Settings refreshes it right away; keep one timer
         hub.main.postDelayed(weatherTimer, 30 * 60_000L)

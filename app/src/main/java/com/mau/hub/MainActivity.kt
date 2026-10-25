@@ -451,6 +451,7 @@ class MainActivity : Activity() {
             detail.isShown -> detail.close()
             hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
             hub.phone && phoneHome.nowPanel.isOpen -> phoneHome.nowPanel.close()
+            hub.phone && phoneHome.weatherPanel.isOpen -> phoneHome.weatherPanel.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
             hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
@@ -471,7 +472,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
-        if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); return }
+        if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
     }

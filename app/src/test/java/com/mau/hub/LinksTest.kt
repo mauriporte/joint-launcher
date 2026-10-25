@@ -131,6 +131,20 @@ class SourcesTest {
         assertEquals("⛈️", Sources.weatherIcon(95, day = false))
     }
 
+    @Test fun forecastReadsOpenMeteo() {
+        val json = """{"current":{"time":"2026-10-25T14:15","temperature_2m":20.4,"apparent_temperature":19.6,"relative_humidity_2m":61,"wind_speed_10m":11.7,"weather_code":2,"is_day":1},
+            "hourly":{"time":["2026-10-25T13:00","2026-10-25T14:00","2026-10-25T15:00","2026-10-25T16:00"],"temperature_2m":[20,20.4,21.2,20],"weather_code":[2,2,61,3],"precipitation_probability":[0,0,40,10],"is_day":[1,1,1,1]},
+            "daily":{"time":["2026-10-25","2026-10-26","2026-10-27"],"weather_code":[2,61,0],"temperature_2m_max":[22.4,19,23],"temperature_2m_min":[14.6,13,12],"precipitation_probability_max":[40,80,0],"sunrise":["2026-10-25T07:12"],"sunset":["2026-10-25T17:49"]}}"""
+        val f = Sources.parseForecast(json, java.util.Locale.ENGLISH)
+        assertEquals(20, f.temp); assertEquals(20, f.feels); assertEquals(61, f.humidity); assertEquals(12, f.wind)
+        assertEquals("Partly cloudy", f.summary); assertEquals(22, f.high); assertEquals(15, f.low); assertEquals(40, f.rain)
+        assertEquals("07:12", f.sunrise); assertEquals("17:49", f.sunset)
+        // hours start after now (14:15): 15h and 16h
+        assertEquals(listOf("15h", "16h"), f.hours.map { it.time }); assertEquals(40, f.hours[0].rain); assertEquals("🌧️", f.hours[0].icon)
+        // days start tomorrow, by name
+        assertEquals(listOf("Monday", "Tuesday"), f.days.map { it.name }); assertEquals(80, f.days[0].rain); assertEquals(23, f.days[1].high)
+    }
+
     @Test fun weatherPlaceFromOpenMeteoGeocoder() {
         val json = """{"results":[{"name":"Valencia","latitude":39.47,"longitude":-0.38,"country":"Spain"}]}"""
         assertEquals(Triple("Valencia, Spain", 39.47, -0.38), Sources.parseGeocode(json))

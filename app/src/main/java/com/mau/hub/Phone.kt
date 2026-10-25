@@ -47,30 +47,36 @@ class PhoneHome(private val a: MainActivity) {
         }
     }.apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(dock) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
-    private val clock = FlipClock(a, 72)
+    private val clock = FlipClock(a, 144) // big: two cards fill most of the phone's width
     private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { icons = !icons; render() }.apply {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
     val drawer = AllApps(a)
     val nowPanel = NowPanel(a)
-    private val musicButton = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open() }.apply {
+    val weatherPanel = WeatherPanel(a)
+    private val musicButton: ImageView = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open(from = musicButton) }.apply {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
 
     val view: View = FrameLayout(a).apply {
         addView(LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
-            // top: weather on the right, the flip clock in the middle, the date under it; each opens its app (hold: pick another)
+            // top: the big flip clock in the middle, the date and weather under it; each opens its app (hold: pick another)
             addView(FrameLayout(a).apply {
                 addView(clock, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-                a.topBar.takeWeather()?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL)) }
-                // like the tablet's and TV's button: flips Home's list between names and icons
-                // top left: names/icons, and under it the music note that slides out Now Playing
+                // top left, in the clock's margin: names/icons (like the tablet's and TV's button), and under it the music
+                // note that pops out Now Playing
                 addView(LinearLayout(a).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(iconsButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                     addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
-                }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(12) })
+                }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
+                // right, in the clock's other margin: the weather; a tap pops out the forecast (hold still picks the weather app)
+                a.topBar.takeWeather()?.let { w ->
+                    (w as? TextView)?.apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) } // icon over the degrees
+                    addView(w, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
+                    w.setOnClickListener { weatherPanel.open(from = w) }
+                }
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -83,6 +89,7 @@ class PhoneHome(private val a: MainActivity) {
             addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)).apply { bottomMargin = a.dp(10) })
         }, FrameLayout.LayoutParams(-1, -1))
         addView(nowPanel.view, FrameLayout.LayoutParams(-1, -1))
+        addView(weatherPanel.view, FrameLayout.LayoutParams(-1, -1))
         addView(drawer.view, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -470,72 +477,89 @@ object ProLauncherImport {
 }
 
 /**
- * The phone's Now Playing, slid out from the left over Home by the music note: what any app is playing (cover, title,
- * artist, which app), with previous / play-pause / next. Tap the cover to open the app; tap outside, swipe left or
- * Back to slide it away. Reads media sessions, which Android only allows with notification access.
+ * A card over Home's whole top (clock, date, weather, the buttons) that pops out of the button you pressed and shrinks
+ * back into it: tap beside it, swipe it away or Back. Now Playing comes out of the music note, the forecast out of the
+ * weather.
  */
-class NowPanel(private val a: MainActivity) {
+open class PopPanel(protected val a: MainActivity) {
+    protected val panel = LinearLayout(a).apply {
+        setPadding(a.dp(16), a.dp(16), a.dp(16), a.dp(16))
+        background = GradientDrawable().apply { setColor(0xE6101012.toInt()); cornerRadius = a.dp(24).toFloat() }
+        isClickable = true // taps on it stay in it
+    }
+    val view: View = FrameLayout(a).apply {
+        setOnClickListener { close() } // a tap beside the panel puts it away
+        addView(panel, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { leftMargin = a.dp(8); rightMargin = a.dp(8); topMargin = a.dp(8) })
+        visibility = View.GONE
+    }
+    val isOpen get() = view.visibility == View.VISIBLE
+
+    protected open fun update() = Unit
+
+    /** Opens it growing out of [from]'s centre. */
+    fun open(from: View? = null) {
+        update()
+        if (isOpen) return
+        val inView = IntArray(2).also(view::getLocationOnScreen)
+        val btn = IntArray(2).also { from?.getLocationOnScreen(it) }
+        view.visibility = View.VISIBLE
+        panel.pivotX = btn[0] - inView[0] - a.dp(8) + (from?.width ?: 0) / 2f
+        panel.pivotY = btn[1] - inView[1] - a.dp(8) + (from?.height ?: 0) / 2f
+        panel.scaleX = 0.1f; panel.scaleY = 0.1f; panel.alpha = 0f
+        panel.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(240).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
+
+    fun close() {
+        if (!isOpen) return
+        panel.animate().scaleX(0.1f).scaleY(0.1f).alpha(0f).setDuration(180).setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction { view.visibility = View.GONE }.start()
+    }
+}
+
+/**
+ * The phone's Now Playing, out of the music note: what any app is playing (cover, title, artist, which app), with
+ * previous / play-pause / next. Tap the cover to open the app. Reads media sessions, which Android only allows with
+ * notification access.
+ */
+class NowPanel(a: MainActivity) : PopPanel(a) {
     private val art = ImageView(a).apply {
         scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true
         background = GradientDrawable().apply { cornerRadius = a.dp(16).toFloat(); setColor(0x22FFFFFF) }
     }
-    private val title = a.text(20f, Color.WHITE).apply {
+    private val title = a.text(18f, Color.WHITE).apply {
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
     }
-    private val artist = a.text(15f, TEXT_SOFT).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+    private val artist = a.text(14f, TEXT_SOFT).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
     private val source = a.text(12f, TEXT_MUTED)
     private val playPause = control("▶", "Play or pause") { c ->
         if (c.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING) c.transportControls.pause() else c.transportControls.play()
     }
     private val controls = LinearLayout(a).apply {
         gravity = Gravity.CENTER
-        addView(control("⏮", "Previous") { it.transportControls.skipToPrevious() }, LinearLayout.LayoutParams(0, a.dp(56), 1f))
-        addView(playPause, LinearLayout.LayoutParams(0, a.dp(56), 1f))
-        addView(control("⏭", "Next") { it.transportControls.skipToNext() }, LinearLayout.LayoutParams(0, a.dp(56), 1f))
+        addView(control("⏮", "Previous") { it.transportControls.skipToPrevious() }, LinearLayout.LayoutParams(0, a.dp(48), 1f))
+        addView(playPause, LinearLayout.LayoutParams(0, a.dp(48), 1f))
+        addView(control("⏭", "Next") { it.transportControls.skipToNext() }, LinearLayout.LayoutParams(0, a.dp(48), 1f))
     }
     private val access = a.button("Allow notification access") {
         runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
     }
-    private val panel = LinearLayout(a).apply {
-        orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(a.dp(24), a.dp(32), a.dp(24), a.dp(24))
-        val r = a.dp(24).toFloat()
-        background = GradientDrawable().apply { setColor(0xE6101012.toInt()); cornerRadii = floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f) }
-        isClickable = true // taps on it stay in it
-        addView(a.text(13f, TEXT_MUTED).apply { text = "Now playing"; letterSpacing = 0.1f }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = a.dp(16) })
-        addView(art, LinearLayout.LayoutParams(a.dp(240), a.dp(240)))
-        addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
-        addView(artist, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(4) })
-        addView(source, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(2) })
-        addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(16) })
-        addView(access, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(16) })
-    }
-    val view: View = FrameLayout(a).apply {
-        setOnClickListener { close() } // a tap beside the panel puts it away
-        addView(panel, FrameLayout.LayoutParams((a.resources.displayMetrics.widthPixels * 0.82).toInt(), -2, Gravity.START or Gravity.CENTER_VERTICAL))
-        visibility = View.GONE
-    }
-    val isOpen get() = view.visibility == View.VISIBLE
 
     init {
+        panel.gravity = Gravity.CENTER_VERTICAL
+        panel.addView(art, LinearLayout.LayoutParams(a.dp(132), a.dp(132)).apply { marginEnd = a.dp(16) })
+        panel.addView(LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(title, LinearLayout.LayoutParams(-1, -2))
+            addView(artist, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(2) })
+            addView(source, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(2) })
+            addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(6) })
+            addView(access, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
         art.setOnClickListener { a.nowPlaying.current?.let { c -> runCatching { c.sessionActivity?.send() ?: a.apps.launch(c.packageName) } } }
     }
 
-    fun open() {
-        update()
-        if (isOpen) return
-        view.visibility = View.VISIBLE
-        panel.translationX = -panel.layoutParams.width.toFloat()
-        panel.animate().translationX(0f).setDuration(220).start()
-    }
-
-    fun close() {
-        if (!isOpen) return
-        panel.animate().translationX(-panel.width.toFloat()).setDuration(200).withEndAction { view.visibility = View.GONE }.start()
-    }
-
     /** Fills it from the playing session; called on open and whenever playback changes. */
-    fun update() {
+    public override fun update() {
         val c = a.nowPlaying.current
         val allowed = a.nowPlaying.allowed
         access.visibility = if (allowed) View.GONE else View.VISIBLE
@@ -554,5 +578,73 @@ class NowPanel(private val a: MainActivity) {
     private fun control(glyph: String, label: String, act: (android.media.session.MediaController) -> Unit) = a.text(30f, Color.WHITE).apply {
         text = glyph; gravity = Gravity.CENTER; contentDescription = label; isClickable = true
         setOnClickListener { a.nowPlaying.current?.let(act) }
+    }
+}
+
+/**
+ * The forecast, out of the weather on Home: now (feels like, humidity, wind, rain), today's high and low, sunrise and
+ * sunset, the next 12 hours and the next 5 days. Open-Meteo, the place set in Settings (else found from the connection).
+ * "Weather app" opens the app picked for the weather.
+ */
+class WeatherPanel(a: MainActivity) : PopPanel(a) {
+    private val now = a.text(44f, Color.WHITE).apply { typeface = Typeface.create("sans-serif-light", Typeface.NORMAL) }
+    private val what = a.text(15f, Color.WHITE)
+    private val facts = a.text(13f, TEXT_SOFT).apply { setLineSpacing(0f, 1.2f) }
+    private val hours = LinearLayout(a)
+    private val days = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
+
+    init {
+        panel.orientation = LinearLayout.VERTICAL
+        panel.addView(LinearLayout(a).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(now, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = a.dp(16) })
+            addView(LinearLayout(a).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(what); addView(facts)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        })
+        panel.addView(android.widget.HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(hours) },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(12) })
+        panel.addView(days, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
+        panel.addView(a.text(13f, TEXT_MUTED).apply {
+            text = "Weather app ›"; gravity = Gravity.END; setPadding(0, a.dp(8), 0, 0); isClickable = true
+            setOnClickListener { a.hub.prefs.getString("opens_weather", null)?.takeIf(a.hub::installed)?.let { a.apps.launch(it); close() } ?: a.toast("Hold the weather on Home to pick its app") }
+        }, LinearLayout.LayoutParams(-1, -2))
+    }
+
+    override fun update() {
+        if (now.text.isNullOrEmpty()) what.text = "Loading the forecast…"
+        val hub = a.hub
+        hub.pool.execute {
+            val w = runCatching {
+                val lat = hub.prefs.getString("lat", null)?.toDouble(); val lon = hub.prefs.getString("lon", null)?.toDouble()
+                val (la, lo) = if (lat != null && lon != null) lat to lon else Sources.locate()
+                Sources.forecast(la, lo)
+            }.getOrNull()
+            hub.main.post { if (w != null) show(w) else what.text = "Can't get the forecast right now" }
+        }
+    }
+
+    private fun show(w: Sources.Forecast) {
+        now.text = "${w.temp}°"
+        what.text = "${w.icon}  ${w.summary}"
+        facts.text = "Feels ${w.feels}° · ↑${w.high}° ↓${w.low}°\nHumidity ${w.humidity}% · Wind ${w.wind} km/h · Rain ${w.rain}%\nSunrise ${w.sunrise} · Sunset ${w.sunset}"
+        hours.removeAllViews()
+        w.hours.forEach { h ->
+            hours.addView(a.text(13f, Color.WHITE).apply {
+                gravity = Gravity.CENTER; text = "${h.time}\n${h.icon}\n${h.temp}°" + if (h.rain > 0) "\n${h.rain}%" else ""
+                setLineSpacing(0f, 1.15f)
+            }, LinearLayout.LayoutParams(a.dp(52), -2))
+        }
+        days.removeAllViews()
+        w.days.forEach { d ->
+            days.addView(LinearLayout(a).apply {
+                gravity = Gravity.CENTER_VERTICAL; setPadding(0, a.dp(3), 0, a.dp(3))
+                addView(a.text(14f, Color.WHITE).apply { text = d.name }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(a.text(16f, Color.WHITE).apply { text = d.icon }, LinearLayout.LayoutParams(a.dp(36), -2))
+                addView(a.text(13f, TEXT_SOFT).apply { text = if (d.rain > 0) "${d.rain}%" else ""; gravity = Gravity.END }, LinearLayout.LayoutParams(a.dp(44), -2))
+                addView(a.text(14f, Color.WHITE).apply { text = "${d.high}° / ${d.low}°"; gravity = Gravity.END }, LinearLayout.LayoutParams(a.dp(84), -2))
+            })
+        }
     }
 }
