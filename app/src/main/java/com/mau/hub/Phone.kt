@@ -186,7 +186,6 @@ class AllApps(private val a: MainActivity) {
 
     val view: View = LinearLayout(a).apply {
         orientation = LinearLayout.VERTICAL
-        setBackgroundColor(0xF0050505.toInt())
         isClickable = true // touches stay in the drawer, not on Home under it
         addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(chips) },
             LinearLayout.LayoutParams(-1, a.dp(60)).apply { topMargin = a.dp(12) })
@@ -201,6 +200,8 @@ class AllApps(private val a: MainActivity) {
         search.setText("")
         refresh()
         if (isOpen) return
+        // see-through as much as Settings says (0 = clear, the wallpaper shows; 100 = black)
+        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 94) * 255 / 100, 5, 5, 5))
         view.visibility = View.VISIBLE
         view.translationY = a.window.decorView.height * 0.3f; view.alpha = 0f
         view.animate().translationY(0f).alpha(1f).setDuration(200).start()
@@ -294,9 +295,12 @@ class AllApps(private val a: MainActivity) {
         override fun getItemCount() = shown.size
         override fun onCreateViewHolder(parent: ViewGroup, type: Int): Holder {
             val icon = ImageView(a)
-            val label = a.text(19f, Color.WHITE).apply { typeface = Typeface.create("sans-serif", Typeface.NORMAL); letterSpacing = 0.02f }
+            val label = a.text(19f, Color.WHITE).apply {
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL); letterSpacing = 0.02f
+                setShadowLayer(10f, 0f, 1f, 0xCC000000.toInt()) // readable over the wallpaper when the list is see-through
+            }
             val row = LinearLayout(a).apply {
-                gravity = Gravity.CENTER_VERTICAL; setPadding(a.dp(28), a.dp(10), a.dp(20), a.dp(10))
+                gravity = Gravity.CENTER; setPadding(a.dp(20), a.dp(10), a.dp(20), a.dp(10)) // centred, like Home
                 background = a.bareButton(); isClickable = true; isLongClickable = true
                 addView(icon, LinearLayout.LayoutParams(a.dp(30), a.dp(30)).apply { marginEnd = a.dp(16) })
                 addView(label)

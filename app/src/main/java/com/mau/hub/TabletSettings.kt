@@ -74,7 +74,7 @@ class TabletSettings(private val a: MainActivity) {
         fun dimText(v: Int) { dimLabel.text = "Transparency: darken $v %" + when (v) { 0 -> " (wallpaper as it is)"; 100 -> " (black)"; else -> "" } }
         list.addView(dimLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
         list.addView(SeekBar(a).apply {
-            max = 100; progress = p.getInt("bg_dim", 60); dimText(progress)
+            max = 100; progress = p.getInt("bg_dim", if (hub.phone) 0 else 60); dimText(progress)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { dimText(v); p.edit().putInt("bg_dim", v).apply(); a.applyBackground() }
                 override fun onStartTrackingTouch(s: SeekBar) = Unit
@@ -204,6 +204,17 @@ class TabletSettings(private val a: MainActivity) {
             text = "Keyboard up when the app list opens"; textSize = 16f; setTextColor(Color.WHITE)
             isChecked = p.getBoolean("phone_keyboard", false)
             setOnCheckedChangeListener { _, on -> p.edit().putBoolean("phone_keyboard", on).apply() }
+        }, LinearLayout.LayoutParams(-1, a.dp(48)))
+        val drawerLabel = a.text(15f, TEXT_SOFT)
+        fun drawerText(v: Int) { drawerLabel.text = "App list (swipe up): darken $v %" + when (v) { 0 -> " (see-through)"; 100 -> " (black)"; else -> "" } }
+        list.addView(drawerLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
+        list.addView(SeekBar(a).apply {
+            max = 100; progress = p.getInt("drawer_dim", 94); drawerText(progress)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { drawerText(v); p.edit().putInt("drawer_dim", v).apply() }
+                override fun onStartTrackingTouch(s: SeekBar) = Unit
+                override fun onStopTrackingTouch(s: SeekBar) = Unit
+            })
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
         heading("Pro Launcher")
