@@ -239,8 +239,12 @@ class TabletSettings(private val a: MainActivity) {
     private fun phone() {
         val home = a.phoneHome
         heading("Home")
-        line("Apps on Home and in the list", if (home.icons) "Icons (from the icon pack) and names" else "Names only") {
+        line("Apps on Home", if (home.icons) "Icons (from the icon pack) and names" else "Names only (also the button at the top left of Home)") {
             home.icons = !home.icons; a.refreshApps(); draw()
+        }
+        val drawerIcons = p.getBoolean("drawer_icons", false)
+        line("Apps in the list (swipe up)", if (drawerIcons) "Icons and names" else "Names only") {
+            p.edit().putBoolean("drawer_icons", !drawerIcons).apply(); a.refreshApps(); draw()
         }
         list.addView(android.widget.Switch(a).apply {
             text = "Keyboard up when the app list opens"; textSize = 16f; setTextColor(Color.WHITE)

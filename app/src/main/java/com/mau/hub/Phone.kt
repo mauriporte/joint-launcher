@@ -32,6 +32,9 @@ class PhoneHome(private val a: MainActivity) {
     private val dock = LinearLayout(a).apply { gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), a.dp(10)) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
     private val clock = FlipClock(a, 72)
+    private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { icons = !icons; render() }.apply {
+        setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
+    }
     val drawer = AllApps(a)
 
     val view: View = FrameLayout(a).apply {
@@ -41,6 +44,8 @@ class PhoneHome(private val a: MainActivity) {
             addView(FrameLayout(a).apply {
                 addView(clock, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
                 a.topBar.takeWeather()?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL)) }
+                // like the tablet's and TV's button: flips Home's list between names and icons
+                addView(iconsButton, FrameLayout.LayoutParams(a.dp(44), a.dp(44), Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(12) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -71,6 +76,9 @@ class PhoneHome(private val a: MainActivity) {
     fun setDock(keys: List<String>) = p.edit().putString("phone_dock", keys.distinct().joinToString("\n")).apply()
 
     fun render() {
+        // the button shows what a tap switches to
+        iconsButton.setImageResource(if (icons) R.drawable.ic_text_fields else R.drawable.ic_apps)
+        iconsButton.contentDescription = if (icons) "Names only on Home" else "Icons on Home"
         val cal = java.util.Calendar.getInstance()
         date.text = android.text.format.DateFormat.format("EEE d MMM", cal).toString().replaceFirstChar { it.uppercase() }
         clock.timeZone = p.getString("clock_tz", null)
@@ -109,7 +117,7 @@ class PhoneHome(private val a: MainActivity) {
 
     /** One line on Home: the name, with its LineX icon before it in icon mode. */
     private fun entry(label: String, iconPkg: String?, category: Boolean) = LinearLayout(a).apply {
-        gravity = Gravity.CENTER_VERTICAL
+        gravity = Gravity.CENTER // the row is as wide as the screen: centre the name (and icon) in it
         setPadding(a.dp(20), a.dp(8), a.dp(20), a.dp(8))
         background = a.bareButton(); isClickable = true
         if (iconPkg != null) addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) },
@@ -311,9 +319,10 @@ class AllApps(private val a: MainActivity) {
         override fun onBindViewHolder(h: Holder, i: Int) {
             val app = shown[i]
             h.label.text = app.label
-            h.icon.visibility = if (home.icons) View.VISIBLE else View.GONE
+            val icons = a.hub.prefs.getBoolean("drawer_icons", false) // the app list's own choice; Home's button doesn't change it
+            h.icon.visibility = if (icons) View.VISIBLE else View.GONE
             h.icon.setImageDrawable(null)
-            if (home.icons) app.pkg?.let { a.apps.iconInto(it, h.icon) }
+            if (icons) app.pkg?.let { a.apps.iconInto(it, h.icon) }
             h.itemView.setOnClickListener { launch(app) }
             h.itemView.setOnLongClickListener { menu(it, app); true }
         }
