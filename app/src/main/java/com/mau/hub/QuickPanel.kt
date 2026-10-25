@@ -51,6 +51,8 @@ class QuickPanel(private val a: MainActivity) {
     }
 
     private fun draw() {
+        // the remote stays on the same button after a redraw (picking a sleep time), or starts on the first one
+        val was = (list.findFocus() as? android.widget.TextView)?.text?.toString()
         list.removeAllViews()
 
         val inputs = hdmiInputs()
@@ -81,6 +83,11 @@ class QuickPanel(private val a: MainActivity) {
         buttons("ADB debugging: ${if (adb) "on" else "off"}" to { adb(!adb) },
             "Screensaver now" to { dialog.dismiss(); open(Intent().setClassName("com.android.systemui", "com.android.systemui.Somnambulator")) },
             "All TV settings" to { open(Intent(Settings.ACTION_SETTINGS)) })
+
+        list.post {
+            val all = ArrayList<android.view.View>().also { list.addFocusables(it, android.view.View.FOCUS_DOWN) }
+            (all.firstOrNull { (it as? android.widget.TextView)?.text?.toString() == was } ?: all.firstOrNull())?.requestFocus()
+        }
     }
 
     /** The HDMI inputs as (input, its name on the TV, something plugged in), in port order. */
