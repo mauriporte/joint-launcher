@@ -100,6 +100,9 @@ class TabletSettings(private val a: MainActivity) {
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
         line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
         line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
+        if (!hub.touch) line("App lock", a.appLock.locked().size.let { n ->
+            (if (a.appLock.hasPin()) "PIN set" else "No PIN yet") + " · " + if (n == 0) "no apps locked: hold an app and choose Lock app" else "$n locked"
+        }) { a.appLock.changePin { a.toast("PIN saved"); draw() } }
 
         heading("Home")
         list.addView(android.widget.Switch(a).apply {
@@ -415,7 +418,7 @@ class TabletSettings(private val a: MainActivity) {
     companion object {
         // backups leave out sign-ins (secrets don't belong in a file on the tablet's storage) and what only means
         // something on this install (placed widgets, picture files, the widget being added)
-        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", "spotify_refresh", "google_client_secret",
+        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", AppLock.PIN, "spotify_refresh", "google_client_secret",
             "google_refresh", "widgets", "widget_pending", "bg_current")
         private fun backedUp(k: String) = k !in NOT_BACKED_UP && !k.startsWith("widget_size_") && !k.startsWith("wspan_") &&
             !k.startsWith("wpos_") && !k.startsWith("logo_")

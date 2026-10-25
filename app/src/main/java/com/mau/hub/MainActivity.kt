@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     val cards by lazy { Cards(this, images, apps, hub.touch) }
     val actions by lazy { Actions(this) }
     val profiles by lazy { Profiles(this) }
+    val appLock by lazy { AppLock(this) }
     lateinit var rows: Rows
     lateinit var sidebar: Sidebar
     lateinit var topBar: TopBar
@@ -375,11 +376,12 @@ class MainActivity : Activity() {
             lateinit var tile: LinearLayout
             fun menu() =
                 MoveMode.holdMenu(this, tile, beside = false,
-                    listOf("Open" to { app.pkg?.let(apps::launch) ?: Unit }) +
+                    listOf("Open" to { app.pkg?.let(actions::launch) ?: Unit }) +
                         (if (hub.touch || !favsOnly || desktopLocked()) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // Apps is A to Z; TV favorites: Move
                         (app.pkg?.let { pkg ->
                             listOf(
                                 (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
+                                (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
                                 // back from Settings → Hidden apps
                                 "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
                                 // Android asks you to confirm; the Apps section updates when you come back
@@ -390,7 +392,7 @@ class MainActivity : Activity() {
                         ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshApps() } }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
-            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(apps::launch) }) {
+            tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(actions::launch) }) {
                 // Favorites: hold and drag to put it somewhere else; hold and let go without moving for the menu
                 if (canDrag) { draggedMenu = ::menu; tile.startDragAndDrop(null, View.DragShadowBuilder(tile), tile, 0); tile.alpha = 0.3f } else menu()
             }

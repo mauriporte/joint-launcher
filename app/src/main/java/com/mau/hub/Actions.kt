@@ -13,7 +13,15 @@ class Actions(private val a: MainActivity) {
     // every title gets the info screen first; only app tiles open straight away
     fun click(item: Item) = if (item.source == Source.APP) open(item.play) else a.detail.show(item)
 
-    fun open(p: Play) {
+    /** Opens an app, after its PIN if it's locked (AppLock). */
+    fun launch(pkg: String) = a.appLock.guard(pkg) { a.apps.launch(pkg) }
+
+    /** Plays or opens [p]; a locked app (or Jellyfin, for what plays in our player) asks its PIN first. */
+    fun open(p: Play) = a.appLock.guard(when (p) {
+        is Play.App -> p.pkg; is Play.Link -> p.pkg; is Play.Jelly, is Play.JellyLive -> Links.JELLYFIN; is Play.StremioSearch -> Links.STREMIO
+    }) { openNow(p) }
+
+    private fun openNow(p: Play) {
         when (p) {
             is Play.App -> a.apps.launch(p.pkg)
             is Play.Jelly -> if (p.folder) a.apps.launch(Links.JELLYFIN) else a.startActivity(
@@ -48,7 +56,7 @@ class Actions(private val a: MainActivity) {
                 hub.pool.execute {
                     val id = runCatching { Sources.stremioFind(p.title, p.year, p.type) }.getOrNull()
                     hub.main.post {
-                        if (id != null) open(Play.Link(Links.stremioDetail(p.type, id), Links.STREMIO))
+                        if (id != null) openNow(Play.Link(Links.stremioDetail(p.type, id), Links.STREMIO))
                         else a.toast("Couldn't find “${p.title}” in Stremio")
                     }
                 }

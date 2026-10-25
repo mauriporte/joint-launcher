@@ -169,17 +169,20 @@ class TopBar(private val a: MainActivity) {
             }
             collapse.id = View.generateViewId(); tvCollapse = collapse
             addView(collapse)
-            addView(tabStrip)
-            addView(gear)
-            addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
+            // tabs and gear get the space that's left, scrolling sideways if they don't fit: the corner (avatar,
+            // weather, clock) keeps its place at the right edge
+            val tabsBox = android.widget.HorizontalScrollView(a).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL; addView(tabStrip); addView(gear) })
+            }
+            addView(tabsBox, LinearLayout.LayoutParams(0, -2, 1f))
             addView(avatar, LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(14) })
             addView(weather)
             addView(clock)
             fun step() = a.hub.prefs.getInt("topbar_fold_tv", if (a.hub.prefs.getBoolean("topbar_folded_tv", false)) 1 else 0)
             fun applyFold() {
                 val s = step()
-                tabStrip.visibility = if (s > 0) View.INVISIBLE else View.VISIBLE
-                gear.visibility = if (s > 0) View.INVISIBLE else View.VISIBLE
+                tabsBox.visibility = if (s > 0) View.INVISIBLE else View.VISIBLE
                 avatar.visibility = if (s > 1) View.INVISIBLE else View.VISIBLE
                 collapse.rotation = if (s == 2) 0f else 180f // ic_chevron points right: left = fold more, right = show all
                 collapse.contentDescription = when (s) { 0 -> "Hide the tabs"; 1 -> "Hide the profile too"; else -> "Show the top bar" }
