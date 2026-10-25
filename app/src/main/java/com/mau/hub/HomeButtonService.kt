@@ -19,7 +19,12 @@ class HomeButtonService : AccessibilityService() {
     // the app asks for a system action (lock the screen) by broadcast: this service runs in its own process
     private val asked = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (i.hasExtra("watch")) watched = i.getStringExtra("watch") else performGlobalAction(i.getIntExtra("action", 0))
+            if (!i.hasExtra("watch")) { performGlobalAction(i.getIntExtra("action", 0)); return }
+            // the launcher says this just before it opens the app, and the app's window can be reported before this arrives:
+            // put the strip up now (any other app coming up takes it down). Remembered for when Android restarts the service.
+            watched = i.getStringExtra("watch")
+            prefs(this@HomeButtonService).edit().putString("watched", watched).apply()
+            showStrip()
         }
     }
 
@@ -55,6 +60,7 @@ class HomeButtonService : AccessibilityService() {
 
     override fun onServiceConnected() {
         wanted(this, true)
+        watched = prefs(this).getString("watched", null)
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(asked, android.content.IntentFilter(ACTION), RECEIVER_NOT_EXPORTED)
         else registerReceiver(asked, android.content.IntentFilter(ACTION))
     }
@@ -81,6 +87,8 @@ class HomeButtonService : AccessibilityService() {
         // the shade or the keyboard opening over the app isn't leaving it
         val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty().substringBefore('/')
         if (pkg == "com.android.systemui" || pkg == ime) return
+        // our own strip appearing is a window of this app too: only Joint Launcher's Home screen counts as leaving the app
+        if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
         if (pkg == watched) showStrip() else hideStrip()
     }
     override fun onInterrupt() = Unit
