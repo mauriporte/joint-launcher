@@ -27,7 +27,10 @@ class IconPacks(private val hub: Hub) {
         if (p == NONE) null else p?.takeIf(hub::installed) ?: LINEX.takeIf(hub::installed)
     }
 
-    /** pack|name[|auto] you picked for this app by hand, if any; "auto" = recoloured in the app's own colour. */
+    /**
+     * pack|name[|auto|#RRGGBB] you picked for this app by hand, if any: "auto" = recoloured in the app's own colour,
+     * "#RRGGBB" = in that colour (e.g. Lords Mobile's red LineX target in grey).
+     */
     private fun override(pkg: String) = hub.prefs.getString("icon_$pkg", null)?.split('|')?.takeIf { it.size in 2..3 }
 
     fun setOverride(pkg: String, pack: String?, name: String?, appColour: Boolean = true) = hub.prefs.edit().apply {
@@ -65,7 +68,7 @@ class IconPacks(private val hub: Hub) {
         val d = drawable(pick[0], pick[1]) ?: return null
         // hand-picked and guessed icons take the app's colour (GeeSports' G stays yellow); a service that isn't
         // installed takes its brand colour (Filmin's F in green)
-        if (pick.getOrNull(2) == "auto") (if (hub.installed(pkg)) appColour(pkg) else brand)
+        if (pick.getOrNull(2) == "auto" || fixedColour(pick.getOrNull(2)) != null) (fixedColour(pick.getOrNull(2)) ?: if (hub.installed(pkg)) appColour(pkg) else brand)
             ?.let { d.mutate().colorFilter = android.graphics.PorterDuffColorFilter(it, android.graphics.PorterDuff.Mode.SRC_IN) }
         return d
     }
@@ -149,6 +152,10 @@ class IconPacks(private val hub: Hub) {
     companion object {
         const val LINEX = "com.jndapp.line.x.iconpack"
         const val NONE = "none" // icon_pack value for "the apps' own icons"
+
+        /** A pick's "#RRGGBB" colour as an opaque colour int; null for anything else ("auto", nothing). */
+        fun fixedColour(suffix: String?): Int? = suffix?.takeIf { Regex("#[0-9A-Fa-f]{6}").matches(it) }
+            ?.let { (0xFF000000L or it.substring(1).toLong(16)).toInt() }
 
         /** Our own apps keep their own icon with any pack (Joint Remote's is drawn in our style). A Change icon pick still wins. */
         private val OWN = setOf("com.mau.remote")
