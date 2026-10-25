@@ -54,6 +54,16 @@ class PhoneHome(private val a: MainActivity) {
     val drawer = AllApps(a)
     val nowPanel = NowPanel(a)
     val weatherPanel = WeatherPanel(a)
+    // the remote icon with the name you gave it (Settings → Remotes) under it, small
+    private val remoteButtons = listOf(1, 2).map { n ->
+        LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; isClickable = true
+            addView(ImageView(a).apply { setImageResource(R.drawable.ic_remote); setColorFilter(Color.WHITE) }, LinearLayout.LayoutParams(a.dp(22), a.dp(22)))
+            addView(a.text(9f, TEXT_SOFT).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; gravity = Gravity.CENTER },
+                LinearLayout.LayoutParams(-1, -2))
+            setOnClickListener { (if (n == 1) a.remote1 else a.remote2).toggle(this) }
+        }
+    }
     private val musicButton: ImageView = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open(from = musicButton) }.apply {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
@@ -72,11 +82,17 @@ class PhoneHome(private val a: MainActivity) {
                     addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                 }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
                 // right, in the clock's other margin: the weather; a tap pops out the forecast (hold still picks the weather app)
-                a.topBar.takeWeather()?.let { w ->
-                    (w as? TextView)?.apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) } // icon over the degrees
-                    addView(w, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
-                    w.setOnClickListener { weatherPanel.open(from = w) }
-                }
+                // right, in the clock's other margin: the weather (a tap pops out the forecast, hold picks the weather app)
+                // and under it the two remotes, each popping out its Joint Remote card
+                addView(LinearLayout(a).apply {
+                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+                    a.topBar.takeWeather()?.let { w ->
+                        (w as? TextView)?.apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0) } // icon over the degrees
+                        addView(w, LinearLayout.LayoutParams(-1, -2))
+                        w.setOnClickListener { weatherPanel.open(from = w) }
+                    }
+                    remoteButtons.forEach { addView(it, LinearLayout.LayoutParams(-1, a.dp(40))) }
+                }, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -94,7 +110,7 @@ class PhoneHome(private val a: MainActivity) {
     }
 
     init {
-        nowPanel.coverTo = date; weatherPanel.coverTo = date
+        nowPanel.coverTo = date; weatherPanel.coverTo = date; a.remote1.coverTo = date; a.remote2.coverTo = date
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
     }
@@ -126,6 +142,10 @@ class PhoneHome(private val a: MainActivity) {
     fun render() {
         // the button shows what a tap switches to
         iconsButton.setImageResource(if (icons) R.drawable.ic_text_fields else R.drawable.ic_apps)
+        remoteButtons.forEachIndexed { i, b ->
+            val name = (if (i == 0) a.remote1 else a.remote2).name
+            ((b as LinearLayout).getChildAt(1) as TextView).text = name; b.contentDescription = name
+        }
         iconsButton.contentDescription = if (icons) "Names only on Home" else "Icons on Home"
         val cal = java.util.Calendar.getInstance()
         date.text = android.text.format.DateFormat.format("EEE d MMM", cal).toString().replaceFirstChar { it.uppercase() }

@@ -230,7 +230,7 @@ class TabletSettings(private val a: MainActivity) {
                         else {
                             val field = EditText(a).apply { setText(r.name); isSingleLine = true; setTextColor(Color.WHITE) }
                             AlertDialog.Builder(a).setTitle("Button name").setView(field)
-                                .setPositiveButton("Save") { _, _ -> p.edit().putString("remote_name_${r.n}", field.text.toString().trim()).apply(); a.topBar.refreshRemotes(); draw() }
+                                .setPositiveButton("Save") { _, _ -> p.edit().putString("remote_name_${r.n}", field.text.toString().trim()).apply(); a.topBar.refreshRemotes(); a.refreshApps(); draw() }
                                 .setNegativeButton("Cancel", null).show()
                         }
                     }.show()
