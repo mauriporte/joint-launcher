@@ -160,7 +160,11 @@ class MainActivity : Activity() {
         (hub.touch && gestures.onTouch(e) { super.dispatchTouchEvent(it) }) || super.dispatchTouchEvent(e)
 
     // widgets only update while the screen is showing
-    override fun onStart() { super.onStart(); if (hub.touch) { widgets.start(); topBar.applyCornerClock() } }
+    override fun onStart() {
+        super.onStart()
+        if (hub.touch) { widgets.start(); topBar.applyCornerClock() }
+        if (hub.touch && !hub.phone) topBar.refreshRemotes() // the remotes' devices may have changed in Joint Remote
+    }
     override fun onStop() { super.onStop(); if (hub.touch) widgets.stop() }
 
     /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
