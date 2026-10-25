@@ -266,10 +266,18 @@ class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
 
     init {
         panel.orientation = LinearLayout.VERTICAL
+        // a small arrow on the card's outer edge (the side it comes out on) puts it away, pinned or not
+        val shut = ImageView(a).apply {
+            setImageResource(R.drawable.ic_chevron); setColorFilter(TEXT_SOFT); background = a.bareButton()
+            setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8)); rotation = if (n == 1) 180f else 0f // ic_chevron points right
+            contentDescription = "Put it away"; setOnClickListener { close() }
+        }
         panel.addView(LinearLayout(a).apply {
             gravity = Gravity.CENTER_VERTICAL
+            if (n == 1) addView(shut, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
             addView(title, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = a.dp(6) })
             addView(pin, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
+            if (n == 2) addView(shut, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
         })
         panel.addView(holder, LinearLayout.LayoutParams(-1, -2))
         view.setOnClickListener { if (!pinned) close() }
