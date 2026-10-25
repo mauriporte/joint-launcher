@@ -61,7 +61,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         HomeButtonService.restore(this)
-        heroImg = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+        heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD); letterSpacing = -0.01f
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setShadowLayer(12f, 0f, 2f, 0x99000000.toInt())
@@ -106,9 +106,9 @@ class MainActivity : Activity() {
             root = this
             setBackgroundColor(BG)
             if (!touch) {
-                addView(heroImg, FrameLayout.LayoutParams(-1, dp(320), Gravity.END).apply { leftMargin = dp(300) })
-                addView(View(this@MainActivity).apply { background = fade() }, FrameLayout.LayoutParams(-1, -1))
-                addView(View(this@MainActivity).apply { background = fadeDown() }, FrameLayout.LayoutParams(-1, dp(320)))
+                // the picture fades out at its left and bottom edges by itself (FadedImage), so it melts into whatever is
+                // behind it (black or your background) instead of ending in a hard line
+                addView(heroImg, FrameLayout.LayoutParams(-1, dp(360), Gravity.END).apply { leftMargin = dp(300) })
             }
             // Android 15 draws apps under the status and navigation bars (tablets, phones); keep clear of them. TVs have none.
             if (android.os.Build.VERSION.SDK_INT >= 30) setOnApplyWindowInsetsListener { v, insets ->

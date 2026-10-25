@@ -127,7 +127,7 @@ class TopBar(private val a: MainActivity) {
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
             addView(weather)
             addView(tvClock.apply {
-                format24Hour = "HH:mm"; format12Hour = "h:mm"
+                format24Hour = "HH:mm"; format12Hour = "HH:mm" // always 24-hour
                 textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             })
         }
@@ -195,14 +195,13 @@ class TopBar(private val a: MainActivity) {
         titlesButton.contentDescription = if (on) "Hide section titles" else "Show section titles"
     }
 
-    /** Settings' time format (device / 24 / 12 hour) and timezone (device's unless picked) on the flip clock. */
+    /** Clocks are always 24-hour; Settings' timezone (the device's unless picked) applies to them. */
     fun applyClock() {
-        val f = a.hub.prefs.getString("clock_format", null)
         val tz = a.hub.prefs.getString("clock_tz", null)
-        clocks.firstOrNull()?.apply { format24Hour = if (f == "12") "hh" else "HH"; format12Hour = if (f == "24") "HH" else "hh" }
+        clocks.firstOrNull()?.apply { format24Hour = "HH"; format12Hour = "HH" } // always 24-hour
         clocks.forEach { it.timeZone = tz }
         if (!a.hub.touch) tvClock.apply {
-            format24Hour = if (f == "12") "h:mm a" else "HH:mm"; format12Hour = if (f == "24") "HH:mm" else "h:mm a"; timeZone = tz
+            format24Hour = "HH:mm"; format12Hour = "HH:mm"; timeZone = tz // always 24-hour
         }
     }
 

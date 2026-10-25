@@ -166,13 +166,11 @@ class TabletSettings(private val a: MainActivity) {
         )
 
         heading("Clock")
-        val format = p.getString("clock_format", null)
         val cornerSet = p.getInt("corner_widget", -1) >= 0
         if (hub.touch) line("Corner clock", if (cornerSet) "A widget (tap Change to pick another or go back)" else "Built-in") {
             val opts = arrayOf("Built-in clock", "Pick a widget (e.g. Flip Clock)")
             AlertDialog.Builder(a).setTitle("Corner clock").setItems(opts) { _, i -> if (i == 0) a.widgets.clearCorner() else a.widgets.pick(forCorner = true); draw() }.show()
         }
-        line("Time format", when (format) { "24" -> "24-hour (17:30)"; "12" -> "12-hour (05:30)"; else -> "Like the $device" }) { timeFormat(format) }
         val tz = p.getString("clock_tz", null)
         line("Timezone", tz?.replace('_', ' ') ?: "Like the $device (${TimeZone.getDefault().id.replace('_', ' ')})") { timezone(tz) }
 
@@ -304,14 +302,6 @@ class TabletSettings(private val a: MainActivity) {
             }
             .setNeutralButton("Default") { _, _ -> p.edit().remove("section_name_$key").apply(); a.loadHome(); draw() }
             .setNegativeButton("Cancel", null).show()
-    }
-
-    private fun timeFormat(current: String?) {
-        val values = listOf(null, "24", "12")
-        AlertDialog.Builder(a).setTitle("Time format")
-            .setSingleChoiceItems(arrayOf("Like the $device", "24-hour (17:30)", "12-hour (05:30)"), values.indexOf(current)) { d, i ->
-                p.edit().putString("clock_format", values[i]).apply(); a.topBar.applyClock(); d.dismiss(); draw()
-            }.show()
     }
 
     private fun timezone(current: String?) {

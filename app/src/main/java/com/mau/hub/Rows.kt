@@ -57,6 +57,8 @@ class Rows(private val a: MainActivity) {
         // TV keeps its safe margins; the tablet has no overscan, so less space at the sides
         if (a.hub.touch) setPadding(a.dp(8), 0, a.dp(12), a.dp(40)) else setPadding(a.dp(28), 0, a.dp(36), a.dp(40))
         isVerticalScrollBarEnabled = false
+        // rows scrolling up under the title fade out instead of being cut off flat
+        isVerticalFadingEdgeEnabled = true; setFadingEdgeLength(a.dp(48))
     }
 
     private val adapter get() = view.adapter as RowsAdapter

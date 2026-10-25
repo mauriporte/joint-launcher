@@ -100,5 +100,21 @@ internal fun Context.pill(label: String) = text(13f, Color.WHITE).apply {
     layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
 }
 
+/** An image that fades to transparent towards its left and bottom edges (the TV's title art behind the rows). */
+internal class FadedImage(c: Context) : ImageView(c) {
+    private val paint = android.graphics.Paint().apply { xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN) }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        val w = width.toFloat(); val h = height.toFloat()
+        val layer = canvas.saveLayer(0f, 0f, w, h, null)
+        super.onDraw(canvas)
+        // keep the picture where both masks are opaque: fully from 45% across and down to 35% from the bottom, gone at the edges
+        paint.shader = android.graphics.LinearGradient(0f, 0f, w * 0.45f, 0f, 0x00000000, 0xFF000000.toInt(), android.graphics.Shader.TileMode.CLAMP)
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = android.graphics.LinearGradient(0f, h * 0.35f, 0f, h, 0xFF000000.toInt(), 0x00000000, android.graphics.Shader.TileMode.CLAMP)
+        canvas.drawRect(0f, 0f, w, h, paint)
+        canvas.restoreToCount(layer)
+    }
+}
+
 internal fun fade() = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(BG, 0xEB050505.toInt(), 0x00050505))
-internal fun fadeDown() = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00050505, 0x00050505, BG))
