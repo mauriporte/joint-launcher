@@ -255,7 +255,7 @@ class TabletSettings(private val a: MainActivity) {
         fun drawerText(v: Int) { drawerLabel.text = "App list (swipe up): darken $v %" + when (v) { 0 -> " (see-through)"; 100 -> " (black)"; else -> "" } }
         list.addView(drawerLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })
         list.addView(SeekBar(a).apply {
-            max = 100; progress = p.getInt("drawer_dim", 94); drawerText(progress)
+            max = 100; progress = p.getInt("drawer_dim", 15); drawerText(progress)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, v: Int, user: Boolean) { drawerText(v); p.edit().putInt("drawer_dim", v).apply() }
                 override fun onStartTrackingTouch(s: SeekBar) = Unit

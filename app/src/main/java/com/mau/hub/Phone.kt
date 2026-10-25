@@ -262,7 +262,7 @@ class AllApps(private val a: MainActivity) {
         refresh()
         if (isOpen) return
         // see-through as much as Settings says (0 = clear, the wallpaper shows; 100 = black)
-        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 94) * 255 / 100, 5, 5, 5))
+        view.setBackgroundColor(android.graphics.Color.argb(a.hub.prefs.getInt("drawer_dim", 15) * 255 / 100, 5, 5, 5))
         view.visibility = View.VISIBLE
         view.translationY = a.window.decorView.height * 0.3f; view.alpha = 0f
         view.animate().translationY(0f).alpha(1f).setDuration(200).start()
