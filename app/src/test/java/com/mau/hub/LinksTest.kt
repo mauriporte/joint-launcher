@@ -403,3 +403,39 @@ class ProfilesTest {
         org.junit.Assert.assertEquals(listOf("u1" to "Mau", "u3" to "Guest"), p.map { it.id to it.name })
     }
 }
+
+class HaTilesTest {
+    @Test fun tilesSurviveSavingAndLoading() {
+        val back = HaWidget.fromJson(HaWidget.toJson(HaWidget.TILES))
+        assertEquals(HaWidget.TILES, back) // names, icons, kinds, strips' outlets and warnings all come back
+    }
+
+    @Test fun aNewTileGuessesFromTheDevice() {
+        assertEquals(HaTile.Kind.LIGHT, HaWidget.guess("light.salon").first)
+        assertEquals(HaTile.Kind.CAMERA, HaWidget.guess("camera.entrada").first)
+        assertEquals(HaTile.Kind.RUN, HaWidget.guess("scene.cine").first)
+        assertEquals(HaTile.Kind.SWITCH, HaWidget.guess("input_boolean.guests").first)
+    }
+}
+
+class HeraldWidgetTest {
+    private val sensor = org.json.JSONObject("""{"state":"Quiet night at home","attributes":{"edition":12,"published":"2026-10-24T15:53:39+02:00",
+        "subhead":"All servers up","headline_es":"Noche tranquila en casa","briefs":["One","Two"],"watch":"Nothing urgent.",
+        "numbers":{"devices_online":41,"servers_up":3,"servers_total":3,"lights_on":2,"weather":"Cloudy","temperature":17.5}}}""")
+
+    @Test fun editionInBothLanguages() {
+        val en = HeraldWidget.page(sensor, es = false)
+        assertEquals("Quiet night at home", en.headline)
+        assertEquals("No. 12", en.no)
+        assertEquals("Saturday, 24 October 2026", en.date)
+        assertEquals("Morning edition · 15:53", en.edition)
+        assertEquals(listOf("41" to "devices online", "3/3" to "servers up", "2" to "lights on", "17.5°C" to "Cloudy"), en.kpis)
+        assertEquals("• One\n• Two", en.briefs)
+        val es = HeraldWidget.page(sensor, es = true)
+        assertEquals("Noche tranquila en casa", es.headline)
+        assertEquals("All servers up", es.subhead) // no subhead_es: the English one
+        assertEquals("sábado, 24 de octubre de 2026", es.date)
+        assertEquals("Nº 12", es.no)
+        assertEquals("Heraldo del Hogar", es.masthead)
+    }
+}

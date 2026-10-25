@@ -1,6 +1,5 @@
 package com.mau.hub
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -66,15 +65,19 @@ internal class FlipCard(c: Context) : View(c) {
         if (text == now) return
         before = if (animate && now.isNotEmpty()) now else text
         now = text
-        if (before == now) { progress = 1f; invalidate(); return }
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 600
-            addUpdateListener { progress = it.animatedValue as Float; invalidate() }
-            start()
-        }
+        progress = if (before == now) 1f else 0f
+        flipStart = android.os.SystemClock.uptimeMillis()
+        invalidate()
     }
 
+    // timed by hand, frame by frame: a ValueAnimator jumps straight to the end when the device's animations are off (the tablet's are)
+    private var flipStart = 0L
+
     override fun onDraw(canvas: Canvas) {
+        if (progress < 1f) {
+            progress = ((android.os.SystemClock.uptimeMillis() - flipStart) / 600f).coerceIn(0f, 1f)
+            if (progress < 1f) postInvalidateOnAnimation()
+        }
         val w = width.toFloat(); val h = height.toFloat(); val mid = h / 2
         digits.textSize = h * 0.7f
         val baseline = mid - (digits.descent() + digits.ascent()) / 2

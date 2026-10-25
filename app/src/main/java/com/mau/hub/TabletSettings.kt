@@ -124,6 +124,7 @@ class TabletSettings(private val a: MainActivity) {
 
         if (!hub.phone) {
         heading("Home")
+        if (hub.touch) line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(android.widget.Switch(a).apply {
             text = "Show section titles (off: their icons instead)"; textSize = 16f; setTextColor(Color.WHITE)
             isChecked = p.getBoolean("section_titles", true)
@@ -265,6 +266,7 @@ class TabletSettings(private val a: MainActivity) {
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
         // the MauHome widget's Home Assistant token: typed here on the phone (the Connect page is for setting up another device)
         heading("Home Assistant")
+        line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "For the MauHome widget: paste a long-lived token (HA → your profile → Security → Long-lived access tokens). " +
             if (p.contains("ha_token")) "A token is saved." else "No token yet." })
         val token = EditText(a).apply {
@@ -276,7 +278,7 @@ class TabletSettings(private val a: MainActivity) {
         buttons("Save token" to {
             val t = token.text.toString().replace(Regex("\\s+"), "").removePrefix("Bearer") // pasted with spaces or as a header
             if (t.isEmpty()) a.toast("Paste the token first")
-            else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); a.toast("Token saved"); draw() }
+            else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); HeraldWidget.refresh(a, force = true); a.toast("Token saved"); draw() }
         })
 
         heading("Pro Launcher")
