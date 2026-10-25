@@ -31,7 +31,6 @@ class PhoneHome(private val a: MainActivity) {
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
     // the shortcuts: up to 5 pages side by side; swipe the row sideways for the next one (it snaps to a page)
     private val dock = LinearLayout(a)
-    private val dots = a.text(9f, TEXT_SOFT).apply { gravity = Gravity.CENTER; letterSpacing = 0.4f }
     private val dockScroll = object : HorizontalScrollView(a) {
         private var flung = false
         override fun fling(velocityX: Int) { flung = true; snap(page() + if (velocityX > 0) 1 else -1) }
@@ -44,7 +43,7 @@ class PhoneHome(private val a: MainActivity) {
         fun page() = (scrollX + width / 2) / maxOf(1, width)
         fun snap(p: Int) {
             val target = p.coerceIn(0, maxOf(0, dock.childCount - 1))
-            smoothScrollTo(target * width, 0); showDots(target)
+            smoothScrollTo(target * width, 0)
         }
     }.apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(dock) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
@@ -72,8 +71,7 @@ class PhoneHome(private val a: MainActivity) {
                     setOnLongClickListener { a.actions.settings(); true } // hold empty space: Settings, as in Pro Launcher
                 })
             }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)))
-            addView(dots, LinearLayout.LayoutParams(-1, a.dp(14)).apply { bottomMargin = a.dp(6) })
+            addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)).apply { bottomMargin = a.dp(10) })
         }, FrameLayout.LayoutParams(-1, -1))
         addView(drawer.view, FrameLayout.LayoutParams(-1, -1))
     }
@@ -179,13 +177,6 @@ class PhoneHome(private val a: MainActivity) {
         }
         val now = dockScroll.page().coerceIn(0, pages.size - 1)
         dockScroll.post { dockScroll.scrollTo(now * dockScroll.width, 0) }
-        showDots(now)
-    }
-
-    /** ● for the page shown, ○ for the others; nothing with a single page. */
-    private fun showDots(page: Int) {
-        val n = dock.childCount
-        dots.text = if (n < 2) "" else (0 until n).joinToString("") { if (it == page) "●" else "○" }
     }
 
     private fun dockIcon(page: Int, pkg: String) = ImageView(a).apply {
