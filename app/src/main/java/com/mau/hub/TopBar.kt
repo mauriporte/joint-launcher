@@ -15,6 +15,7 @@ class TopBar(private val a: MainActivity) {
     private val tabStrip = LinearLayout(a).apply { gravity = Gravity.CENTER_VERTICAL }
     // before the bar is built below (init starts the weather timer); the Xperia-style flip clock: 58 dp cards on the
     // tablet's tall corner, 30 dp on the TV's slim bar
+    private var tvCollapse: View? = null // the TV's fold arrow, for the bar's focus chain
     private val clock = FlipClock(a, if (a.hub.touch) 58 else 30)
     // tablet corner: the built-in clock, or a widget you picked for it (Settings → Clock), e.g. Flip Clock's real flip clock
     private val corner = android.widget.FrameLayout(a)
@@ -122,11 +123,29 @@ class TopBar(private val a: MainActivity) {
             search.setOnKeyListener(null) // Left now goes to the padlock and the icon
             search.setOnClickListener { a.sidebar.focus(Sidebar.SEARCH) }
             addView(search)
+            // arrow: hides the tabs and the gear (weather and clock stay); remembered. Hidden while the desktop is locked
+            val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply {
+                layoutParams = LinearLayout.LayoutParams(a.dp(32), a.dp(32)).apply { marginEnd = a.dp(8) }
+                setPadding(a.dp(7), a.dp(7), a.dp(7), a.dp(7)); background = iconBackground()
+            }
+            collapse.id = View.generateViewId(); tvCollapse = collapse
+            addView(collapse)
             addView(tabStrip)
             addView(gear)
             addView(View(a), LinearLayout.LayoutParams(0, 0, 1f))
             addView(weather)
             addView(clock)
+            fun applyFold() {
+                val folded = a.hub.prefs.getBoolean("topbar_folded_tv", false)
+                tabStrip.visibility = if (folded) View.INVISIBLE else View.VISIBLE
+                gear.visibility = if (folded) View.INVISIBLE else View.VISIBLE
+                collapse.rotation = if (folded) 0f else 180f // ic_chevron points right: left = hide, right = show
+                collapse.contentDescription = if (folded) "Show the top bar" else "Hide the top bar"
+                collapse.visibility = if (a.desktopLocked()) View.GONE else View.VISIBLE
+            }
+            collapse.setOnClickListener { a.hub.prefs.edit().putBoolean("topbar_folded_tv", !a.hub.prefs.getBoolean("topbar_folded_tv", false)).apply(); applyFold() }
+            lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); applyFold(); a.loadHome() }
+            applyFold()
         }
     }
 
@@ -234,8 +253,10 @@ class TopBar(private val a: MainActivity) {
         }
         // the default focus search jumped from the search icon down into the rows; chain the bar explicitly
         val first = tabStrip.getChildAt(0) ?: return
-        search.nextFocusRightId = first.id
-        first.nextFocusLeftId = search.id
+        // TV: search -> fold arrow -> first tab
+        val before = tvCollapse?.also { search.nextFocusRightId = it.id; it.nextFocusLeftId = search.id } ?: search
+        before.nextFocusRightId = first.id
+        first.nextFocusLeftId = before.id
         val last = tabStrip.getChildAt(tabStrip.childCount - 1)
         last.nextFocusRightId = gear.id
         gear.nextFocusLeftId = last.id
