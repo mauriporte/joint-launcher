@@ -199,10 +199,19 @@ row order and the content parsers.
 
 ## Not done / known gaps
 
-- Widgets need adding again in the new app (Mau will do it).
-- The pull request into `main` is open, not merged; the version is still 2.0 (build 6).
+- 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
+- The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
+- MauHome tiles can only be changed in code (no add/remove/reorder screen yet).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
-- The flip animation hasn't been watched on screen at the moment a minute changes.
+- The flip clock's card flip hasn't been watched on screen at the moment a minute changes.
+
+## Day log, 25/10/2026
+
+- Joint Remote's icon: LineX `ir_remote` in the launcher orange, the remote's icon everywhere.
+- MauHome widget (Google Home buttons through HA), then A.R.T. Phone's 36 tiles with cameras; HA token on the Connect page.
+- Phone flavor and the TV work merged into `redesign`; the tablet checked after each merge.
+- Lock screen picture from the background; Lock app and App lock on the tablet.
+- Home Herald widget, matched to its HA page in the same font; HA admin made the page use the same fonts.
 
 ## Decisions Mau made along the way
 
