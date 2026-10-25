@@ -520,8 +520,8 @@ class MainActivity : Activity() {
     /** Which bars are hidden comes from Settings (both by default). */
     fun applySystemBars() {
         if (!hub.touch) return
-        val status = hub.prefs.getBoolean("hide_status_bar", !hub.phone) // the phone keeps its bars unless you hide them
-        val nav = hub.prefs.getBoolean("hide_nav_bar", !hub.phone)
+        val status = hub.prefs.getBoolean("hide_status_bar", true)
+        val nav = hub.prefs.getBoolean("hide_nav_bar", true)
         if (android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
             val s = android.view.WindowInsets.Type.statusBars(); val n = android.view.WindowInsets.Type.navigationBars()
             if (status) hide(s) else show(s)

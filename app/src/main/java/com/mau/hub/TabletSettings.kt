@@ -148,7 +148,7 @@ class TabletSettings(private val a: MainActivity) {
         }
         heading("Screen")
         fun barSwitch(label: String, key: String) = list.addView(android.widget.Switch(a).apply {
-            text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, !hub.phone)
+            text = label; textSize = 16f; setTextColor(Color.WHITE); isChecked = p.getBoolean(key, true)
             setOnCheckedChangeListener { _, on -> p.edit().putBoolean(key, on).apply(); a.applySystemBars() }
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
         barSwitch("Hide the status bar (clock, Wi-Fi, battery)", "hide_status_bar")
