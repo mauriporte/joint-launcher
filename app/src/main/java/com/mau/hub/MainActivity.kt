@@ -62,6 +62,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        if (openedAsAppWhileHome()) return
         HomeButtonService.restore(this)
         heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
@@ -525,6 +526,21 @@ class MainActivity : Activity() {
     // tablet: Android's status bar (clock, Wi-Fi, battery) and navigation bar (back, home, recents) stay hidden while
     // Joint Launcher is on screen; a swipe in from the top or bottom edge shows them for a moment. Re-applied on focus
     // because dialogs and other apps bring them back.
+    /**
+     * Opened like any app (from an app list, or by another app) while we're the touch device's Home: hand over to Home
+     * and close this copy. Kept, it would sit in its own task, come back when the next app closes, and get HyperOS's
+     * split-screen "•••" handle over a black strip.
+     */
+    private fun openedAsAppWhileHome(): Boolean {
+        if (packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return false // the TV has its own Home handling
+        if (intent?.hasCategory(Intent.CATEGORY_HOME) == true) return false
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        if (packageManager.resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName != packageName) return false
+        startActivity(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        finishAndRemoveTask()
+        return true
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) applySystemBars()
@@ -596,8 +612,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        nowPlaying.stop()
-        hub.shutdown()
+        if (::nowPlaying.isInitialized) { nowPlaying.stop(); hub.shutdown() } // not when onCreate only handed over to Home
+        else hub.shutdown()
         super.onDestroy()
     }
 
