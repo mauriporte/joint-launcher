@@ -115,7 +115,7 @@ class Widgets(private val a: MainActivity) {
         a.hub.prefs.getInt("widget_pending_remote", 0).takeIf { it > 0 }?.let { n ->
             a.hub.prefs.getInt("remote_widget_$n", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId) // the one it replaces
             a.hub.prefs.edit().putInt("remote_widget_$n", id).remove("widget_pending_remote").apply()
-            (if (n == 1) a.remote1 else a.remote2).open(); return
+            (if (n == 1) a.remote1 else a.remote2).open(); a.topBar.refreshRemotes(); return
         }
         if (a.hub.prefs.getBoolean("widget_pending_corner", false)) {
             a.hub.prefs.getInt("corner_widget", -1).takeIf { it >= 0 }?.let(host::deleteAppWidgetId) // the one it replaces
@@ -166,6 +166,10 @@ class Widgets(private val a: MainActivity) {
     }
 
     /** Remote card [n]'s widget at w x h px; null if none is chosen yet or its app is gone. */
+    /** The device remote card [n]'s widget controls, as Joint Remote publishes it in the widget's options; null if unknown. */
+    fun remoteDevice(n: Int): String? = a.hub.prefs.getInt("remote_widget_$n", -1).takeIf { it >= 0 }
+        ?.let { manager.getAppWidgetOptions(it).getString("com.mau.remote.DEVICE") }?.takeIf { it.isNotBlank() }
+
     fun remoteView(n: Int, w: Int, h: Int): View? {
         val id = a.hub.prefs.getInt("remote_widget_$n", -1).takeIf { it >= 0 } ?: return null
         val info = manager.getAppWidgetInfo(id) ?: return null

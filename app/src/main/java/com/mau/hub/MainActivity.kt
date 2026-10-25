@@ -63,7 +63,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         if (openedAsAppWhileHome()) return
-        HomeButtonService.restore(this)
+        Thread { HomeButtonService.restore(this) }.start() // may wait a moment (see restore)
         heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD); letterSpacing = -0.01f
@@ -160,7 +160,11 @@ class MainActivity : Activity() {
         (hub.touch && gestures.onTouch(e) { super.dispatchTouchEvent(it) }) || super.dispatchTouchEvent(e)
 
     // widgets only update while the screen is showing
-    override fun onStart() { super.onStart(); if (hub.touch) { widgets.start(); topBar.applyCornerClock() } }
+    override fun onStart() {
+        super.onStart()
+        if (hub.touch) { widgets.start(); topBar.applyCornerClock() }
+        if (hub.touch && !hub.phone) topBar.refreshRemotes() // the remotes' devices may have changed in Joint Remote
+    }
     override fun onStop() { super.onStop(); if (hub.touch) widgets.stop() }
 
     /** A tap on the edge strip, or a swipe from it to the right, opens the sidebar; anything else passes. */
@@ -614,7 +618,7 @@ class MainActivity : Activity() {
         rows.retryFailed()
         if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
         if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min
-        if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
+        if (!hub.touch) Thread { HomeButtonService.restore(this) }.start() // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
         if (hub.touch) {
             apps.forgetList(); refreshApps() // back from uninstalling (or installing) something

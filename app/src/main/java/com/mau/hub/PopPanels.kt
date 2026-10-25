@@ -253,7 +253,9 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
 class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
     var other: RemotePanel? = null
     private val prefs get() = a.hub.prefs
-    val name get() = prefs.getString("remote_name_$n", null)?.takeIf { it.isNotBlank() } ?: "Remote $n"
+    /** Your name for it; else, on the tablet only, the device its remote controls (MauTV...); else "Remote n". */
+    val name get() = prefs.getString("remote_name_$n", null)?.takeIf { it.isNotBlank() }
+        ?: (if (a.hub.phone) null else a.widgets.remoteDevice(n)) ?: "Remote $n"
     private val title = a.text(15f, Color.WHITE).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
     private val pin = ImageView(a).apply {
         setImageResource(R.drawable.ic_pin); setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8)); background = a.bareButton()
@@ -266,10 +268,18 @@ class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
 
     init {
         panel.orientation = LinearLayout.VERTICAL
+        // a small arrow on the card's outer edge (the side it comes out on) puts it away, pinned or not
+        val shut = ImageView(a).apply {
+            setImageResource(R.drawable.ic_chevron); setColorFilter(TEXT_SOFT); background = a.bareButton()
+            setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8)); rotation = if (n == 1) 180f else 0f // ic_chevron points right
+            contentDescription = "Put it away"; setOnClickListener { close() }
+        }
         panel.addView(LinearLayout(a).apply {
             gravity = Gravity.CENTER_VERTICAL
+            if (n == 1) addView(shut, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
             addView(title, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = a.dp(6) })
             addView(pin, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
+            if (n == 2) addView(shut, LinearLayout.LayoutParams(a.dp(40), a.dp(40)))
         })
         panel.addView(holder, LinearLayout.LayoutParams(-1, -2))
         view.setOnClickListener { if (!pinned) close() }
@@ -301,6 +311,7 @@ class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
         val across = (if (land) dm.widthPixels / 2 else dm.widthPixels) - a.dp(16) - a.dp(32) // margins, card padding
         val side = minOf(across, dm.heightPixels * 3 / 4) // Joint Remote draws itself square in what it's given
         title.text = name
+        if (!a.hub.phone) a.topBar.refreshRemotes() // a device changed inside the widget shows on its button too
         showPin()
         holder.removeAllViews()
         val remote = a.widgets.remoteView(n, side, side)

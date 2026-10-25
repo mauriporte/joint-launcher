@@ -35,6 +35,8 @@ class TopBar(private val a: MainActivity) {
             addView(ImageView(a).apply { setImageResource(R.drawable.ic_remote); setColorFilter(Color.WHITE) }, LinearLayout.LayoutParams(a.dp(24), a.dp(24)))
             addView(a.text(13f, TEXT_SOFT), LinearLayout.LayoutParams(-2, -2).apply { marginStart = a.dp(6) })
             setOnClickListener { (if (n == 1) a.remote1 else a.remote2).toggle(this) }
+            // press and hold: choose which device this remote controls (Joint Remote's own picker)
+            setOnLongClickListener { (if (n == 1) a.remote1 else a.remote2).close(); a.widgets.pick(remote = n); true }
         }
     } }
 

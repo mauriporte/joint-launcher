@@ -204,6 +204,8 @@ row order and the content parsers.
 ## Not done / known gaps
 
 - 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
+- Not yet tried on screen: the remote cards upright (one at a time), and press-and-hold on a remote button.
+- MauHome tiles: HA admin helps Mau set them up in the tile editor when Mau brings it up (no reminders).
 - The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
 
@@ -217,6 +219,12 @@ row order and the content parsers.
 - MauHome tile editor. The corner flip clock now flips even with the tablet's animations switched off (it times
   itself instead of relying on Android's animation setting, which is at 0 on the tablet).
 - Joint Remote keeps its own (v0.6) icon in the launcher, any pack.
+- Joint Remote's icon read from its plain drawing (no HyperOS white or black box); the tile editor hides the bars too.
+- Opened as an app while it's Home, the launcher hands over to Home (no stray copy with HyperOS's "•••" handle).
+- Wallpaper top-edge line cleaned; the same picture on the lock screen.
+- Two remote cards (Joint Remote's widget each) from top-bar buttons named after their device: side by side when
+  turned, one at a time upright; pin, outer-edge close arrow, own % solid; press and hold a button to change device.
+- Home button service restore made safe right after updates (shared code; matters on the TV).
 
 ## Decisions Mau made along the way
 
