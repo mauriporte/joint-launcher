@@ -86,10 +86,13 @@ class PhotoDream : DreamService() {
     private val pool = Executors.newSingleThreadExecutor()
     private val shown = arrayOfNulls<ImageView>(2)
     private var front = 0
-    private var ids: List<String> = emptyList()
+    @Volatile private var ids: List<String> = emptyList()
     private var next = 0
+    // no photos yet (Immich stopped or unreachable): ask again every minute, the clock keeps going meanwhile
     private val step = object : Runnable {
-        override fun run() { showNext(); main.postDelayed(this, 15_000) }
+        override fun run() {
+            if (ids.isEmpty()) { load(); main.postDelayed(this, 60_000) } else { showNext(); main.postDelayed(this, 15_000) }
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -103,10 +106,14 @@ class PhotoDream : DreamService() {
         val p = hubPrefs()
         val base = p.getString("immich_url", null); val key = p.getString("immich_key", null)
         if (base == null || key == null) return // not connected: a dark screen with the clock (connect Immich from the phone page)
-        pool.execute {
-            ids = runCatching { Immich.photos(base, key, p.getString("immich_album", null)) }.getOrDefault(emptyList())
-            main.post(step)
-        }
+        main.post(step)
+    }
+
+    private fun load(): Unit = pool.execute {
+        val p = hubPrefs()
+        val base = p.getString("immich_url", null) ?: return@execute; val key = p.getString("immich_key", null) ?: return@execute
+        ids = runCatching { Immich.photos(base, key, p.getString("immich_album", null)) }.getOrDefault(emptyList())
+        if (ids.isNotEmpty()) main.post { main.removeCallbacks(step); step.run() }
     }
 
     private fun showNext() {
