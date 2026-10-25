@@ -442,3 +442,15 @@ class HeraldWidgetTest {
         assertEquals("Heraldo del Hogar", es.masthead)
     }
 }
+
+class MiniSocketTest {
+    @Test fun clientFramesAreFinalAndMasked() {
+        val mask = byteArrayOf(1, 2, 3, 4)
+        val f = MiniSocket.frame(0x2, byteArrayOf(9, 0, 0), mask)
+        assertEquals(listOf(0x82, 0x83, 1, 2, 3, 4, 9 xor 1, 0 xor 2, 0 xor 3), f.map { it.toInt() and 0xFF })
+        // 200 bytes: the 16-bit length form
+        val g = MiniSocket.frame(0x1, ByteArray(200), mask)
+        assertEquals(listOf(0x81, 0xFE, 0, 200), g.take(4).map { it.toInt() and 0xFF })
+        assertEquals(4 + 4 + 200, g.size)
+    }
+}
