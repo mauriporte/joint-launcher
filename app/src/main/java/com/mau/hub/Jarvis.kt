@@ -200,6 +200,30 @@ internal class MiniSocket(url: String) : Closeable {
     }
 }
 
+/**
+ * The Jarvis screens' frame: the status and navigation bars hidden as everywhere else in the launcher (a swipe shows them
+ * for a moment), and the content kept clear of the keyboard (and of the bars while they show).
+ */
+open class JarvisScreen : Activity() {
+    override fun setContentView(v: android.view.View) {
+        super.setContentView(android.widget.FrameLayout(this).apply {
+            setBackgroundColor(BG); addView(v)
+            if (android.os.Build.VERSION.SDK_INT >= 30) setOnApplyWindowInsetsListener { f, ins ->
+                val i = ins.getInsets(android.view.WindowInsets.Type.ime() or android.view.WindowInsets.Type.systemBars())
+                f.setPadding(i.left, i.top, i.right, i.bottom); ins
+            }
+        })
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
+            hide(android.view.WindowInsets.Type.systemBars())
+            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+}
+
 /** "Chat with Jarvis": a tap opens [JarvisChat]. */
 class JarvisChatWidget : AppWidgetProvider() {
     override fun onUpdate(c: Context, m: AppWidgetManager, ids: IntArray) =
@@ -213,7 +237,7 @@ class JarvisVoiceWidget : AppWidgetProvider() {
 }
 
 /** A small chat with Jarvis: your messages on the right, its answers on the left; "New chat" starts over. */
-class JarvisChat : Activity() {
+class JarvisChat : JarvisScreen() {
     private lateinit var log: LinearLayout
     private lateinit var scroll: ScrollView
     @Volatile private var busy = false // one question at a time
@@ -273,7 +297,7 @@ class JarvisChat : Activity() {
  * "Stop and send" (or 30 seconds) ends it. Then it shows what you said and the answer, and plays the answer's audio unless
  * the Google Mini is speaking it.
  */
-class JarvisVoice : Activity() {
+class JarvisVoice : JarvisScreen() {
     private lateinit var status: TextView
     private lateinit var said: TextView
     private lateinit var answer: TextView
