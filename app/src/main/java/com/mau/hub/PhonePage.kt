@@ -109,7 +109,7 @@ class PhonePage(
                 val t = params["token"].orEmpty().replace(Regex("\\s"), "").removePrefix("Bearer") // a pasted token can carry line breaks
                 if (t.isEmpty()) return send(out, 200, done("Paste the token first.", ok = false))
                 hub.prefs.edit().putString("ha_token", t).apply()
-                HaWidget.refresh(hub.ctx)
+                HaWidget.refresh(hub.ctx); HeraldWidget.refresh(hub.ctx, force = true)
                 send(out, 200, done("Home Assistant token saved. The MauHome widget refreshes now."))
             }
             // the same accounts, for setting up another device (tablet) from this one; same random path, only while the screen is open

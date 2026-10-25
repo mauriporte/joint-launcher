@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home Herald, laid out like its page in HA (homelab-pc-helper/herald.py): meta line, masthead over a double rule,
+     centred headline and italic subhead, the lead with a drop cap, "By the numbers", the watch box, briefs -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/herald" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="14dp" android:background="@drawable/herald_bg_night">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@+id/herald_no" style="@style/HeraldMeta" android:layout_width="wrap_content" />
+        <TextView android:id="@+id/herald_date" style="@style/HeraldMeta" android:layout_width="0dp" android:layout_weight="1" android:gravity="center" />
+        <TextView android:id="@+id/herald_edition" style="@style/HeraldMeta" android:layout_width="wrap_content" />
+    </LinearLayout>
+    <FrameLayout android:id="@+id/herald_rule1" android:layout_width="match_parent" android:layout_height="1dp" />
+    <TextView android:id="@+id/herald_masthead" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:fontFamily="serif" android:textStyle="bold" android:textSize="28sp" android:singleLine="true"
+        android:paddingTop="2dp" android:paddingBottom="2dp" />
+    <FrameLayout android:id="@+id/herald_rule2" android:layout_width="match_parent" android:layout_height="1dp" />
+    <FrameLayout android:id="@+id/herald_rule3" android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="2dp" />
+
+    <TextView android:id="@+id/herald_headline" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="10dp" android:gravity="center" android:fontFamily="serif" android:textStyle="bold"
+        android:textSize="21sp" android:maxLines="3" android:ellipsize="end" />
+    <TextView android:id="@+id/herald_subhead" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:gravity="center" android:fontFamily="serif" android:textStyle="italic"
+        android:textSize="14sp" android:maxLines="2" android:ellipsize="end" />
+    <TextView android:id="@+id/herald_lead" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="10dp" android:fontFamily="serif" android:textSize="14sp" android:lineSpacingMultiplier="1.15"
+        android:maxLines="6" android:ellipsize="end" />
+
+    <LinearLayout android:id="@+id/herald_numbers_box" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:orientation="vertical" android:padding="10dp">
+        <TextView android:id="@+id/herald_numbers_h" style="@style/HeraldH3" />
+        <FrameLayout android:id="@+id/herald_numbers_rule" android:layout_width="match_parent" android:layout_height="1dp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
+            <TextView android:id="@+id/herald_k1" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k2" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k3" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k4" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k5" style="@style/HeraldKpi" />
+            <TextView android:id="@+id/herald_k6" style="@style/HeraldKpi" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/herald_watch_box" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp">
+        <FrameLayout android:id="@+id/herald_watch_bar" android:layout_width="4dp" android:layout_height="match_parent" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp">
+            <TextView android:id="@+id/herald_watch_h" style="@style/HeraldH3" />
+            <FrameLayout android:id="@+id/herald_watch_rule" android:layout_width="match_parent" android:layout_height="1dp" />
+            <TextView android:id="@+id/herald_watch" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" android:fontFamily="serif" android:textSize="13sp" android:maxLines="3" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/herald_briefs_box" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:orientation="vertical">
+        <TextView android:id="@+id/herald_briefs_h" style="@style/HeraldH3" />
+        <FrameLayout android:id="@+id/herald_briefs_rule" android:layout_width="match_parent" android:layout_height="1dp" />
+        <TextView android:id="@+id/herald_briefs" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:fontFamily="serif" android:textSize="13sp" android:lineSpacingMultiplier="1.15"
+            android:maxLines="5" android:ellipsize="end" />
+    </LinearLayout>
+</LinearLayout>

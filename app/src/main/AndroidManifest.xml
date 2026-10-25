@@ -41,6 +41,7 @@
         <package android:name="com.amazon.avod.thirdpartyclient" />
         <package android:name="com.hulu.plus" />
         <package android:name="es.filmin.app" />
+        <package android:name="io.homeassistant.companion.android" /> <!-- Home Herald opens the edition there -->
         <!-- icon packs (ADW / Nova format), for app icons -->
         <intent>
             <action android:name="org.adw.launcher.THEMES" />
@@ -137,6 +138,13 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/ha_widget_info" />
+        </receiver>
+        <!-- Home Herald: the house's daily newspaper from HA (tablet and phone) -->
+        <receiver android:name=".HeraldWidget" android:label="Home Herald" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/herald_widget_info" />
         </receiver>
         <!-- a tap on a MauHome tile: runs it with no screen, or asks first for the server plugs -->
         <activity android:name=".HaTap" android:exported="false" android:excludeFromRecents="true"

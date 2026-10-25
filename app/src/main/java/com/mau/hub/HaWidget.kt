@@ -193,8 +193,8 @@ class HaWidget : AppWidgetProvider() {
         }.getOrNull()
 
         private fun token(c: Context) = c.getSharedPreferences("hub", Context.MODE_PRIVATE).getString("ha_token", null)?.takeIf { it.isNotBlank() }
-        private fun auth(c: Context) = mapOf("Authorization" to "Bearer ${token(c) ?: error("no token")}")
-        private fun base(c: Context) = (Hub.haUrl() ?: error("no address")).trimEnd('/')
+        internal fun auth(c: Context) = mapOf("Authorization" to "Bearer ${token(c) ?: error("no token")}")
+        internal fun base(c: Context) = (Hub.haUrl() ?: error("no address")).trimEnd('/')
         private fun msg(c: Context, e: Throwable) = when {
             token(c) == null -> "Add your Home Assistant token on the Connect page"
             e is Sources.FetchError && e.code == 401 -> "Home Assistant refused the token"
