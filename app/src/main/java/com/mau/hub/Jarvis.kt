@@ -95,6 +95,27 @@ object Jarvis {
         return Reply(speech(r.optJSONObject("response")))
     }
 
+    /**
+     * The answer's audio for the device to play, or null when the Google Mini says it (switch.jarvis_habla_por_google_mini
+     * on). Piper, in the answer's own language: Assistant Me answers in the language Mau used, whatever the selector says.
+     */
+    private fun speech(c: Context, answer: String): String? {
+        if (answer.isBlank() || http(c, "/api/states/switch.jarvis_habla_por_google_mini").optString("state") == "on") return null
+        val es = spanish(answer)
+        val req = JSONObject().put("engine_id", "tts.piper").put("message", answer).put("language", if (es) "es_ES" else "en_GB")
+            .put("options", JSONObject().put("voice", if (es) "es_ES-davefx-medium" else "en_GB-alan-medium"))
+        return http(c, "/api/tts_get_url", req.toString()).optString("url").takeIf { it.isNotEmpty() }
+            ?.let { if (it.startsWith("http")) it else HaWidget.base(c) + it }
+    }
+
+    /** Spanish or English, by a word check (HA admin: enough): Spanish marks and common words against English ones. */
+    internal fun spanish(text: String): Boolean {
+        val words = text.lowercase().split(Regex("[^\\p{L}]+"))
+        val es = words.count { it in setOf("el", "la", "los", "las", "de", "que", "y", "en", "es", "un", "una", "por", "para", "con", "no", "está", "son") }
+        val en = words.count { it in setOf("the", "and", "is", "are", "you", "to", "of", "in", "it", "that", "for", "with", "not", "on", "a") }
+        return es + (if (Regex("[áéíóúñ¿¡]").containsMatchIn(text.lowercase())) 2 else 0) > en
+    }
+
     private fun speech(response: JSONObject?) = response?.optJSONObject("speech")?.optJSONObject("plain")?.optString("speech").orEmpty()
 
     /**
@@ -109,7 +130,7 @@ object Jarvis {
             require(JSONObject(ws.readText()).optString("type") == "auth_required") { "Home Assistant didn't ask to sign in" }
             ws.sendText(JSONObject().put("type", "auth").put("access_token", token).toString())
             require(JSONObject(ws.readText()).optString("type") == "auth_ok") { "Home Assistant refused the token" }
-            val run = JSONObject().put("id", 1).put("type", "assist_pipeline/run").put("start_stage", "stt").put("end_stage", "tts")
+            val run = JSONObject().put("id", 1).put("type", "assist_pipeline/run").put("start_stage", "stt").put("end_stage", "intent") // never "tts": with the Google Mini on, the pipeline has none and fails
                 .put("pipeline", PIPELINE).put("input", JSONObject().put("sample_rate", 16000))
             conversation(c)?.let { run.put("conversation_id", it) }
             ws.sendText(run.toString())
@@ -123,16 +144,15 @@ object Jarvis {
             }
             while (true) { val chunk = audio() ?: break; ws.sendBinary(byteArrayOf(handler.toByte()) + chunk) }
             ws.sendBinary(byteArrayOf(handler.toByte())) // the end of the audio
-            var said: String? = null; var answer = ""; var url: String? = null
+            var said: String? = null; var answer = ""
             while (true) {
                 val e = JSONObject(ws.readText()).optJSONObject("event") ?: continue
                 val d = e.optJSONObject("data")
                 when (e.optString("type")) {
                     "stt-end" -> said = d?.optJSONObject("stt_output")?.optString("text")?.also(heard)
                     "intent-end" -> d?.optJSONObject("intent_output")?.let { answer = speech(it.optJSONObject("response")); keep(c, it.optString("conversation_id")) }
-                    "tts-end" -> url = d?.optJSONObject("tts_output")?.optString("url")?.takeIf { it.isNotEmpty() }?.let { if (it.startsWith("http")) it else base + it }
                     "error" -> error(d?.optString("message") ?: "Jarvis's voice pipeline failed")
-                    "run-end" -> return Reply(answer, said, url) // no URL when the Google Mini speaks the answer
+                    "run-end" -> return Reply(answer, said, runCatching { speech(c, answer) }.getOrNull())
                 }
             }
         }
