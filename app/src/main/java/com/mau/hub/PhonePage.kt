@@ -99,7 +99,7 @@ class PhonePage(
                 })
             }
             "/homeassistant" -> {
-                val t = params["token"].orEmpty().trim()
+                val t = params["token"].orEmpty().replace(Regex("\\s"), "").removePrefix("Bearer") // a pasted token can carry line breaks
                 if (t.isEmpty()) return send(out, 200, done("Paste the token first.", ok = false))
                 hub.prefs.edit().putString("ha_token", t).apply()
                 HaWidget.refresh(hub.ctx)
@@ -205,7 +205,7 @@ class PhonePage(
         <form method=post action="/$token/youtube"><input name=client_id placeholder="Client ID (TVs and Limited Input devices)" value="${pref("google_client_id")}"><input name=secret placeholder="Client secret" value="${pref("google_client_secret")}"><button>Get a sign-in code</button></form>
         <p class=hint>Google Cloud Console → APIs &amp; Services → Credentials → Create OAuth client ID → type <b>TVs and Limited Input devices</b>.</p>
         <h2>Home Assistant${mark(hub.prefs.contains("ha_token"))}</h2>
-        <form method=post action="/$token/homeassistant"><input name=token type=password placeholder="Long-lived access token" autocomplete=off><button>Save token</button></form>
+        <form method=post action="/$token/homeassistant"><input name=token placeholder="Long-lived access token" autocomplete=off autocapitalize=off spellcheck=false><button>Save token</button></form>
         <p class=hint>For the MauHome widget. In Home Assistant: your profile → Security → Long-lived access tokens → Create token. Stays on this device only.</p>
     """)
 
