@@ -116,7 +116,14 @@ class HomeButtonService : AccessibilityService() {
          * once over adb (`adb shell pm grant <package> android.permission.WRITE_SECURE_SETTINGS`), switch it back on.
          * Touches only this app's own entry in the enabled-services list.
          */
-        fun restore(c: Context) {
+        /** done: an update receiver's goAsync(), finished once the service is back on the list (see the off/on below). */
+        fun restore(c: Context, done: BroadcastReceiver.PendingResult? = null) {
+            try { restoreNow(c) } finally { done?.finish() }
+        }
+
+        // Runs on a background thread when it has to wait, so the off/on below survives the process being torn down
+        // right after an update (a delayed re-add on the main thread was lost with it, leaving the service off).
+        private fun restoreNow(c: Context) {
             // asked of Android: the service lives in its own process (":home"), so `running` here never sees it
             val am = c.getSystemService(Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
             if (am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
@@ -137,12 +144,17 @@ class HomeButtonService : AccessibilityService() {
             if (me !in enabled) { add(); return }
             restoring = true
             runCatching { Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (enabled - me).joinToString(":")) }
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ add() }, 800)
+            Thread.sleep(800) // both at once read as no change
+            add()
         }
     }
 
     /** Runs right after an update installs, so Home works again without opening the app first. */
     class Restorer : BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) { if (i.action == Intent.ACTION_MY_PACKAGE_REPLACED) restore(c) }
+        override fun onReceive(c: Context, i: Intent) {
+            if (i.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+            val done = goAsync() // keeps the process alive until the service is back on
+            Thread { restore(c, done) }.start()
+        }
     }
 }

@@ -63,7 +63,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         if (openedAsAppWhileHome()) return
-        HomeButtonService.restore(this)
+        Thread { HomeButtonService.restore(this) }.start() // may wait a moment (see restore)
         heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD); letterSpacing = -0.01f
@@ -618,7 +618,7 @@ class MainActivity : Activity() {
         rows.retryFailed()
         if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
         if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min
-        if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
+        if (!hub.touch) Thread { HomeButtonService.restore(this) }.start() // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
         if (hub.touch) {
             apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
