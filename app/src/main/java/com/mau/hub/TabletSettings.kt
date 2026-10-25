@@ -228,7 +228,7 @@ class TabletSettings(private val a: MainActivity) {
         }
         list.addView(token)
         buttons("Save token" to {
-            val t = token.text.toString().replace(Regex("\s+"), "").removePrefix("Bearer") // pasted with spaces or as a header
+            val t = token.text.toString().replace(Regex("\\s+"), "").removePrefix("Bearer") // pasted with spaces or as a header
             if (t.isEmpty()) a.toast("Paste the token first")
             else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); a.toast("Token saved"); draw() }
         })
