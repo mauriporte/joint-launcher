@@ -13,6 +13,10 @@ import android.media.session.PlaybackState
  */
 class NowPlaying(private val a: MainActivity, private val onChange: (NowRow?) -> Unit) {
     private var controller: MediaController? = null
+    /** What's playing (or paused) in another app, for the phone's Now Playing panel. */
+    val current: MediaController? get() = controller?.takeIf { it.packageName != a.packageName }
+    /** False until notification access is granted (Android hides other apps' media sessions without it). */
+    var allowed = false; private set
     private val msm get() = a.getSystemService(MediaSessionManager::class.java)
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { pick(it.orEmpty()) }
     private val callback = object : MediaController.Callback() {
@@ -23,7 +27,7 @@ class NowPlaying(private val a: MainActivity, private val onChange: (NowRow?) ->
     fun start() {
         try {
             val me = ComponentName(a, NowPlayingListener::class.java)
-            pick(msm.getActiveSessions(me))
+            pick(msm.getActiveSessions(me)); allowed = true
             msm.addOnActiveSessionsChangedListener(sessionsListener, me, a.hub.main)
         } catch (_: SecurityException) { /* notification access not granted: no Now Playing row */ }
     }

@@ -52,6 +52,10 @@ class PhoneHome(private val a: MainActivity) {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
     val drawer = AllApps(a)
+    val nowPanel = NowPanel(a)
+    private val musicButton = a.iconButton(R.drawable.ic_ha_music, "Now playing") { nowPanel.open() }.apply {
+        setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
+    }
 
     val view: View = FrameLayout(a).apply {
         addView(LinearLayout(a).apply {
@@ -61,7 +65,12 @@ class PhoneHome(private val a: MainActivity) {
                 addView(clock, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
                 a.topBar.takeWeather()?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL)) }
                 // like the tablet's and TV's button: flips Home's list between names and icons
-                addView(iconsButton, FrameLayout.LayoutParams(a.dp(44), a.dp(44), Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(12) })
+                // top left: names/icons, and under it the music note that slides out Now Playing
+                addView(LinearLayout(a).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(iconsButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
+                    addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
+                }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(12) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -73,6 +82,7 @@ class PhoneHome(private val a: MainActivity) {
             }, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(dockScroll, LinearLayout.LayoutParams(-1, a.dp(56)).apply { bottomMargin = a.dp(10) })
         }, FrameLayout.LayoutParams(-1, -1))
+        addView(nowPanel.view, FrameLayout.LayoutParams(-1, -1))
         addView(drawer.view, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -456,5 +466,93 @@ object ProLauncherImport {
         r.swipeLeft?.let { e.putString(Gestures.SWIPE_LEFT, "app:$it") }
         e.apply()
         a.apps.forgetList()
+    }
+}
+
+/**
+ * The phone's Now Playing, slid out from the left over Home by the music note: what any app is playing (cover, title,
+ * artist, which app), with previous / play-pause / next. Tap the cover to open the app; tap outside, swipe left or
+ * Back to slide it away. Reads media sessions, which Android only allows with notification access.
+ */
+class NowPanel(private val a: MainActivity) {
+    private val art = ImageView(a).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true
+        background = GradientDrawable().apply { cornerRadius = a.dp(16).toFloat(); setColor(0x22FFFFFF) }
+    }
+    private val title = a.text(20f, Color.WHITE).apply {
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    private val artist = a.text(15f, TEXT_SOFT).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+    private val source = a.text(12f, TEXT_MUTED)
+    private val playPause = control("▶", "Play or pause") { c ->
+        if (c.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING) c.transportControls.pause() else c.transportControls.play()
+    }
+    private val controls = LinearLayout(a).apply {
+        gravity = Gravity.CENTER
+        addView(control("⏮", "Previous") { it.transportControls.skipToPrevious() }, LinearLayout.LayoutParams(0, a.dp(56), 1f))
+        addView(playPause, LinearLayout.LayoutParams(0, a.dp(56), 1f))
+        addView(control("⏭", "Next") { it.transportControls.skipToNext() }, LinearLayout.LayoutParams(0, a.dp(56), 1f))
+    }
+    private val access = a.button("Allow notification access") {
+        runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+    }
+    private val panel = LinearLayout(a).apply {
+        orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(a.dp(24), a.dp(32), a.dp(24), a.dp(24))
+        val r = a.dp(24).toFloat()
+        background = GradientDrawable().apply { setColor(0xE6101012.toInt()); cornerRadii = floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f) }
+        isClickable = true // taps on it stay in it
+        addView(a.text(13f, TEXT_MUTED).apply { text = "Now playing"; letterSpacing = 0.1f }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = a.dp(16) })
+        addView(art, LinearLayout.LayoutParams(a.dp(240), a.dp(240)))
+        addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
+        addView(artist, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(4) })
+        addView(source, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(2) })
+        addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(16) })
+        addView(access, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(16) })
+    }
+    val view: View = FrameLayout(a).apply {
+        setOnClickListener { close() } // a tap beside the panel puts it away
+        addView(panel, FrameLayout.LayoutParams((a.resources.displayMetrics.widthPixels * 0.82).toInt(), -2, Gravity.START or Gravity.CENTER_VERTICAL))
+        visibility = View.GONE
+    }
+    val isOpen get() = view.visibility == View.VISIBLE
+
+    init {
+        art.setOnClickListener { a.nowPlaying.current?.let { c -> runCatching { c.sessionActivity?.send() ?: a.apps.launch(c.packageName) } } }
+    }
+
+    fun open() {
+        update()
+        if (isOpen) return
+        view.visibility = View.VISIBLE
+        panel.translationX = -panel.layoutParams.width.toFloat()
+        panel.animate().translationX(0f).setDuration(220).start()
+    }
+
+    fun close() {
+        if (!isOpen) return
+        panel.animate().translationX(-panel.width.toFloat()).setDuration(200).withEndAction { view.visibility = View.GONE }.start()
+    }
+
+    /** Fills it from the playing session; called on open and whenever playback changes. */
+    fun update() {
+        val c = a.nowPlaying.current
+        val allowed = a.nowPlaying.allowed
+        access.visibility = if (allowed) View.GONE else View.VISIBLE
+        controls.visibility = if (c != null) View.VISIBLE else View.GONE
+        val md = c?.metadata
+        title.text = md?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: md?.description?.title
+            ?: if (allowed) "Nothing is playing" else "Joint Launcher needs notification access to see what's playing"
+        artist.text = md?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: md?.description?.subtitle ?: ""
+        source.text = c?.packageName?.let { pkg -> runCatching { a.packageManager.getApplicationLabel(a.packageManager.getApplicationInfo(pkg, 0)) }.getOrNull() } ?: ""
+        val cover = md?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART) ?: md?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
+        if (cover != null) art.setImageBitmap(cover)
+        else art.setImageDrawable(c?.packageName?.let { runCatching { a.packageManager.getApplicationIcon(it) }.getOrNull() })
+        playPause.text = if (c?.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING) "⏸" else "▶"
+    }
+
+    private fun control(glyph: String, label: String, act: (android.media.session.MediaController) -> Unit) = a.text(30f, Color.WHITE).apply {
+        text = glyph; gravity = Gravity.CENTER; contentDescription = label; isClickable = true
+        setOnClickListener { a.nowPlaying.current?.let(act) }
     }
 }

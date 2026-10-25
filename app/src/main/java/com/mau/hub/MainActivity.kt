@@ -35,7 +35,7 @@ class MainActivity : Activity() {
     lateinit var detail: DetailScreen
     lateinit var searchBar: SearchBar
     lateinit var moveMode: MoveMode
-    private lateinit var nowPlaying: NowPlaying
+    lateinit var nowPlaying: NowPlaying // the phone's Now Playing panel reads it too
     lateinit var page: LinearLayout // top bar + header + rows: blocked from focus while the detail screen covers it
 
     var gen = 0 // bumps on reload/search so stale async rows are dropped
@@ -94,7 +94,7 @@ class MainActivity : Activity() {
             if (container === sidebar.rail) rowsDirty = true // Home rows follow the sidebar: reorder them when it closes
             else sidebar.dirty = true // the sidebar picks the new order up next time it opens
         }
-        nowPlaying = NowPlaying(this) { rows.nowPlaying(it) }
+        nowPlaying = NowPlaying(this) { rows.nowPlaying(it); if (hub.phone) phoneHome.nowPanel.update() }
 
         // Layout budget (960x540dp): 46dp top bar + 136dp header + two ~178dp rows still fit without scrolling.
         // Touchscreens: no header (it follows the remote's focus, and a tap opens the title straight away), so more rows fit.
@@ -450,6 +450,7 @@ class MainActivity : Activity() {
         when {
             detail.isShown -> detail.close()
             hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
+            hub.phone && phoneHome.nowPanel.isOpen -> phoneHome.nowPanel.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
             hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
@@ -470,7 +471,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
-        if (hub.phone) { phoneHome.drawer.close(); return }
+        if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); return }
         sidebar.hide()
         if (inSearch || appFilter != null || tab != Tab.HOME) { tab = Tab.HOME; pickApp(null) } else rows.top()
     }
@@ -583,6 +584,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
+        if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
         if (hub.touch) HaWidget.refresh(this) // MauHome shows current states whenever you're back on Home
         if (!hub.touch) HomeButtonService.restore(this) // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
