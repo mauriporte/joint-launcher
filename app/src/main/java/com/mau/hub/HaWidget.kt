@@ -122,7 +122,9 @@ class HaWidget : AppWidgetProvider() {
                 }
                 HaTile.Kind.IR -> Look(true, VIOLET, "Mando IR")
                 HaTile.Kind.TV -> (state !in setOf("off", "standby", "unknown")).let { Look(it, if (it) BLUE else GREY, if (it) "Encendido" else "Apagado") }
-                HaTile.Kind.CAMERA -> Look(true, BLUE, java.text.SimpleDateFormat("HH:mm", Locale.ROOT).format(java.util.Date())) // when the still was taken
+                // when the still was taken; or that HA gave none (camera off, or a stream HA can't take a still from)
+                HaTile.Kind.CAMERA -> if (shots[t.entities[0]] == null) Look(false, GREY, "Sin imagen")
+                    else Look(true, BLUE, java.text.SimpleDateFormat("HH:mm", Locale.ROOT).format(java.util.Date()))
                 HaTile.Kind.SPEAKER -> when (state) {
                     "playing" -> Look(true, BLUE, "Reproduciendo")
                     "paused" -> Look(true, BLUE, "En pausa")

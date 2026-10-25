@@ -215,12 +215,14 @@ class Widgets(private val a: MainActivity) {
         fun free(c: Int, r: Int, w: Int, h: Int) = (c until c + w).all { x -> (r until r + h).all { y -> (x to y) !in taken } }
         ids.forEach { id ->
             val info = manager.getAppWidgetInfo(id) ?: return@forEach
-            val (sw, sh) = span(id, cell).let { (w, h) -> w.coerceIn(1, cols) to h.coerceIn(1, rows) }
-            // its spot in this orientation, else the first free one (reading order), else the top-left corner
+            val (sw, sh) = span(id, cell).let { (w, h) -> w.coerceIn(1, cols) to maxOf(1, h) }
+            // its spot in this orientation, else the first free one (reading order), else a new row under the rest:
+            // the grid grows downwards for as many widgets as you add (the page scrolls), like Pro Launcher's widget page
             val saved = ints("wpos_${orient}_$id")
-            val (pc, pr) = if (saved != null) saved[0] to saved[1]
-                else (0..rows - sh).asSequence().flatMap { r -> (0..cols - sw).asSequence().map { c -> c to r } }.firstOrNull { (c, r) -> free(c, r, sw, sh) } ?: (0 to 0)
-            val spot = Spot(pc.coerceIn(0, cols - sw), pr.coerceIn(0, rows - sh), sw, sh)
+            val (pc, pr) = if (saved != null) saved[0] to maxOf(0, saved[1])
+                else (0..rows - sh).asSequence().flatMap { r -> (0..cols - sw).asSequence().map { c -> c to r } }.firstOrNull { (c, r) -> free(c, r, sw, sh) } ?: (0 to rows)
+            rows = maxOf(rows, pr + sh)
+            val spot = Spot(pc.coerceIn(0, cols - sw), pr, sw, sh)
             (spot.c until spot.c + sw).forEach { x -> (spot.r until spot.r + sh).forEach { y -> taken += x to y } }
             addView(tile(id, info, this, spot), spot)
         }
