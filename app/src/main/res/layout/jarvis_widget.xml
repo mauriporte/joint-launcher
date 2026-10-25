@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- a Jarvis widget (chat or voice): one see-through tile, its icon and name; a tap opens it -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/jarvis_tile" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/ha_tile_violet" android:gravity="center" android:orientation="vertical" android:padding="10dp">
+    <ImageView android:id="@+id/jarvis_icon" android:layout_width="40dp" android:layout_height="40dp" />
+    <TextView android:id="@+id/jarvis_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" android:textColor="#FFF2F2F2" android:textSize="14sp" android:textStyle="bold" />
+</LinearLayout>

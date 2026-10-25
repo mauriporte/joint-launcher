@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" /> <!-- "Voice to Jarvis" widget -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" /> <!-- Settings: the background picture on the lock screen too -->
     <!-- the TV's own network address, for the phone sign-in page's QR code -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -147,6 +148,19 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/herald_widget_info" />
         </receiver>
         <!-- a tap on a MauHome tile: runs it with no screen, or asks first for the server plugs -->
+        <!-- the Jarvis widgets: a text chat, and a voice message -->
+        <receiver android:name=".JarvisChatWidget" android:label="Chat with Jarvis" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_chat_info" />
+        </receiver>
+        <receiver android:name=".JarvisVoiceWidget" android:label="Voice to Jarvis" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/jarvis_voice_info" />
+        </receiver>
+        <activity android:name=".JarvisChat" android:exported="false" android:label="Jarvis" android:taskAffinity=".jarvis"
+            android:excludeFromRecents="true" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".JarvisVoice" android:exported="false" android:label="Voice to Jarvis" android:taskAffinity=".jarvis"
+            android:excludeFromRecents="true" android:noHistory="true" />
         <!-- MauHome's tile editor (the widget's pencil, or Settings) -->
         <activity android:name=".HaTiles" android:exported="false" android:label="MauHome tiles"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
