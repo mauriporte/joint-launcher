@@ -117,6 +117,17 @@
             </intent-filter>
         </service>
 
+        <!-- MauHome: the Home Assistant switches widget (tablet and phone; Google TV has no widgets) -->
+        <receiver android:name=".HaWidget" android:label="MauHome" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ha_widget_info" />
+        </receiver>
+        <!-- a tap on a MauHome tile: runs it with no screen, or asks first for the server plugs -->
+        <activity android:name=".HaTap" android:exported="false" android:excludeFromRecents="true"
+            android:noHistory="true" android:taskAffinity="" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"

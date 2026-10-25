@@ -346,3 +346,25 @@ class WidgetGridTest {
         org.junit.Assert.assertEquals(null, Widgets.nearestFree(0, 0, 8, 4, 8, 4, listOf(beeper)))   // no room anywhere
     }
 }
+
+class HaWidgetTest {
+    private fun st(id: String, state: String, attrs: String = "{}") = id to org.json.JSONObject("""{"entity_id":"$id","state":"$state","attributes":$attrs}""")
+    private fun tile(name: String) = HaWidget.TILES.first { it.name == name }
+
+    @Test fun tilesShowHomeAssistantStates() {
+        val strip = tile("Regleta Multimedia")
+        // a strip is on while any outlet is on
+        val s = mapOf(st("switch.regleta_multimedia_enchufe_1", "off"), st("switch.regleta_multimedia_enchufe_2", "on"), st("switch.regleta_multimedia_enchufe_3", "off"))
+        assertTrue(HaWidget.look(strip, s).on)
+        assertEquals("Apagado", HaWidget.look(strip, s.mapValues { org.json.JSONObject(it.value.toString().replace("\"on\"", "\"off\"")) }).status)
+        // the thermostat reports °F; the tile shows °C
+        assertEquals("25.7 °C", HaWidget.look(tile("Termostato"), mapOf(st("sensor.termostato_temperatura", "78.26", """{"unit_of_measurement":"°F"}"""))).status)
+        // the lights group counts its members that are on
+        val lights = mapOf(st("light.lucesmultimedia", "on", """{"entity_id":["light.a","light.b"]}"""), st("light.a", "on"), st("light.b", "on"))
+        assertEquals("2 encendidas", HaWidget.look(tile("Luces de Multimedia"), lights).status)
+        // not in HA, or unreachable: grey, never "on"
+        assertEquals("No disponible", HaWidget.look(tile("TV"), mapOf(st("switch.other", "on"))).status)
+        assertTrue(!HaWidget.look(tile("MauTV"), mapOf(st("media_player.mautv_2", "unavailable"))).on)
+        assertEquals(23, HaWidget.TILES.size)
+    }
+}

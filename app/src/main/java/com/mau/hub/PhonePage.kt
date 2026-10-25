@@ -98,6 +98,13 @@ class PhonePage(
                     "Now open <a href=\"https://${d.url.removePrefix("https://")}\">${d.url.removePrefix("https://")}</a> and enter <b style=\"font-size:1.6em\">${d.userCode}</b><br>(it's on the TV too). Come back here or look at the TV once you've approved."
                 })
             }
+            "/homeassistant" -> {
+                val t = params["token"].orEmpty().trim()
+                if (t.isEmpty()) return send(out, 200, done("Paste the token first.", ok = false))
+                hub.prefs.edit().putString("ha_token", t).apply()
+                HaWidget.refresh(hub.ctx)
+                send(out, 200, done("Home Assistant token saved. The MauHome widget refreshes now."))
+            }
             // the same accounts, for setting up another device (tablet) from this one; same random path, only while the screen is open
             "/export" -> {
                 val form = (ACCOUNT_KEYS.mapNotNull { k -> hub.prefs.getString(k, null)?.let { k to it } } +
@@ -197,6 +204,9 @@ class PhonePage(
         <h2>YouTube${mark(hub.connected("google"))}</h2>
         <form method=post action="/$token/youtube"><input name=client_id placeholder="Client ID (TVs and Limited Input devices)" value="${pref("google_client_id")}"><input name=secret placeholder="Client secret" value="${pref("google_client_secret")}"><button>Get a sign-in code</button></form>
         <p class=hint>Google Cloud Console → APIs &amp; Services → Credentials → Create OAuth client ID → type <b>TVs and Limited Input devices</b>.</p>
+        <h2>Home Assistant${mark(hub.prefs.contains("ha_token"))}</h2>
+        <form method=post action="/$token/homeassistant"><input name=token type=password placeholder="Long-lived access token" autocomplete=off><button>Save token</button></form>
+        <p class=hint>For the MauHome widget. In Home Assistant: your profile → Security → Long-lived access tokens → Create token. Stays on this device only.</p>
     """)
 
     private fun done(msg: String, ok: Boolean = true) = page("Joint Launcher", "<p class=${if (ok) "msg" else "err"}>$msg</p><p><a href=\"/$token\">← Back</a></p>")
