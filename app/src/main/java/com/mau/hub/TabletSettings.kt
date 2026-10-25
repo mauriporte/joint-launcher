@@ -105,6 +105,9 @@ class TabletSettings(private val a: MainActivity) {
         line("Icon pack", packs.firstOrNull { it.first == pack }?.second ?: "The apps' own icons") { iconPack(packs, pack) }
         if (!hub.phone) line("Favorite apps", "${a.apps.favourites().size} chosen") { favouriteApps() }
         line("Hidden apps", a.apps.hidden().size.let { if (it == 0) "None: hold an app and choose Hide" else "$it hidden" }) { hiddenApps() }
+        if (!hub.touch) line("App lock", a.appLock.locked().size.let { n ->
+            (if (a.appLock.hasPin()) "PIN set" else "No PIN yet") + " · " + if (n == 0) "no apps locked: hold an app and choose Lock app" else "$n locked"
+        }) { a.appLock.changePin { a.toast("PIN saved"); draw() } }
 
         if (!hub.phone) {
         heading("Home")
@@ -201,6 +204,20 @@ class TabletSettings(private val a: MainActivity) {
 
         heading("Weather")
         line("Location", p.getString("weather_place", null) ?: "Automatic (from your connection)") { weatherPlace() }
+
+        if (!hub.touch) { // the TV's screensavers; not offered on the tablet and phone (yet)
+            heading("Screensaver")
+            val savers = linkedMapOf<String?, String>(null to "Android's own", ClockDream::class.java.name to "Flip clock on your background",
+                PhotoDream::class.java.name to "Your Immich photos")
+            val saver = p.getString("screensaver", null)
+            line("Screensaver", savers[saver] ?: savers.getValue(null)) { screensaver(savers, saver) }
+            if (saver == PhotoDream::class.java.name) {
+                val connected = p.contains("immich_key")
+                line("Photos", if (!connected) "Connect Immich first (Connect accounts → phone page)" else p.getString("immich_album_name", null) ?: "All photos") {
+                    if (connected) immichAlbum() else ConnectScreen(a).show()
+                }
+            }
+        }
 
         list.addView(a.text(13f, TEXT_MUTED).apply { text = a.actions.storageLine(); setPadding(0, a.dp(24), 0, 0) })
     }
@@ -383,6 +400,53 @@ class TabletSettings(private val a: MainActivity) {
             .setNegativeButton("Cancel", null).show()
     }
 
+    /**
+     * Makes one of ours (or Android's own again) the screensaver. Writing the system's screensaver setting needs the
+     * WRITE_SECURE_SETTINGS permission (granted once over adb, as for the Home button); without it, Android's
+     * screensaver settings open so you can pick it there.
+     */
+    private fun screensaver(savers: Map<String?, String>, current: String?) {
+        val keys = savers.keys.toList()
+        AlertDialog.Builder(a).setTitle("Screensaver")
+            .setSingleChoiceItems(savers.values.toTypedArray(), keys.indexOf(current)) { d, i ->
+                d.dismiss()
+                val pick = keys[i]
+                val cr = a.contentResolver
+                val permitted = a.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (!permitted) {
+                    runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS)) }
+                    return@setSingleChoiceItems
+                }
+                // remember Android's own choice once, to put it back when you pick "Android's own" again
+                if (!p.contains("screensaver_android")) p.edit().putString("screensaver_android",
+                    android.provider.Settings.Secure.getString(cr, "screensaver_components").orEmpty()).apply()
+                val component = pick?.let { android.content.ComponentName(a, it).flattenToString() } ?: p.getString("screensaver_android", "")
+                runCatching {
+                    android.provider.Settings.Secure.putString(cr, "screensaver_components", component)
+                    android.provider.Settings.Secure.putInt(cr, "screensaver_enabled", 1)
+                }.onFailure { a.toast("Couldn't set the screensaver: ${it.message}") }
+                p.edit().apply { if (pick == null) remove("screensaver") else putString("screensaver", pick) }.apply()
+                draw()
+            }.show()
+    }
+
+    /** All photos (random) or one of your Immich albums. */
+    private fun immichAlbum() = hub.pool.execute {
+        val albums = runCatching { Immich.albums(p.getString("immich_url", "")!!, p.getString("immich_key", "")!!) }
+        hub.main.post {
+            albums.onSuccess { list ->
+                val names = listOf("All photos (random)") + list.map { it.second }
+                AlertDialog.Builder(a).setTitle("Photos to show").setItems(names.toTypedArray()) { _, i ->
+                    p.edit().apply {
+                        if (i == 0) { remove("immich_album"); remove("immich_album_name") }
+                        else { putString("immich_album", list[i - 1].first); putString("immich_album_name", list[i - 1].second.substringBefore(" · ")) }
+                    }.apply()
+                    draw()
+                }.show()
+            }.onFailure { a.toast("Couldn't reach Immich: ${Sources.explain(it)}") }
+        }
+    }
+
     private fun timezone(current: String?) {
         // region/city zones only (skips the Etc/GMT+3 style aliases), alphabetical
         val zones = TimeZone.getAvailableIDs().filter { '/' in it && !it.startsWith("Etc/") && !it.startsWith("SystemV/") }.sorted()
@@ -431,7 +495,7 @@ class TabletSettings(private val a: MainActivity) {
     companion object {
         // backups leave out sign-ins (secrets don't belong in a file on the tablet's storage) and what only means
         // something on this install (placed widgets, picture files, the widget being added)
-        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "spotify_refresh", "google_client_secret",
+        private val NOT_BACKED_UP = setOf("key", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", AppLock.PIN, "spotify_refresh", "google_client_secret",
             "google_refresh", "widgets", "widget_pending", "bg_current", "ha_token")
         private fun backedUp(k: String) = k !in NOT_BACKED_UP && !k.startsWith("widget_size_") && !k.startsWith("wspan_") &&
             !k.startsWith("wpos_") && !k.startsWith("logo_")
@@ -466,15 +530,15 @@ class TabletSettings(private val a: MainActivity) {
             }.toMap()
         }
 
-        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "watch" to "To Watch", "ha" to "Home Assistant")
+        val SECTIONS = linkedMapOf("widgets" to "Widgets", "apps" to "Apps", "live" to "Live TV", "watch" to "To Watch", "ha" to "Home Assistant")
         private val DEFAULT_NAMES = SECTIONS + ("favorites" to "Favorites")
 
         /** A section's title on Home: your name for it, else the default. */
         fun name(hub: Hub, key: String) = hub.prefs.getString("section_name_$key", null) ?: DEFAULT_NAMES.getValue(key)
 
         // each section's icon in the icon pack (LineX names; most packs follow them), and a built-in one if the pack lacks it
-        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "mymovies") // a clapperboard: the reel read as a wheel
-        private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie)
+        private val PACK_ICONS = mapOf("widgets" to "magicwidgets", "apps" to "app_drawer_1", "ha" to "home_assistant", "watch" to "mymovies", "live" to "livetv") // a clapperboard: the reel read as a wheel
+        private val OWN_ICONS = mapOf("widgets" to R.drawable.ic_widgets, "apps" to R.drawable.ic_apps, "ha" to R.drawable.ic_house, "watch" to R.drawable.ic_movie, "live" to R.drawable.ic_live_tv)
 
         /** The icon a section shows when titles are off: the one you picked, else the selected pack's, else a built-in one. */
         fun icon(a: MainActivity, key: String): android.graphics.drawable.Drawable? {
@@ -487,6 +551,6 @@ class TabletSettings(private val a: MainActivity) {
 
         /** Tablet Home's sections in your order (new ones join at the end). */
         fun sections(hub: Hub) = RowOrder.apply(SECTIONS.keys.toList(), hub.prefs.getString("home_sections", "")!!.split(",").filter(String::isNotEmpty))
-            .filter { hub.touch || it == "apps" || it == "watch" } // the TV: just your apps and the video rows
+            .filter { if (hub.touch) it != "live" else it == "apps" || it == "live" || it == "watch" } // the TV: your apps, Live TV and the video rows
     }
 }
