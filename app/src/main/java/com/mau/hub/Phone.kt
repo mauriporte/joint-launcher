@@ -121,7 +121,9 @@ class PhoneHome(private val a: MainActivity) {
                 if (k.startsWith("cat:")) k to k.removePrefix("cat:") else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
             // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
-            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey } }.let { all -> all.take(maxOf(1, all.indexOfLast { it.isNotEmpty() } + 1)) }
+            // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
+            // changes shortcut page and never Home's (widgets, Beeper)
+            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey } }.let { all -> all.take(minOf(DOCK_PAGES, all.indexOfLast { it.isNotEmpty() } + 2)) }
             a.hub.main.post { fill(entries, byKey); fillDock(pages) }
         }
     }
@@ -168,6 +170,11 @@ class PhoneHome(private val a: MainActivity) {
             dock.addView(LinearLayout(a).apply {
                 gravity = Gravity.CENTER; setPadding(a.dp(12), 0, a.dp(12), 0)
                 keys.forEach { pkg -> addView(dockIcon(i, pkg), LinearLayout.LayoutParams(0, a.dp(52), 1f)) }
+                // an empty page: + opens the app list, where holding an app offers "Add to the shortcuts"
+                if (keys.isEmpty()) addView(a.text(26f, TEXT_SOFT).apply {
+                    text = "+"; gravity = Gravity.CENTER; background = a.bareButton(); contentDescription = "Add shortcuts to page ${i + 1}"
+                    setOnClickListener { drawer.open(); a.toast("Hold an app → Add to the shortcuts → Page ${i + 1}") }
+                }, LinearLayout.LayoutParams(a.dp(52), a.dp(52)))
             }, LinearLayout.LayoutParams(w, -1))
         }
         val now = dockScroll.page().coerceIn(0, pages.size - 1)
