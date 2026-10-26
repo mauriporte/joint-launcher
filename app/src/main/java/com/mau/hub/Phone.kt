@@ -280,7 +280,15 @@ class AllApps(private val a: MainActivity) {
         isClickable = true // touches stay in the drawer, not on Home under it
         addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(chips) },
             LinearLayout.LayoutParams(-1, a.dp(60)).apply { topMargin = a.dp(12) })
-        addView(search, LinearLayout.LayoutParams(-1, a.dp(48)).apply { setMargins(a.dp(20), a.dp(8), a.dp(20), a.dp(8)) })
+        // the search box, and beside it the list's icons on/off (names always stay), like Home's names/icons button
+        addView(LinearLayout(a).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(search, LinearLayout.LayoutParams(0, a.dp(48), 1f))
+            addView(a.iconButton(R.drawable.ic_apps, "Icons in the list") {
+                a.hub.prefs.edit().putBoolean("drawer_icons", !a.hub.prefs.getBoolean("drawer_icons", false)).apply(); show()
+            }.apply { setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton() },
+                LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginStart = a.dp(8) })
+        }, LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(20), a.dp(8), a.dp(12), a.dp(8)) })
         addView(recycler, LinearLayout.LayoutParams(-1, 0, 1f))
         visibility = View.GONE
     }
@@ -332,6 +340,15 @@ class AllApps(private val a: MainActivity) {
         home.categories().filter { it in used }.forEach { c ->
             chip(c, a.text(24f, Color.WHITE).apply { text = c.trim(); gravity = Gravity.CENTER; minWidth = a.dp(48) })
         }
+    }
+
+    /** A sideways swipe on the list: the next (1) or previous (-1) category; "all apps" counts as the first. */
+    fun step(by: Int) {
+        val cats = listOf<String?>(null) + home.categories().filter { c -> all.any { home.category(it.key) == c } }
+        val i = (cats.indexOf(category).coerceAtLeast(0) + by).coerceIn(0, cats.size - 1)
+        if (cats[i] == category) return
+        category = cats[i]; search.setText(""); drawChips(); show(); recycler.scrollToPosition(0)
+        chips.getChildAt(i)?.let { c -> (chips.parent as? HorizontalScrollView)?.smoothScrollTo(c.left - a.dp(48), 0) } // keep its icon in view
     }
 
     private fun show() {

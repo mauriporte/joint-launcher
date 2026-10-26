@@ -617,6 +617,7 @@ class MainActivity : Activity() {
         super.onResume()
         rows.retryFailed()
         if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
+        if (hub.phone) HomeButtonService.edgeBack(this, hub.prefs.getBoolean("edge_back", true))
         if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min
         if (!hub.touch) Thread { HomeButtonService.restore(this) }.start() // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again

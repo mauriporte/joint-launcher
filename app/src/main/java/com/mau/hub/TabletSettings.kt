@@ -317,6 +317,13 @@ class TabletSettings(private val a: MainActivity) {
         }, LinearLayout.LayoutParams(-1, a.dp(48)))
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Swipe up for every app · hold an app there to add it to Home, the shortcuts or a category" })
         // the MauHome widget's Home Assistant token: typed here on the phone (the Connect page is for setting up another device)
+        list.addView(android.widget.Switch(a).apply {
+            text = "Swipe from the left edge to go back (in every app; over Beeper it goes Home)"; textSize = 16f; setTextColor(Color.WHITE)
+            isChecked = p.getBoolean("edge_back", true)
+            setOnCheckedChangeListener { _, on -> p.edit().putBoolean("edge_back", on).apply(); HomeButtonService.edgeBack(a, on) }
+        }, LinearLayout.LayoutParams(-1, -2))
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "Needs Joint Launcher gestures switched on in Accessibility" })
+
         heading("Home Assistant")
         line("MauHome widget", "Edit its tiles: add, rename, reorder, remove") { a.startActivity(android.content.Intent(a, HaTiles::class.java)) }
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "For the MauHome widget: paste a long-lived token (HA → your profile → Security → Long-lived access tokens). " +
