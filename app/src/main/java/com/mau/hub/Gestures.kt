@@ -36,6 +36,8 @@ class Gestures(private val a: MainActivity) {
                 if (!tracking) return false
                 val dx = e.rawX - x0; val dy = e.rawY - y0
                 val swipe = when {
+                    // two fingers down on Home: the shortcuts hide or come back
+                    a.hub.phone && e.pointerCount >= 2 -> dy > a.dp(60) && abs(dy) > 2 * abs(dx) && onHome() && run { a.phoneHome.toggleDock(); true }
                     !side && abs(dx) > a.dp(90) && abs(dx) > 2 * abs(dy) -> { swiped(right = dx > 0); true }
                     // the phone: up and down too, unless what's under the finger scrolls that way (the drawer's list)
                     a.hub.phone && abs(dy) > a.dp(80) && abs(dy) > 2 * abs(dx) -> {
@@ -67,6 +69,7 @@ class Gestures(private val a: MainActivity) {
 
     private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown
     private fun drawerOpen() = a.hub.phone && a.phoneHome.drawer.isOpen
+    private fun onHome() = !drawerOpen() && !a.widgetPage.isOpen && !a.phoneHome.nowPanel.isOpen && !a.phoneHome.weatherPanel.isOpen
 
     private fun swiped(right: Boolean) {
         val page = a.widgetPage

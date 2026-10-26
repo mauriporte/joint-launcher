@@ -110,6 +110,14 @@ class PhoneHome(private val a: MainActivity) {
         nowPanel.coverTo = date; weatherPanel.coverTo = date; a.remote1.coverTo = date; a.remote2.coverTo = date
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
+        if (p.getBoolean("phone_dock_hidden", false)) dockScroll.visibility = View.GONE
+    }
+
+    /** Two fingers down on Home: hide the shortcuts, or bring them back. Remembered. */
+    fun toggleDock() {
+        val hide = dockScroll.visibility == View.VISIBLE
+        dockScroll.visibility = if (hide) View.GONE else View.VISIBLE
+        p.edit().putBoolean("phone_dock_hidden", hide).apply()
     }
 
     var icons: Boolean
