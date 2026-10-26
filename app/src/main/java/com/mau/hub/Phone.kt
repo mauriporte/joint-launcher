@@ -64,6 +64,8 @@ class PhoneHome(private val a: MainActivity) {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
 
+    private val sides = mutableListOf<View>() // the buttons and weather either side of the clock
+
     val view: View = FrameLayout(a).apply {
         addView(LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
@@ -77,7 +79,7 @@ class PhoneHome(private val a: MainActivity) {
                     addView(iconsButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                     addView(musicButton, LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
                     addView(remoteButtons[0], LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
-                }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
+                }.also { sides += it }, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = a.dp(2) })
                 // right, in the clock's other margin: the weather; a tap pops out the forecast (hold still picks the weather app)
                 // right, in the clock's other margin: the weather (a tap pops out the forecast, hold picks the weather app)
                 // and under it Remote 2 (Remote 1 is on the left), each popping out its Joint Remote card
@@ -89,7 +91,7 @@ class PhoneHome(private val a: MainActivity) {
                         w.setOnClickListener { weatherPanel.open(from = w) }
                     }
                     addView(remoteButtons[1], LinearLayout.LayoutParams(a.dp(44), a.dp(44)))
-                }, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
+                }.also { sides += it }, FrameLayout.LayoutParams(a.dp(52), -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = a.dp(2) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(18) })
             addView(date, LinearLayout.LayoutParams(-1, -2).apply { topMargin = a.dp(8) })
             addView(android.widget.ScrollView(a).apply {
@@ -111,6 +113,16 @@ class PhoneHome(private val a: MainActivity) {
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
         if (p.getBoolean("phone_dock_hidden", false)) dockScroll.visibility = View.GONE
+        if (p.getBoolean("phone_clean", false)) showClean(true)
+    }
+
+    /** Two fingers up on Home: only the flip clock (the buttons, weather, date and Home apps hide), or everything back. Remembered. */
+    fun toggleClean() = showClean(!p.getBoolean("phone_clean", false)).also { p.edit().putBoolean("phone_clean", it).apply() }
+
+    // invisible, not gone: the clock stays where it is, and holding the empty space still opens Settings
+    private fun showClean(clean: Boolean): Boolean {
+        (sides + date + list).forEach { it.visibility = if (clean) View.INVISIBLE else View.VISIBLE }
+        return clean
     }
 
     /** Two fingers down on Home: hide the shortcuts, or bring them back. Remembered. */
