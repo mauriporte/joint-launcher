@@ -251,8 +251,8 @@ class HaWidget : AppWidgetProvider() {
             setTextViewText(R.id.ha_msg, problem.orEmpty())
             setViewVisibility(R.id.ha_msg, if (problem == null) View.GONE else View.VISIBLE)
             if (Build.VERSION.SDK_INT < 31) return@apply
-            // columns follow the widget's width: resize it for more or fewer per row
-            setInt(R.id.ha_grid, "setNumColumns", (opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 360) / 90).coerceIn(2, 8))
+            // columns follow the widget's width: resize it for more or fewer per row (the phone: always 4, so names stay readable)
+            setInt(R.id.ha_grid, "setNumColumns", if (BuildConfig.FLAVOR == "phone") 4 else (opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 360) / 90).coerceIn(2, 8))
             setPendingIntentTemplate(R.id.ha_grid, PendingIntent.getActivity(c, 0, Intent(c, HaTap::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
             val st = states
@@ -273,7 +273,8 @@ class HaWidget : AppWidgetProvider() {
             setImageViewResource(R.id.ha_icon, t.icon)
             setInt(R.id.ha_icon, "setColorFilter", l.colour)
             setViewVisibility(R.id.ha_lock, if (t.guard != null) View.VISIBLE else View.GONE)
-            setTextViewText(R.id.ha_name, t.name)
+            // run-together names wrap as words: LucesComedor → Luces Comedor, GoogleMini → Google Mini
+            setTextViewText(R.id.ha_name, t.name.replace(Regex("(?<=\\p{Ll})(?=\\p{Lu})"), " "))
             setTextColor(R.id.ha_name, if (l.colour == GREY) GREY else 0xFFF2F2F2.toInt())
             setTextViewText(R.id.ha_status, l.status)
             setTextColor(R.id.ha_status, l.colour)
