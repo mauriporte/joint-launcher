@@ -72,7 +72,6 @@ class HaWidget : AppWidgetProvider() {
             s("PC Escritorio", R.drawable.ic_ha_server, "${OFFICE_STRIP}_4", guard = "PC Escritorio is the ServerStation. Turn it off?"),
             s("Regleta Monitor", R.drawable.ic_ha_plug, "${OFFICE_STRIP}_1", guard = "Regleta Monitor is on HA admin's do-not-switch list. Turn it off?"),
             HaTile("MauTV", R.drawable.ic_ha_tv, HaTile.Kind.TV, listOf("media_player.mautv_2")),
-            HaTile("GoogleMini", R.drawable.ic_ha_speaker, HaTile.Kind.SPEAKER, listOf("media_player.googlemini")),
             s("Enchufe Comedor", R.drawable.ic_ha_plug, "switch.smart_switch_19123114000010251h3048e1e9159739_outlet"),
             s("Enchufe Habitación", R.drawable.ic_ha_plug, "switch.smart_switch_20061255443881251h4648e1e91f084e_outlet"),
             s("Enchufe Sofá", R.drawable.ic_ha_plug, "${TV_STRIP}_4"),
