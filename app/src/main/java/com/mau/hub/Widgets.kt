@@ -211,7 +211,7 @@ class Widgets(private val a: MainActivity) {
 
     /** Settings → Widget page height: how many screens tall the grid is (1-10). Setting it replaces a height dragged by hand. */
     var screens: Int
-        get() = a.hub.prefs.getInt("widget_screens", 1)
+        get() = a.hub.prefs.getInt("widget_screens", if (a.hub.phone) 2 else 1)
         set(v) = a.hub.prefs.edit().apply {
             putInt("widget_screens", v.coerceIn(1, 10))
             listOf("p", "l").forEach { o -> ints("wgrid_$o")?.let { (c, _) -> putString("wgrid_$o", "$c,0") } } // 0 rows = follow Settings
@@ -220,6 +220,7 @@ class Widgets(private val a: MainActivity) {
     /** Columns x rows of the grid in this orientation: yours (rows dragged by hand, or Settings' screens), else the whole width. */
     private fun gridSize(width: Int): Pair<Int, Int> {
         val fromSettings = screenRows(width) * screens
+        if (a.hub.phone) return maxCols(width) to fromSettings // the phone: always the screen's width, Settings' height (2 screens unless changed)
         return ints("wgrid_$orient")?.let { (c, r) -> c.coerceIn(1, maxCols(width)) to (if (r <= 0) fromSettings else r.coerceIn(1, maxRows(width))) }
             ?: (maxCols(width) to fromSettings)
     }
@@ -255,7 +256,7 @@ class Widgets(private val a: MainActivity) {
             (spot.c until spot.c + sw).forEach { x -> (spot.r until spot.r + sh).forEach { y -> taken += x to y } }
             addView(tile(id, info, this, spot), spot)
         }
-        if (editing) addView(gridHandle(this), Spot(-1, -1, 0, 0))
+        if (editing && !a.hub.phone) addView(gridHandle(this), Spot(-1, -1, 0, 0)) // the phone's area has a fixed size
     }
 
     private inner class Grid : ViewGroup(a) {
