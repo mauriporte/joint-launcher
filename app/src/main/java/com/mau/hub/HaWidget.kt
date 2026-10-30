@@ -22,7 +22,7 @@ internal data class HaTile(val name: String, val icon: Int, val kind: Kind, val 
 }
 
 /**
- * MauHome: Mau's Google Home widget, button for button, wired to Home Assistant instead. See-through tiles with a
+ * MauHome: the owner's Google Home widget, button for button, wired to Home Assistant instead. See-through tiles with a
  * coloured outline (blue on, amber lights, green temperature, violet remote, grey off). Talks to HA's REST API with the
  * long-lived token entered on the Connect page; states refresh when the launcher comes back, after a tap, every 30
  * minutes, and when you tap the title. Android 12+ (both the tablet and the phone are).
@@ -51,7 +51,7 @@ class HaWidget : AppWidgetProvider() {
         private const val STRIP_GUARD = "This strip also powers the servers plugged into it (Home Assistant among them). Turn the whole strip off?"
 
         /**
-         * Mau's Google Home favourites first, in their order (4 across; the three without a sure HA match are left out),
+         * The owner's Google Home favourites first, in their order (4 across; the three without a sure HA match are left out),
          * then his other everyday lights, plugs and modes, then the cameras. List from HA admin, 25/10/2026.
          */
         internal val TILES = listOf(

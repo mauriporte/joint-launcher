@@ -55,7 +55,7 @@ Lessons learned:
   share a run; running it again fixes it.
 - An adb install can stop at "Performing Streamed Install" without finishing. Check
   `dumpsys package com.mau.hub.tablet | grep lastUpdateTime` and install again if it's old.
-- Ask Mau before installing (house rule, see `network.md`). After installing, press Home to restart the launcher
+- Ask the owner before installing (house rule, see `network.md`). After installing, press Home to restart the launcher
   rather than `am start`/`am force-stop`: starting it as a normal app gives it HyperOS's split-screen handle.
 
 ## What the tablet has
@@ -95,7 +95,7 @@ come from the selected icon pack, with built-in ones as a fallback.
   GeeSports' G stays yellow). Services that aren't installed take their brand colour (Filmin's F is green).
 - **Change icon** picks any icon from any installed pack, searchable, with an option to recolour it in the app's
   colour. Hand-picked icons were reviewed one by one (GeeSports = G, WayCar = car, etc.).
-- **The remote's icon** (Mau's standard, used everywhere): LineX's `ir_remote` D-pad keypad in the accent orange
+- **The remote's icon** (the owner's standard, used everywhere): LineX's `ir_remote` D-pad keypad in the accent orange
   `#E8650A`. Joint Remote (`com.mau.remote`) gets it built in (`IconPacks.OWN`); Change icon still overrides it.
 - The sidebar uses the same icons: pack icons and Joint Launcher's own icon have no grey tile behind them.
 - The Connect page's export also carries each app's icon by app name, so another device (the TV) can show the
@@ -160,7 +160,7 @@ otherwise; both come from `local.properties`. You sign in once inside the sectio
 
 ### MauHome widget
 
-Mau's Google Home widget, button for button, run by Home Assistant (`HaWidget.kt`): see-through tiles with coloured
+The owner's Google Home widget, button for button, run by Home Assistant (`HaWidget.kt`): see-through tiles with coloured
 outlines, padlocked server plugs ask before turning off, columns follow the widget's width. It reads HA's REST API
 with a long-lived token saved on the Connect page (Home Assistant section). Tiles without a sure HA match are grey
 "Sin asignar" placeholders. A.R.T. Phone extended it to 36 tiles with cameras.
@@ -174,7 +174,7 @@ off, reorder, remove, or go back to the original tiles. Saved in prefs `ha_tiles
 The house's daily paper from HA's `sensor.home_herald` (`HeraldWidget.kt`), read-only with MauHome's token, laid
 out like its HA page and in the same font (Gelasio, Georgia's free twin, also embedded in the page): masthead with
 the round logo, night/day and EN/ES switches, numbers 4 across, watch box, briefs. Keeps the last edition when HA is
-away; a tap opens it in the HA app. Mau approved the look (no blackletter masthead).
+away; a tap opens it in the HA app. The owner approved the look (no blackletter masthead).
 
 ### Other details
 
@@ -191,7 +191,7 @@ away; a tap opens it in the HA app. Mau approved the look (no blackletter masthe
 
 - Colours (`Ui.kt`): background `#050505`, accent `#E8650A` (dark orange), soft text `#C9CBD3`, muted text `#9A9DA8`.
 - Buttons on the tablet are bare icons (no circles or outlines); the clock and weather have no cards behind them.
-- Background picture in use: Mau's black vertical-wood floor photo with the MauCasaOS "M" logo in the bottom-right
+- Background picture in use: the owner's black vertical-wood floor photo with the MauCasaOS "M" logo in the bottom-right
   corner, darkened 25 %, with a landscape and a portrait version.
 - No fading at the page edges (it was tried and removed).
 
@@ -203,10 +203,10 @@ row order and the content parsers.
 
 ## Not done / known gaps
 
-- 25/10/2026: Mau called the tablet **a success**. Everything below is optional.
+- 25/10/2026: the owner called the tablet **a success**. Everything below is optional.
 - Not yet tried on screen: the remote cards upright (one at a time), and press-and-hold on a remote button.
-- MauHome tiles: HA admin helps Mau set them up in the tile editor when Mau brings it up (no reminders).
-- The pull request into `main` is open, waiting for Mau to merge it; the version is still 2.0 (build 6).
+- MauHome tiles: HA admin helps the owner set them up in the tile editor when the owner brings it up (no reminders).
+- The pull request into `main` is open, waiting for the owner to merge it; the version is still 2.0 (build 6).
 - New apps installed later don't get icons on the TV until another export/import (no in-app button).
 
 ## Day log, 25/10/2026
@@ -226,7 +226,7 @@ row order and the content parsers.
   turned, one at a time upright; pin, outer-edge close arrow, own % solid; press and hold a button to change device.
 - Home button service restore made safe right after updates (shared code; matters on the TV).
 
-## Decisions Mau made along the way
+## Decisions the owner made along the way
 
 - The TV and the tablet are different devices with different jobs: tablet builds never go on the TV.
 - 24-hour time everywhere, always.

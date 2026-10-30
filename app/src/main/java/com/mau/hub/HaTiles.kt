@@ -54,7 +54,7 @@ class HaTiles : Activity() {
 
     private fun name(o: JSONObject) = o.optJSONObject("attributes")?.optString("friendly_name").orEmpty().ifEmpty { o.optString("entity_id") }
 
-    // the status and navigation bars stay hidden here as on Home (Mau: hidden in all his apps); a swipe shows them for a moment
+    // the status and navigation bars stay hidden here as on Home (the owner: hidden in all his apps); a swipe shows them for a moment
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {

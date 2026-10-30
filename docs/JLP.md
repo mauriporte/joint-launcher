@@ -5,7 +5,7 @@ session (Android Redesign Team), 25/10/2026.
 
 ## What it is
 
-The phone version replaces Pro Launcher (`app.prolauncher`, which Mau paid for) on his POCO F5 Pro. It keeps what he
+The phone version replaces Pro Launcher (`app.prolauncher`, which the owner paid for) on his POCO F5 Pro. It keeps what he
 liked about Pro Launcher and matches the rest of his setup (the black wood + M wallpaper, LineX icons, the flip clock,
 Home Assistant):
 
@@ -38,7 +38,7 @@ export JAVA_HOME="C:/Users/mauri/android-tools/jdk/jdk-17.0.20.1+1"
 Lessons learned:
 - **HyperOS refuses every first install over adb** with `INSTALL_FAILED_USER_RESTRICTED` and no prompt, whatever
   the settings say ("Install via USB" on, `pm install`, the wireless-debugging port: all refused). The first install
-  works this way: copy the APK to `/sdcard/Download/`, make the media scanner see it (an adb push doesn't), and Mau
+  works this way: copy the APK to `/sdcard/Download/`, make the media scanner see it (an adb push doesn't), and the owner
   taps it once:
   `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/<apk>`.
   `am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t application/vnd.android.package-archive`
@@ -46,7 +46,7 @@ Lessons learned:
 - In Git Bash set `MSYS_NO_PATHCONV=1` for adb commands with phone paths, or `/sdcard/...` gets rewritten to a
   Windows path.
 - R8 sometimes fails with a file lock; run it again.
-- Default Home: `cmd package set-home-activity com.mau.hub.phone/com.mau.hub.MainActivity` (only when Mau asks).
+- Default Home: `cmd package set-home-activity com.mau.hub.phone/com.mau.hub.MainActivity` (only when the owner asks).
 - Never screenshot the phone to check the app: read only the app's own nodes from `uiautomator dump`, then delete
   the dump file. A screenshot once caught a private chat.
 
@@ -80,7 +80,7 @@ Lessons learned:
   the accessibility service (`HomeButtonService`, shown on the phone as "Joint Launcher gestures"). The service puts
   a 16 dp invisible strip on the left edge, only over the app being watched. That edge is free because the phone uses
   the 3-button bar. The service runs in its own process (`:home`), so the app talks to it by broadcast:
-  `HomeButtonService.watch()` and `global()` (lock). Mau switched it on in Accessibility on 25/10.
+  `HomeButtonService.watch()` and `global()` (lock). The owner switched it on in Accessibility on 25/10.
 - Swipes that start on something that scrolls that way (the category row, the list) are left to it.
 
 ### Widget page (`WidgetPage` in `Gestures.kt`, `Widgets.kt`)
@@ -91,7 +91,7 @@ Lessons learned:
 
 ### MauHome widget (`HaWidget.kt`, shared with the tablet)
 - 36 tiles, 4 across:
-  - Mau's 20 Google Home favourites in their order (the three without a sure HA match are left out);
+  - The owner's 20 Google Home favourites in their order (the three without a sure HA match are left out);
   - then 12 everyday tiles from HA admin's list: lights, Monitores, Ambiente, Modo Noche/Película/Ausente;
   - then 4 cameras.
   Full list and HA entities: `art-coordinator/shared/google-home-widget.md` and `ha-entities-for-widget.md`.
@@ -102,7 +102,7 @@ Lessons learned:
   still changes when a capture is taken. Ziicam and Webcam MauStation only have a picture while their RTSP stream is
   live, otherwise HA answers 500 and the tile says "Sin imagen".
 - The token goes in Settings → Home Assistant on the phone: a hidden field, no autofill, spaces and a pasted "Bearer"
-  stripped. The pref is `ha_token`, kept out of backups. Working since 25/10 with Mau's new token.
+  stripped. The pref is `ha_token`, kept out of backups. Working since 25/10 with the owner's new token.
 
 ### Pro Launcher import (`ProLauncherImport` in `Phone.kt`)
 - Settings → Import from Pro Launcher, or Restore from a file: both accept a .zip. Pick
@@ -127,7 +127,7 @@ order, the swipe-left app, and a zip that isn't a backup. `HaWidgetTest` (in `Li
 lamps vs groups, which tiles ask first, and the 36-tile count.
 
 ## Not done / known gaps
-- Which switch each MauHome tile controls: Mau will adjust some.
+- Which switch each MauHome tile controls: the owner will adjust some.
 - Tile editing in the widget (add/remove/reorder tiles from HA) is not built yet.
 - Pro Launcher extras not copied: the screen-time figure, the calendar line under the date, Notes, Interrupt.
 - Accounts (Jellyfin, Stremio, …) are hidden on the phone. A.R.T. Watch would need them later to sign the watch in.
@@ -135,7 +135,7 @@ lamps vs groups, which tiles ask first, and the 36-tile count.
   (hide them there if they don't fit).
 - Pro Launcher is still installed (not the default Home).
 
-## Decisions Mau made along the way
+## Decisions the owner made along the way
 - Swipe right opens the widget page, swipe left opens Beeper. The left edge goes back from Beeper.
 - Home apps can be text or LineX icons. App names are centred, and the list's transparency is adjustable.
 - Fold Pro Launcher's old word categories into the emoji ones. 🏠 House (his home setup) matters most.
