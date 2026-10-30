@@ -76,8 +76,8 @@ class HaTiles : Activity() {
             addView(button("+  Add a tile") { edit(null) })
             addView(View(this@HaTiles), LinearLayout.LayoutParams(dp(12), 1))
             addView(button("Back to the original tiles") {
-                AlertDialog.Builder(this@HaTiles).setMessage("Replace your tiles with the original ${HaWidget.TILES.size}?")
-                    .setPositiveButton("Replace") { _, _ -> HaWidget.save(this@HaTiles, null); tiles = HaWidget.TILES.toMutableList(); draw() }
+                AlertDialog.Builder(this@HaTiles).setMessage("Replace your tiles with the original ${HaWidget.defaults(this@HaTiles).size}?")
+                    .setPositiveButton("Replace") { _, _ -> HaWidget.save(this@HaTiles, null); tiles = HaWidget.defaults(this@HaTiles).toMutableList(); draw() }
                     .setNegativeButton("Cancel", null).show()
             })
         })

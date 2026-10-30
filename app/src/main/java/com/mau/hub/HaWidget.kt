@@ -22,7 +22,7 @@ internal data class HaTile(val name: String, val icon: Int, val kind: Kind, val 
 }
 
 /**
- * MauHome: the owner's Google Home widget, button for button, wired to Home Assistant instead. See-through tiles with a
+ * MauHome: a Google Home style widget, wired to Home Assistant. See-through tiles with a
  * coloured outline (blue on, amber lights, green temperature, violet remote, grey off). Talks to HA's REST API with the
  * long-lived token entered on the Connect page; states refresh when the launcher comes back, after a tap, every 30
  * minutes, and when you tap the title. Android 12+ (both the tablet and the phone are).
@@ -42,57 +42,27 @@ class HaWidget : AppWidgetProvider() {
         private const val BLUE = 0xFF29B6F6.toInt(); private const val AMBER = 0xFFFFC107.toInt()
         private const val GREEN = 0xFF66BB6A.toInt(); private const val VIOLET = 0xFFAB47BC.toInt(); private const val GREY = 0xFF8A8A8A.toInt()
 
-        private const val TV_STRIP = "switch.smart_switch_24080577293446540301c4e7ae08a829_outlet"
-        private const val OFFICE_STRIP = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet"
         private fun s(name: String, icon: Int, vararg e: String, guard: String? = null) = HaTile(name, icon, HaTile.Kind.SWITCH, e.toList(), guard)
-
         private fun l(name: String, e: String) = HaTile(name, R.drawable.ic_ha_bulb, HaTile.Kind.LIGHT, listOf(e))
         private fun cam(name: String, e: String) = HaTile(name, R.drawable.ic_ha_camera, HaTile.Kind.CAMERA, listOf(e))
-        private const val STRIP_GUARD = "This strip also powers the servers plugged into it (Home Assistant among them). Turn the whole strip off?"
 
         /**
-         * The owner's Google Home favourites first, in their order (4 across; the three without a sure HA match are left out),
-         * then his other everyday lights, plugs and modes, then the cameras. List from HA admin, 25/10/2026.
+         * Example tiles, one of each kind, for a build without its own list. Your real tiles go in assets/ha_tiles.json
+         * (kept out of git; same format as app/ha_tiles.example.json), or are made in the tile editor.
          */
         internal val TILES = listOf(
-            s("Regleta TV", R.drawable.ic_ha_plug, TV_STRIP, guard = STRIP_GUARD),
-            s("Regleta Oficina", R.drawable.ic_ha_plug, OFFICE_STRIP, guard = STRIP_GUARD.replace("Home Assistant", "the PC")),
-            s("Escritorio", R.drawable.ic_ha_plug, "${OFFICE_STRIP}_3"),
-            s("TV", R.drawable.ic_ha_tv, "${TV_STRIP}_2"),
-            HaTile("Audio", R.drawable.ic_ha_music, HaTile.Kind.IR, listOf("button.audio_on_off")),
-            s("Server Mini", R.drawable.ic_ha_server, "${TV_STRIP}_3", guard = "Server Mini runs Home Assistant and OMV. Turning it off takes both down, " +
-                "and this widget can't turn it back on: the plug has to be switched on by hand."),
-            HaTile("Termostato", R.drawable.ic_ha_thermo, HaTile.Kind.TEMP, listOf("sensor.termostato_temperatura")),
-            s("Cargador", R.drawable.ic_ha_charger, "switch.regleta_multimedia_enchufe_1"),
-            s("Monitor 1", R.drawable.ic_ha_monitor, "switch.enchufe_inteligente_2"), // HA's numbers are the other way round
-            s("Monitor 2", R.drawable.ic_ha_monitor, "switch.enchufe_inteligente_1"),
-            s("Luces Multimedia", R.drawable.ic_ha_bulb, "switch.regleta_multimedia_enchufe_2"),
-            HaTile("Luces de Multimedia", R.drawable.ic_ha_bulb, HaTile.Kind.LIGHT, listOf("light.lucesmultimedia")),
-            s("Cargador PC", R.drawable.ic_ha_charger, "${OFFICE_STRIP}_2"),
-            s("PC Escritorio", R.drawable.ic_ha_server, "${OFFICE_STRIP}_4", guard = "PC Escritorio is the ServerStation. Turn it off?"),
-            s("Regleta Monitor", R.drawable.ic_ha_plug, "${OFFICE_STRIP}_1", guard = "Regleta Monitor is on HA admin's do-not-switch list. Turn it off?"),
-            HaTile("MauTV", R.drawable.ic_ha_tv, HaTile.Kind.TV, listOf("media_player.mautv_2")),
-            s("Enchufe Comedor", R.drawable.ic_ha_plug, "switch.smart_switch_19123114000010251h3048e1e9159739_outlet"),
-            s("Enchufe Habitación", R.drawable.ic_ha_plug, "switch.smart_switch_20061255443881251h4648e1e91f084e_outlet"),
-            s("Enchufe Sofá", R.drawable.ic_ha_plug, "${TV_STRIP}_4"),
-            // everyday, not in Google Home
-            l("Luces Comedor", "light.lucescomedor"),
-            l("Luces Dormitorio", "light.lucesdormitorio"),
-            l("Lámpara Vestidor", "light.salon_lampara_vestidor"),
-            l("Lámpara de Pie", "light.lampara_de_pie"),
-            l("Lámpara de Lectura", "light.lampara_de_lectura"),
-            l("Luz Habitación", "light.dormitorio_luz_habitacion_interruptor_1"),
-            l("Luz Invitados", "light.luzinvitados"),
-            s("Monitores", R.drawable.ic_ha_monitor, "switch.monitores"),
-            s("Ambiente", R.drawable.ic_ha_plug, "switch.regleta_multimedia_enchufe_3"),
-            s("Modo Noche", R.drawable.ic_ha_night, "switch.modo_noche"),
-            s("Modo Película", R.drawable.ic_ha_movie, "switch.modo_peli"),
-            s("Modo Ausente", R.drawable.ic_ha_away, "switch.modo_ausente"),
-            // cameras: Entrada and Vestidor are Verisure (their still changes when it's captured in HA/Verisure)
-            cam("Entrada", "camera.entrada"),
-            cam("Vestidor", "camera.vestidor"),
-            cam("Cámara Ziicam", "camera.camara_ziicam"),
-            cam("Webcam MauStation", "camera.webcam_maustation"),
+            s("Power Strip", R.drawable.ic_ha_plug, "switch.power_strip", guard = "This strip also powers the home server. Turn the whole strip off?"),
+            s("Desk Plug", R.drawable.ic_ha_plug, "switch.desk_plug"),
+            s("TV Plug", R.drawable.ic_ha_tv, "switch.tv_plug"),
+            HaTile("Audio", R.drawable.ic_ha_music, HaTile.Kind.IR, listOf("button.audio_power")),
+            HaTile("Thermostat", R.drawable.ic_ha_thermo, HaTile.Kind.TEMP, listOf("sensor.thermostat_temperature")),
+            HaTile("Living Room Lights", R.drawable.ic_ha_bulb, HaTile.Kind.LIGHT, listOf("light.living_room")),
+            l("Reading Lamp", "light.reading_lamp"),
+            HaTile("Living Room TV", R.drawable.ic_ha_tv, HaTile.Kind.TV, listOf("media_player.living_room_tv")),
+            HaTile("Kitchen Speaker", R.drawable.ic_ha_speaker, HaTile.Kind.SPEAKER, listOf("media_player.kitchen_speaker")),
+            s("Night Mode", R.drawable.ic_ha_night, "switch.night_mode"),
+            HaTile("Movie Scene", R.drawable.ic_ha_movie, HaTile.Kind.RUN, listOf("scene.movie")),
+            cam("Front Door", "camera.front_door"),
         )
 
         /** The icons a tile can have, by the name tiles are saved with (a drawable's number changes between builds). */
@@ -102,9 +72,12 @@ class HaWidget : AppWidgetProvider() {
             "camera" to R.drawable.ic_ha_camera, "night" to R.drawable.ic_ha_night, "movie" to R.drawable.ic_ha_movie, "away" to R.drawable.ic_ha_away)
         private const val SAVED = "ha_tiles"
 
-        /** Your tiles as edited in [HaTiles]; [TILES] until you change them. */
+        /** Your tiles as edited in [HaTiles]; until you change them, [defaults]. */
         internal fun tiles(c: Context): List<HaTile> = c.getSharedPreferences("hub", Context.MODE_PRIVATE).getString(SAVED, null)
-            ?.let { runCatching { fromJson(it) }.getOrNull() } ?: TILES
+            ?.let { runCatching { fromJson(it) }.getOrNull() } ?: defaults(c)
+        /** This build's own tiles (assets/ha_tiles.json, not in git), else the examples in [TILES]. */
+        internal fun defaults(c: Context): List<HaTile> =
+            runCatching { fromJson(c.assets.open("ha_tiles.json").bufferedReader().use { it.readText() }) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: TILES
         internal fun save(c: Context, list: List<HaTile>?) {
             c.getSharedPreferences("hub", Context.MODE_PRIVATE).edit().apply { if (list == null) remove(SAVED) else putString(SAVED, toJson(list)) }.apply()
             refresh(c)
@@ -273,7 +246,7 @@ class HaWidget : AppWidgetProvider() {
             setImageViewResource(R.id.ha_icon, t.icon)
             setInt(R.id.ha_icon, "setColorFilter", l.colour)
             setViewVisibility(R.id.ha_lock, if (t.guard != null) View.VISIBLE else View.GONE)
-            // run-together names wrap as words: LucesComedor → Luces Comedor, GoogleMini → Google Mini
+            // run-together names wrap as words: LivingRoom → Living Room, KitchenSpeaker → Kitchen Speaker
             setTextViewText(R.id.ha_name, t.name.replace(Regex("(?<=\\p{Ll})(?=\\p{Lu})"), " "))
             setTextColor(R.id.ha_name, if (l.colour == GREY) GREY else 0xFFF2F2F2.toInt())
             setTextViewText(R.id.ha_status, l.status)

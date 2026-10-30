@@ -90,17 +90,14 @@ Lessons learned:
   edit mode still works; whichever you changed last wins.
 
 ### MauHome widget (`HaWidget.kt`, shared with the tablet)
-- 36 tiles, 4 across:
-  - The owner's 20 Google Home favourites in their order (the three without a sure HA match are left out);
-  - then 12 everyday tiles from HA admin's list: lights, Monitores, Ambiente, Modo Noche/Película/Ausente;
-  - then 4 cameras.
-  Full list and HA entities: `art-coordinator/shared/google-home-widget.md` and `ha-entities-for-widget.md`.
-- Server Mini, PC Escritorio, Regleta TV, Regleta Oficina and Regleta Monitor ask before turning off. They feed or
-  are servers (HA admin's never-switch list).
+- Tiles: the owner's own list lives in `app/src/main/assets/ha_tiles.json`, which git ignores; it is bundled into
+  builds made on this PC. Without it the widget shows example tiles (`HaWidget.TILES`, same format as
+  `app/ha_tiles.example.json`). Tiles edited in the tile editor are saved on the phone and win over both. Up to 5
+  across on the phone, following the widget's width.
+- Tiles with a guard (strips feeding servers, the servers themselves) ask before turning off.
 - Camera tiles show the latest still from `/api/camera_proxy` (small, RGB_565, because a widget's pictures share one
-  size-limited bundle). Tapping one opens it big, refreshing every 2 s. Entrada and Vestidor are Verisure: their
-  still changes when a capture is taken. Ziicam and Webcam MauStation only have a picture while their RTSP stream is
-  live, otherwise HA answers 500 and the tile says "Sin imagen".
+  size-limited bundle). Tapping one opens it big, refreshing every 2 s. A camera that only streams over RTSP has a
+  picture only while the stream is live; otherwise HA answers 500 and the tile says "Sin imagen".
 - The token goes in Settings → Home Assistant on the phone: a hidden field, no autofill, spaces and a pasted "Bearer"
   stripped. The pref is `ha_token`, kept out of backups. Working since 25/10 with the owner's new token.
 

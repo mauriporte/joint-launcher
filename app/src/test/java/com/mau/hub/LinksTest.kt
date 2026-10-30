@@ -369,24 +369,27 @@ class HaWidgetTest {
     private fun tile(name: String) = HaWidget.TILES.first { it.name == name }
 
     @Test fun tilesShowHomeAssistantStates() {
-        val desk = "switch.smart_switch_24080534592012540301c4e7ae08a7e5_outlet_3"
-        assertTrue(HaWidget.look(tile("Escritorio"), mapOf(st(desk, "on"))).on)
-        assertEquals("Apagado", HaWidget.look(tile("Escritorio"), mapOf(st(desk, "off"))).status)
-        // the thermostat reports °F; the tile shows °C
-        assertEquals("25.7 °C", HaWidget.look(tile("Termostato"), mapOf(st("sensor.termostato_temperatura", "78.26", """{"unit_of_measurement":"°F"}"""))).status)
-        // the lights group counts its members that are on
-        val lights = mapOf(st("light.lucesmultimedia", "on", """{"entity_id":["light.a","light.b"]}"""), st("light.a", "on"), st("light.b", "on"))
-        assertEquals("2 encendidas", HaWidget.look(tile("Luces de Multimedia"), lights).status)
+        assertTrue(HaWidget.look(tile("Desk Plug"), mapOf(st("switch.desk_plug", "on"))).on)
+        assertEquals("Apagado", HaWidget.look(tile("Desk Plug"), mapOf(st("switch.desk_plug", "off"))).status)
+        // a thermostat reporting °F; the tile shows °C
+        assertEquals("25.7 °C", HaWidget.look(tile("Thermostat"), mapOf(st("sensor.thermostat_temperature", "78.26", """{"unit_of_measurement":"°F"}"""))).status)
+        // a lights group counts its members that are on
+        val lights = mapOf(st("light.living_room", "on", """{"entity_id":["light.a","light.b"]}"""), st("light.a", "on"), st("light.b", "on"))
+        assertEquals("2 encendidas", HaWidget.look(tile("Living Room Lights"), lights).status)
         // not in HA, or unreachable: grey, never "on"
-        assertEquals("No disponible", HaWidget.look(tile("TV"), mapOf(st("switch.other", "on"))).status)
-        assertTrue(!HaWidget.look(tile("MauTV"), mapOf(st("media_player.mautv_2", "unavailable"))).on)
+        assertEquals("No disponible", HaWidget.look(tile("TV Plug"), mapOf(st("switch.other", "on"))).status)
+        assertTrue(!HaWidget.look(tile("Living Room TV"), mapOf(st("media_player.living_room_tv", "unavailable"))).on)
         // a single lamp, not a group
-        assertEquals("Encendida", HaWidget.look(tile("Lámpara Vestidor"), mapOf(st("light.salon_lampara_vestidor", "on"))).status)
-        // the servers and the strips feeding them ask before turning off; nothing else does
-        assertEquals(setOf("Regleta TV", "Regleta Oficina", "Server Mini", "PC Escritorio", "Regleta Monitor"), HaWidget.TILES.filter { it.guard != null }.map { it.name }.toSet())
-        // 20 Google Home favourites + 12 everyday + 4 cameras: 9 full rows of 4
-        assertEquals(36, HaWidget.TILES.size)
-        assertEquals(4, HaWidget.TILES.count { it.kind == HaTile.Kind.CAMERA })
+        assertEquals("Encendida", HaWidget.look(tile("Reading Lamp"), mapOf(st("light.reading_lamp", "on"))).status)
+        // only the strip that feeds a server asks before turning off
+        assertEquals(listOf("Power Strip"), HaWidget.TILES.filter { it.guard != null }.map { it.name })
+    }
+
+    @Test fun exampleTilesFileReadsBack() {
+        val list = HaWidget.fromJson(java.io.File("ha_tiles.example.json").readText())
+        assertEquals(HaTile.Kind.values().toSet(), list.map { it.kind }.toSet()) // one of every kind
+        assertEquals(list, HaWidget.fromJson(HaWidget.toJson(list)))
+        assertEquals("This strip also powers the home server. Turn the whole strip off?", list[0].guard)
     }
 }
 

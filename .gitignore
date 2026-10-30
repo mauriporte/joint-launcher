@@ -9,3 +9,6 @@ app/build/
 local.properties
 tools/connect.config.json
 .claude/settings.local.json
+
+# MauHome: your own tiles (real Home Assistant entities), bundled into your build; see app/ha_tiles.example.json
+app/src/main/assets/ha_tiles.json
