@@ -163,6 +163,14 @@ class TabletSettings(private val a: MainActivity) {
         listOf(Gestures.SWIPE_RIGHT, Gestures.SWIPE_LEFT, Gestures.DOUBLE_TAP).forEach { k ->
             line(Gestures.LABELS.getValue(k), a.gestures.describe(k)) { a.gestures.choose(k) { draw() } }
         }
+        if (!hub.phone) {
+            list.addView(android.widget.Switch(a).apply {
+                text = "Swipe from the left edge to go back (in every app)"; textSize = 16f; setTextColor(Color.WHITE)
+                isChecked = p.getBoolean("edge_back", true)
+                setOnCheckedChangeListener { _, on -> p.edit().putBoolean("edge_back", on).apply(); HomeButtonService.edgeBack(a, on) }
+            }, LinearLayout.LayoutParams(-1, -2))
+            list.addView(a.text(14f, TEXT_MUTED).apply { text = "Needs Joint Launcher gestures switched on in Accessibility" })
+        }
         val heightLabel = a.text(15f, TEXT_SOFT)
         fun heightText(n: Int) { heightLabel.text = "Widget page height: $n screen${if (n > 1) "s" else ""} (more rows appear by themselves when it's full)" }
         list.addView(heightLabel, LinearLayout.LayoutParams(-2, -2).apply { topMargin = a.dp(8) })

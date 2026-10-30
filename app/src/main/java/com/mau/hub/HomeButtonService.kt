@@ -19,37 +19,57 @@ class HomeButtonService : AccessibilityService() {
     // the app asks for a system action (lock the screen) by broadcast: this service runs in its own process
     private val asked = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (!i.hasExtra("watch")) { performGlobalAction(i.getIntExtra("action", 0)); return }
-            // the launcher says this just before it opens the app, and the app's window can be reported before this arrives:
-            // put the strip up now (any other app coming up takes it down). Remembered for when Android restarts the service.
-            watched = i.getStringExtra("watch")
-            prefs(this@HomeButtonService).edit().putString("watched", watched).apply()
-            showStrip()
+            when {
+                i.hasExtra("edge_back") -> {
+                    edgeBack = i.getBooleanExtra("edge_back", false)
+                    prefs(this@HomeButtonService).edit().putBoolean("edge_back", edgeBack).apply()
+                    updateStrip()
+                }
+                i.hasExtra("watch") -> {
+                    // the launcher says this just before it opens the app, and the app's window can be reported before this
+                    // arrives: count it as on screen now. Remembered for when Android restarts the service.
+                    watched = i.getStringExtra("watch"); front = watched
+                    prefs(this@HomeButtonService).edit().putString("watched", watched).apply()
+                    updateStrip()
+                }
+                else -> performGlobalAction(i.getIntExtra("action", 0))
+            }
         }
     }
 
-    // phone: the app a swipe opens (Beeper). While it's on screen, a thin strip on the left edge (free with the 3-button
-    // bar) takes a swipe to the right back to Home, as if Beeper were a page beside it
+    // phone and tablet: a thin strip on the left edge (free with the 3-button bar). A swipe right from it goes back, in every app,
+    // when Settings' "swipe from the left edge to go back" is on; over the swipe-left app (Beeper) it goes Home instead,
+    // as if that app were a page beside Home.
     private var watched: String? = null
+    private var edgeBack = false
+    private var front: String? = null // the app on screen
     private var strip: android.view.View? = null
+
+    // not over our own Home: the tablet's left edge there slides the sidebar in
+    private fun updateStrip() { if ((edgeBack && front != packageName) || (watched != null && front == watched)) showStrip() else hideStrip() }
 
     private fun showStrip() {
         if (strip != null) return
         val dp = resources.displayMetrics.density
-        var x0 = 0f
+        val h = resources.displayMetrics.heightPixels
+        var x0 = 0f; var done = false
         strip = android.view.View(this).apply {
             setOnTouchListener { _, e ->
                 when (e.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> x0 = e.rawX
-                    android.view.MotionEvent.ACTION_MOVE -> if (e.rawX - x0 > 70 * dp) { hideStrip(); performGlobalAction(GLOBAL_ACTION_HOME) }
+                    android.view.MotionEvent.ACTION_DOWN -> { x0 = e.rawX; done = false }
+                    android.view.MotionEvent.ACTION_MOVE -> if (!done && e.rawX - x0 > 60 * dp) {
+                        done = true
+                        performGlobalAction(if (watched != null && front == watched) GLOBAL_ACTION_HOME else GLOBAL_ACTION_BACK)
+                    }
                 }
                 true
             }
         }
-        val lp = android.view.WindowManager.LayoutParams((16 * dp).toInt(), -1,
+        // the middle of the edge only: the top keeps the status area, the bottom the keyboard's first keys and the bar
+        val lp = android.view.WindowManager.LayoutParams((12 * dp).toInt(), (h * 0.45).toInt(),
             android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, android.graphics.PixelFormat.TRANSLUCENT,
-        ).apply { gravity = android.view.Gravity.START }
+        ).apply { gravity = android.view.Gravity.START or android.view.Gravity.TOP; y = (h * 0.15).toInt() }
         runCatching { (getSystemService(WINDOW_SERVICE) as android.view.WindowManager).addView(strip, lp) }.onFailure { strip = null }
     }
 
@@ -61,8 +81,10 @@ class HomeButtonService : AccessibilityService() {
     override fun onServiceConnected() {
         wanted(this, true)
         watched = prefs(this).getString("watched", null)
+        edgeBack = prefs(this).getBoolean("edge_back", false)
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(asked, android.content.IntentFilter(ACTION), RECEIVER_NOT_EXPORTED)
         else registerReceiver(asked, android.content.IntentFilter(ACTION))
+        updateStrip()
     }
     override fun onDestroy() { hideStrip(); runCatching { unregisterReceiver(asked) }; super.onDestroy() }
 
@@ -82,14 +104,14 @@ class HomeButtonService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || watched == null) return
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         // the shade or the keyboard opening over the app isn't leaving it
         val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty().substringBefore('/')
         if (pkg == "com.android.systemui" || pkg == ime) return
         // our own strip appearing is a window of this app too: only Joint Launcher's Home screen counts as leaving the app
         if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
-        if (pkg == watched) showStrip() else hideStrip()
+        front = pkg; updateStrip()
     }
     override fun onInterrupt() = Unit
 
@@ -99,6 +121,9 @@ class HomeButtonService : AccessibilityService() {
 
         /** Phone: while [pkg] (the swipe-left app) is on screen, a swipe right from the left edge goes back Home. */
         fun watch(c: Context, pkg: String) = c.sendBroadcast(Intent(ACTION).setPackage(c.packageName).putExtra("watch", pkg))
+
+        /** Phone and tablet: Settings' "swipe from the left edge to go back" (in every app). */
+        fun edgeBack(c: Context, on: Boolean) = c.sendBroadcast(Intent(ACTION).setPackage(c.packageName).putExtra("edge_back", on))
 
         /** A system action only an accessibility service may do (lock the screen, for a gesture); false while it's switched off. */
         fun global(c: Context, action: Int): Boolean {
