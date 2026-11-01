@@ -14,7 +14,7 @@ backgrounds, a flip clock, Home Assistant and a settings panel for all of it.
 |---|---|
 | App name | Joint Launcher Tablet |
 | Package | `com.mau.hub.tablet` |
-| Device | Redmi Pad SE ("MauRedmiPad"), HyperOS, Android 15, used in landscape |
+| Device | Redmi Pad SE, HyperOS, Android 15, used in landscape |
 | Code | this repository, branch `redesign`, product flavor **`tablet`** |
 | Pull request | mauriporte/joint-launcher#1 (`redesign` → `main`) |
 | Device notes | `~/.claude/agents/art/tablet.md` and `network.md` (ADB access and house rules) |
@@ -24,7 +24,7 @@ backgrounds, a flip clock, Home Assistant and a settings panel for all of it.
 The TV, tablet and phone apps are product flavors of one app (`app/build.gradle.kts`, dimension `device`):
 
 - `tv`: `com.mau.hub.redesign` ("Joint Launcher"), what the TV runs. Now owned by the A.R.T. TV session; the TV
-  launcher has moved to its own repository, mauriporte/joint-launcher-tv (`C:\Users\mauri\joint-launcher-tv`).
+  launcher has moved to its own repository, mauriporte/joint-launcher-tv.
 - `tablet`: `com.mau.hub.tablet` ("Joint Launcher Tablet").
 - `phone`: owned by the A.R.T. Phone session.
 
@@ -38,14 +38,14 @@ app's inbox folder, and its sign-ins through the Connect page's export/import. T
 
 ## Building and installing
 
-Tools live in `C:\Users\mauri\android-tools` (JDK 17, Gradle 8.9). Machine-specific values are in the git-ignored
+Tools live in `<android-tools>` (JDK 17, Gradle 8.9). Machine-specific values are in the git-ignored
 `local.properties`: the Jellyfin server, the release signing key and its passwords, and the two Home Assistant
 addresses (`ha.local`, `ha.remote`). None of them are in the repository.
 
 ```bash
-export JAVA_HOME="C:/Users/mauri/android-tools/jdk/jdk-17.0.20.1+1"
-/c/Users/mauri/android-tools/gradle-8.9/bin/gradle -p /c/Users/mauri/joint-launcher-redesign testTabletReleaseUnitTest
-/c/Users/mauri/android-tools/gradle-8.9/bin/gradle -p /c/Users/mauri/joint-launcher-redesign assembleTabletRelease
+export JAVA_HOME="<android-tools>/jdk/jdk-17.0.20.1+1"
+<android-tools>/gradle-8.9/bin/gradle -p <worktree> testTabletReleaseUnitTest
+<android-tools>/gradle-8.9/bin/gradle -p <worktree> assembleTabletRelease
 ```
 
 The APK is `app/build/outputs/apk/tablet/release/app-tablet-release.apk`, signed with the release key and shrunk by R8.

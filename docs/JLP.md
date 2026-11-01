@@ -18,8 +18,8 @@ Home Assistant):
 |---|---|
 | App name | Joint Launcher Phone |
 | Package | `com.mau.hub.phone` |
-| Device | POCO F5 Pro ("MauF5Pro", 23013PC75G), HyperOS, Android 15, portrait, 3-button navigation bar |
-| Code | this repository: product flavor **`phone`**, worked on in branch `phone` (folder `C:\Users\mauri\joint-launcher-phone`), merged into `redesign` and `main` (PR #1) |
+| Device | POCO F5 Pro (23013PC75G), HyperOS, Android 15, portrait, 3-button navigation bar |
+| Code | this repository: product flavor **`phone`**, worked on in branch `phone` (its own worktree), merged into `redesign` and `main` (PR #1) |
 | Device notes | `~/.claude/agents/art/phone.md` and `network.md` (ADB access and house rules) |
 
 It is the third flavor of the same app (see `docs/JLT.md`, "One codebase, separate apps"). At runtime `Hub.phone`
@@ -29,9 +29,9 @@ shares the tablet's widgets, settings panel, icon packs and backups.
 ## Building and installing
 
 ```bash
-export JAVA_HOME="C:/Users/mauri/android-tools/jdk/jdk-17.0.20.1+1"
-/c/Users/mauri/android-tools/gradle-8.9/bin/gradle -p /c/Users/mauri/joint-launcher-phone testPhoneReleaseUnitTest
-/c/Users/mauri/android-tools/gradle-8.9/bin/gradle -p /c/Users/mauri/joint-launcher-phone assemblePhoneRelease
+export JAVA_HOME="<android-tools>/jdk/jdk-17.0.20.1+1"
+<android-tools>/gradle-8.9/bin/gradle -p <worktree> testPhoneReleaseUnitTest
+<android-tools>/gradle-8.9/bin/gradle -p <worktree> assemblePhoneRelease
 /c/adb/adb -s <phone-ip>:5555 install -r app/build/outputs/apk/phone/release/app-phone-release.apk
 ```
 

@@ -12,3 +12,5 @@ tools/connect.config.json
 
 # MauHome: your own tiles (real Home Assistant entities), bundled into your build; see app/ha_tiles.example.json
 app/src/main/assets/ha_tiles.json
+# Home Herald: the HA person whose picture is the masthead logo, one line
+app/src/main/assets/herald_logo.txt
