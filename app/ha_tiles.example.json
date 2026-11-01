@@ -1,0 +1,11 @@
+[
+ {"name": "Power Strip", "icon": "plug", "kind": "SWITCH", "entities": ["switch.power_strip"], "guard": "This strip also powers the home server. Turn the whole strip off?"},
+ {"name": "Desk Plug", "icon": "plug", "kind": "SWITCH", "entities": ["switch.desk_plug"]},
+ {"name": "Living Room Lights", "icon": "bulb", "kind": "LIGHT", "entities": ["light.living_room"]},
+ {"name": "Thermostat", "icon": "thermo", "kind": "TEMP", "entities": ["sensor.thermostat_temperature"]},
+ {"name": "Audio", "icon": "music", "kind": "IR", "entities": ["button.audio_power"]},
+ {"name": "Living Room TV", "icon": "tv", "kind": "TV", "entities": ["media_player.living_room_tv"]},
+ {"name": "Kitchen Speaker", "icon": "speaker", "kind": "SPEAKER", "entities": ["media_player.kitchen_speaker"]},
+ {"name": "Movie Scene", "icon": "movie", "kind": "RUN", "entities": ["scene.movie"]},
+ {"name": "Front Door", "icon": "camera", "kind": "CAMERA", "entities": ["camera.front_door"]}
+]

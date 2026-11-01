@@ -35,10 +35,10 @@ import java.net.URI
 import java.net.URL
 
 /**
- * Talking to Jarvis (Mau's assistant in Home Assistant) from two home-screen widgets: "Chat with Jarvis" opens a small
+ * Talking to Jarvis (the owner's assistant in Home Assistant) from two home-screen widgets: "Chat with Jarvis" opens a small
  * text chat, "Voice to Jarvis" records a voice message and sends it. HA's standard APIs only, with the device's own
  * token and address (like MauHome); the interface is HA admin's (art-coordinator/shared/jarvis-widgets-interface.md).
- * Sends only what Mau types or says; keeps nothing but the visible chat and the conversation id.
+ * Sends only what the owner types or says; keeps nothing but the visible chat and the conversation id.
  */
 object Jarvis {
     private const val AGENT = "conversation.jarvis_router"
@@ -97,7 +97,7 @@ object Jarvis {
 
     /**
      * The answer's audio for the device to play, or null when the Google Mini says it (switch.jarvis_habla_por_google_mini
-     * on). Piper, in the answer's own language: Assistant Me answers in the language Mau used, whatever the selector says.
+     * on). Piper, in the answer's own language: Assistant Me answers in the language the owner used, whatever the selector says.
      */
     private fun speech(c: Context, answer: String): String? {
         if (answer.isBlank() || http(c, "/api/states/switch.jarvis_habla_por_google_mini").optString("state") == "on") return null

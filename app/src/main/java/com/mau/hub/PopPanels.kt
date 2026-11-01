@@ -253,7 +253,7 @@ class WeatherPanel(a: MainActivity) : PopPanel(a) {
 class RemotePanel(a: MainActivity, val n: Int) : PopPanel(a) {
     var other: RemotePanel? = null
     private val prefs get() = a.hub.prefs
-    /** Your name for it; else, on the tablet only, the device its remote controls (MauTV...); else "Remote n". */
+    /** Your name for it; else, on the tablet only, the device its remote controls (Living Room TV...); else "Remote n". */
     val name get() = prefs.getString("remote_name_$n", null)?.takeIf { it.isNotBlank() }
         ?: (if (a.hub.phone) null else a.widgets.remoteDevice(n)) ?: "Remote $n"
     private val title = a.text(15f, Color.WHITE).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
