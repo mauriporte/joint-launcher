@@ -48,7 +48,8 @@ class HeraldWidget : AppWidgetProvider() {
         private const val CACHE = "herald_cache"; private const val AT = "herald_at"
         private const val FLIP_LANG = "com.mau.hub.HERALD_FLIP"; private const val LANG = "herald_es"
         private const val FLIP_MODE = "com.mau.hub.HERALD_MODE"; private const val NIGHT = "herald_night"
-        private const val LOGO_ENTITY = "person.maucasaos" // herald.py's logo_entity: its picture is the masthead logo
+        /** herald.py's logo_entity, from this build's assets/herald_logo.txt (not in git); no file, no logo. */
+        private fun logoEntity(c: Context) = runCatching { c.assets.open("herald_logo.txt").bufferedReader().use { it.readText().trim() } }.getOrNull()
 
         private fun prefs(c: Context) = c.getSharedPreferences("hub", Context.MODE_PRIVATE)
         /** Spanish: the switch's last choice, else the device's language. */
@@ -117,7 +118,8 @@ class HeraldWidget : AppWidgetProvider() {
         /** The masthead logo, as herald.py takes it: the logo person's picture, cut round, kept for a day. */
         private fun fetchLogo(c: Context) {
             val base = HaWidget.base(c)
-            val pic = JSONObject(Sources.get("$base/api/states/$LOGO_ENTITY", HaWidget.auth(c))).optJSONObject("attributes")
+            val entity = logoEntity(c) ?: return
+            val pic = JSONObject(Sources.get("$base/api/states/$entity", HaWidget.auth(c))).optJSONObject("attributes")
                 ?.optString("entity_picture")?.takeIf { it.isNotEmpty() } ?: return
             val bytes = (java.net.URL(base + pic).openConnection() as java.net.HttpURLConnection).run {
                 connectTimeout = 6000; readTimeout = 15000

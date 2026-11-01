@@ -54,7 +54,7 @@ class HaTiles : Activity() {
 
     private fun name(o: JSONObject) = o.optJSONObject("attributes")?.optString("friendly_name").orEmpty().ifEmpty { o.optString("entity_id") }
 
-    // the status and navigation bars stay hidden here as on Home (Mau: hidden in all his apps); a swipe shows them for a moment
+    // the status and navigation bars stay hidden here as on Home (the owner: hidden in all his apps); a swipe shows them for a moment
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
@@ -76,8 +76,8 @@ class HaTiles : Activity() {
             addView(button("+  Add a tile") { edit(null) })
             addView(View(this@HaTiles), LinearLayout.LayoutParams(dp(12), 1))
             addView(button("Back to the original tiles") {
-                AlertDialog.Builder(this@HaTiles).setMessage("Replace your tiles with the original ${HaWidget.TILES.size}?")
-                    .setPositiveButton("Replace") { _, _ -> HaWidget.save(this@HaTiles, null); tiles = HaWidget.TILES.toMutableList(); draw() }
+                AlertDialog.Builder(this@HaTiles).setMessage("Replace your tiles with the original ${HaWidget.defaults(this@HaTiles).size}?")
+                    .setPositiveButton("Replace") { _, _ -> HaWidget.save(this@HaTiles, null); tiles = HaWidget.defaults(this@HaTiles).toMutableList(); draw() }
                     .setNegativeButton("Cancel", null).show()
             })
         })
