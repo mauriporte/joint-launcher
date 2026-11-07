@@ -47,9 +47,29 @@ class DashboardTest {
         assertEquals("http://10.0.0.5:30060", Lan.swap("http://10.0.0.5:30060", pairs, setOf("http://10.0.0.5:3006"))) // another port
     }
 
+    @Test fun scrcpyLinkLikeTheDesktop() {
+        // what the desktop's Screens.jsx (URLSearchParams) builds for the same device
+        assertEquals("http://10.0.0.5:8001/#!action=stream&udid=10.0.0.9%3A5555&player=mse" +
+            "&ws=ws%3A%2F%2F10.0.0.5%3A8001%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%253A8886%26udid%3D10.0.0.9%253A5555&fitToScreen=true",
+            Dashboard.scrcpyLink("http://10.0.0.5:8001/", "10.0.0.9"))
+    }
+
     @Test fun notesCountOnlyNotes() {
         val tree = listOf(Dashboard.Note("B", "30-projects/B", listOf(Dashboard.Note("c", "30-projects/B/c", null))), Dashboard.Note("a", "30-projects/a", null))
         assertEquals(2, Dashboard.countNotes(tree))
+    }
+
+    @Test fun screenSlidersPairWithTheirSwitch() {
+        assertEquals("switch.pantalla_xperia", Dashboard.screenSwitch("switch.adb_xperia", false))
+        assertEquals("switch.stream_tv_video", Dashboard.screenSwitch("switch.stream_tv_control", true))
+    }
+
+    @Test fun sidewaysScreensGetARowUprightOnesShareOne() {
+        // Xperia sideways, two upright phones, a sideways TV, one more upright phone
+        val rows = Dashboard.screenRows(listOf(16 / 9f to true, 16 / 9f to false, 20 / 9f to false, 16 / 9f to true, 16 / 9f to false), 508f, 52f)
+        assertEquals(listOf(listOf(0), listOf(1, 2), listOf(3), listOf(4)), rows.map { r -> r.map { it.first } })
+        assertEquals(508f, rows[0][0].second, 0.01f); assertEquals(456f * 9 / 16, rows[0][0].third, 0.01f) // full width, short
+        assertEquals(250f, rows[1][0].second, 0.01f); assertEquals(198f * 16 / 9, rows[1][0].third, 0.01f) // half width, tall
     }
 
     @Test fun datesAndNotes() {

@@ -115,7 +115,8 @@ class Rows(private val a: MainActivity) {
         val myGen = a.gen
         val hub = a.hub
         // per profile: another Jellyfin user's Continue watching never flashes up after switching
-        val profile = hub.prefs.getString("uid", "").orEmpty().take(8)
+        // and per Jellyfin server: after a move, rows never show the old server's items (their IDs and pictures are gone)
+        val profile = hub.prefs.getString("uid", "").orEmpty().take(8) + hub.serverSetting.hashCode().toString(16)
         val cacheFile = cacheKey?.let { java.io.File(a.cacheDir, "rows/" + title.hashCode().toString(16) + it + profile + ".json") }
         var cached: String? = null // the JSON on screen; only touched on the UI thread
         fun show(items: List<Item>) {
@@ -143,8 +144,9 @@ class Rows(private val a: MainActivity) {
                     loading = false
                     if (myGen != a.gen || row !in models) return@post
                     if (items.isNotEmpty()) { failed.remove(row.id); if (fresh != cached) { cached = fresh; show(items) } }
-                    else if (cached == null) { // nothing cached and nothing fetched: hide the row, or say why
-                        if (errors.isEmpty()) { failed.remove(row.id); remove(row); return@post }
+                    // fetched fine but empty (e.g. no favourites any more): the saved copy is out of date, hide the row
+                    else if (errors.isEmpty()) { cacheFile?.delete(); failed.remove(row.id); remove(row) }
+                    else if (cached == null) { // nothing cached and nothing fetched: say why
                         // e.g. Jellyfin answers 503 for minutes while it starts: retry with backoff, and on every return to Home
                         val wait = 15_000L shl attempt++.coerceAtMost(4) // 15s, 30s, 1m, 2m, then every 4m
                         val again = if (wait < 60_000) "${wait / 1000}s" else "${wait / 60_000} min"

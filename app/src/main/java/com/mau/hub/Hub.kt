@@ -25,7 +25,10 @@ class Hub(val ctx: Context) {
     val country = Locale.getDefault().country.ifEmpty { "US" }
     @Volatile var userId: String? = null
 
-    fun jfUser() = userId ?: prefs.getString("uid", null) ?: Sources.jellyfinUser(server, jfKey).also { userId = it }
+    /** Jellyfin user IDs belong to one server: a saved one from another server (a move) is looked up again. */
+    fun jfUser() = userId ?: prefs.getString("uid", null)?.takeIf { prefs.getString(UID_SERVER, null) == serverSetting }
+        ?: Sources.jellyfinUser(server, jfKey).also { userId = it; saveUser(it) }
+    fun saveUser(id: String) = prefs.edit().putString("uid", id).putString(UID_SERVER, serverSetting).apply()
 
     // replace, not format(): search terms arrive URL-encoded ("%20h" would be read as a format specifier)
     fun jf(path: String): List<Item> = Sources.jellyfin(server, jfKey, path.replace("%s", jfUser()))
@@ -113,6 +116,7 @@ class Hub(val ctx: Context) {
             return host != null && (host.equals(domain, true) || host.endsWith(".$domain", true))
         }
         const val CF_ID = "cf_id"; const val CF_SECRET = "cf_secret"
+        const val UID_SERVER = "uid_server"
 
         /** Home Assistant (HA section, MauHome widget): the home address when it answers (on the home Wi-Fi), else the public one. Off the UI thread. */
         fun haUrl(): String? {

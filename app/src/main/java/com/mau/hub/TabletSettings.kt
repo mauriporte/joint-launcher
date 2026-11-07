@@ -24,8 +24,9 @@ class TabletSettings(private val a: MainActivity) {
     private val device get() = if (hub.phone) "phone" else if (hub.touch) "tablet" else "TV" // "Like the tablet" / "Like the TV"
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), 0, a.dp(24), a.dp(24)) }
     // made once so a redraw keeps what you've typed
-    private val url = field("Jellyfin URL", hub.serverSetting)
-    private val key = field("Jellyfin API key (Dashboard → API Keys)", hub.jfKey)
+    private val shownUrl = hub.serverSetting; private val shownKey = hub.jfKey
+    private val url = field("Jellyfin URL", shownUrl)
+    private val key = field("Jellyfin API key (Dashboard → API Keys)", shownKey)
 
     fun show() {
         val dialog = Dialog(a, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
@@ -589,9 +590,12 @@ class TabletSettings(private val a: MainActivity) {
 
     private fun saveJellyfin() {
         val u = url.text.toString().trim(); val k = key.text.toString().trim()
-        if (u == hub.serverSetting && k == hub.jfKey) return
-        if (k != hub.jfKey) p.edit().remove("uid").apply() // manual key: look the user up again
-        p.edit().putString("server", u).putString("key", k).apply()
+        // only what you edited here: Quick Connect (Connect accounts) may have signed in since these fields were filled
+        if (u == shownUrl && k == shownKey) return
+        p.edit().apply {
+            if (u != shownUrl) putString("server", u)
+            if (k != shownKey) { putString("key", k); remove("uid") } // manual key: look the user up again
+        }.apply()
         hub.userId = null
         a.loadHome()
     }

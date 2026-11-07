@@ -82,7 +82,7 @@ class Dashboard(private val a: MainActivity) {
     fun close() {
         if (!isOpen) return
         val w = a.window.decorView.width.toFloat()
-        panel = null; view.removeCallbacks(loop)
+        panel = null; view.removeCallbacks(loop); view.post(::dropScreen)
         view.animate().translationX(w).setDuration(220).withEndAction { view.visibility = View.GONE }.start()
         a.page.animate().translationX(0f).setDuration(220).start()
     }
@@ -183,6 +183,47 @@ class Dashboard(private val a: MainActivity) {
         trees = t; notes = n
     }
 
+    // the live screen inside the ADB / Stream Control panel, as the desktop's iframe: a real WebView over the drawn panel,
+    // so ws-scrcpy gets the touches (tap, swipe on the device's screen)
+    private val webs = mutableMapOf<String, android.webkit.WebView>() // shown screens by address
+    private val frames = mutableListOf<Pair<RectF, String>>() // where this draw put each screen (dp), and its address
+    private var screenBox: RectF? = null // the panel's scrolling area: screens outside it are hidden
+
+    /** Lays a live WebView over each screen frame drawn in the panel; frames scrolled away are clipped or hidden. */
+    private fun placeScreens(frames: List<Pair<RectF, String>>, box: RectF?) = view.post {
+        val wanted = if (isOpen && box != null) frames else emptyList()
+        (webs.keys - wanted.map { it.second }.toSet()).forEach { src -> webs.remove(src)?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.destroy() } }
+        val d = view.resources.displayMetrics.density
+        wanted.forEach { (r, src) ->
+            val w = webs.getOrPut(src) {
+                android.webkit.WebView(a).apply {
+                    settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = false
+                    webViewClient = android.webkit.WebViewClient(); setBackgroundColor(Color.BLACK)
+                    (view.parent as android.view.ViewGroup).addView(this, android.widget.FrameLayout.LayoutParams(0, 0))
+                    loadUrl(src, Hub.cfAccess(src))
+                }
+            }
+            val vis = RectF(r).apply { if (!intersect(box!!)) setEmpty() }
+            if (vis.height() < 24) { w.visibility = View.GONE; return@forEach }
+            (w.layoutParams as android.widget.FrameLayout.LayoutParams).let { lp ->
+                val l = (r.left * d).roundToInt(); val tp = (r.top * d).roundToInt(); val ww = (r.width() * d).roundToInt(); val hh = (r.height() * d).roundToInt()
+                if (lp.leftMargin != l || lp.topMargin != tp || lp.width != ww || lp.height != hh) { lp.leftMargin = l; lp.topMargin = tp; lp.width = ww; lp.height = hh; w.layoutParams = lp }
+            }
+            // only the part inside the panel's scrolling area shows (the frame keeps its size, so the page doesn't reflow)
+            w.clipBounds = android.graphics.Rect(((vis.left - r.left) * d).roundToInt(), ((vis.top - r.top) * d).roundToInt(), ((vis.right - r.left) * d).roundToInt(), ((vis.bottom - r.top) * d).roundToInt())
+            w.visibility = View.VISIBLE
+        }
+    }
+
+    /** No screen any more: the pages stop streaming. */
+    private fun dropScreen() = placeScreens(emptyList(), null)
+
+    /** This device's own addresses on the network, so its screen isn't listed. */
+    private fun ownIps(): List<String> = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }.mapNotNull { it.hostAddress }
+    }.getOrDefault(emptyList())
+
+
     private fun openNote(path: String) {
         runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("obsidian://open?vault=" + enc(VAULT_NAME) + "&file=" + enc(path))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             .onFailure { flash("Obsidian isn't installed") }
@@ -203,6 +244,13 @@ class Dashboard(private val a: MainActivity) {
                     picture(c.optString("entity"))?.let { pic -> runCatching { image(pic) }.getOrNull()?.let { d[c.optString("entity")] = it } }
                 }
             }
+            // ADB / Stream Control: the devices ADB Control is connected to (its /viewdata), as the desktop's Screens view lists them
+            if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
+                JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
+                    .optJSONArray("devices").objs()
+                    // not this device's own screen, nor any on the owner's list (adb.hide: their IPs)
+                    .filter { dv -> (dv.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) + ownIps()).also { if (!it) d["self"] = (d["self"] as? List<*>).orEmpty() + dv.optString("name") } }
+            }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)
     }
@@ -534,6 +582,7 @@ class Dashboard(private val a: MainActivity) {
 
     private fun drawPanel(c: Canvas, w: Float, h: Float) {
         val sv = panel ?: return
+        frames.clear(); screenBox = null
         hit(0f, 0f, w, h) { panel = null; view.invalidate() } // a tap outside the panel closes it
         val kind = sv.optString("kind"); val screens = sv.has("screens")
         val pw = min(w * (if (screens || kind == "security") 0.62f else 0.5f), 560f)
@@ -645,21 +694,63 @@ class Dashboard(private val a: MainActivity) {
                 treeRows(tree.orEmpty(), 0)
             }
             screens -> {
-                val cw = (bw - 16) / 3
+                // the sliders: ADB Control (or Stream Control) itself for each device
+                val cw3 = (bw - 16) / 3
                 apps.chunked(3).forEach { trio ->
                     rows.add(Row(42f, { cv, x, y, _, hh ->
                         trio.forEachIndexed { m, ap ->
                             val on = states[ap.optString("entity")]?.optString("state") == "on"
-                            val cx = x + m * (cw + 8)
-                            glassTile(cv, cx, y, cw, hh, 14f, on)
-                            text(cv, ap.optString("name").ifEmpty { ap.optString("entity") }, 13f, if (on) Color.WHITE else rgba("#9e9e9e"), cx + 10, y + (hh - 16) / 2, cw - 62, 1, true)
-                            val kx = cx + cw - 46; val ky = y + (hh - 20) / 2
+                            val cx = x + m * (cw3 + 8)
+                            glassTile(cv, cx, y, cw3, hh, 14f, on)
+                            text(cv, ap.optString("name").ifEmpty { ap.optString("entity") }, 13f, if (on) Color.WHITE else rgba("#9e9e9e"), cx + 10, y + (hh - 16) / 2, cw3 - 62, 1, true)
+                            val kx = cx + cw3 - 46; val ky = y + (hh - 20) / 2
                             round(cv, kx, ky, 36f, 20f, 10f, if (on) rgba(ACCENT) else white(0.2f))
                             fill.color = Color.WHITE; cv.drawCircle(kx + if (on) 26 else 10, ky + 10, 8f, fill)
                         }
-                    }, cells = trio to cw))
+                    }, cells = trio to cw3))
                 }
-                note("The live device screens are on the desktop dashboard.")
+                // the chips: each device's screen slider in HA (orange = on, its screen shows below); a tap flips it
+                val stream = sv.optString("screens") == "Stream"
+                @Suppress("UNCHECKED_CAST") val devs = data?.get("devs") as? List<JSONObject>
+                fun screen(ap: JSONObject) = screenSwitch(ap.optString("entity"), stream)
+                fun on(ap: JSONObject) = states[screen(ap)]?.optString("state") == "on"
+                fun dev(ap: JSONObject) = devs?.firstOrNull { it.optString("name") == ap.optString("name") }
+                val chips = apps.filter { states.containsKey(screen(it)) }
+                fun label(ap: JSONObject) = ap.optString("name").ifEmpty { ap.optString("entity") } + (dev(ap)?.takeIf { it.has("battery") }?.let { "  ${it.optString("battery")}%" } ?: "")
+                val lines = mutableListOf(mutableListOf<Pair<JSONObject, Float>>()); var lw = 0f
+                chips.forEach { ap -> val cw = textW(label(ap), 13f, true) + 28
+                    if (lw + cw > bw && lines.last().isNotEmpty()) { lines.add(mutableListOf()); lw = 0f }
+                    lines.last().add(ap to cw); lw += cw + 8 }
+                lines.forEach { line -> rows.add(Row(34f, { cv, x, y, _, hh ->
+                    var cx = x
+                    line.forEach { (ap, cw) ->
+                        val lit = on(ap)
+                        round(cv, cx, y, cw, hh, hh / 2, if (lit) rgba(ACCENT) else white(0.12f))
+                        text(cv, label(ap), 13f, if (lit) Color.BLACK else rgba("#c9cbd3"), cx + 14, y + (hh - 16) / 2, bold = true)
+                        hit(cx, y, cw, hh) { call("switch", "toggle", JSONObject().put("entity_id", screen(ap))) { loadPanel() } }
+                        cx += cw + 8
+                    }
+                })) }
+                when {
+                    BuildConfig.ADB_API.isEmpty() -> note("No ADB Control address in this build (adb.api in local.properties).")
+                    data?.get("devErr") == true -> note("ADB Control isn't reachable (only from home for now).")
+                    devs == null -> note("…")
+                }
+                // the screens switched on (not this device's own: devs leaves it out), each framed to its picture:
+                // one sideways device per row, two upright ones side by side
+                val shown = chips.filter(::on).mapNotNull(::dev).mapNotNull { dv ->
+                    (if (stream) dv.optString("player") else scrcpyLink(BuildConfig.ADB_SCRCPY, dv.optString("ip"))).takeIf { it.isNotEmpty() }?.let { dv to it }
+                }
+                val bar = if (stream) 0f else SCRCPY_BAR
+                screenRows(shown.map { (dv, _) -> dv.optDouble("aspect", 16 / 9.0).toFloat() to dv.optBoolean("landscape") }, bw, bar).forEach { row ->
+                    rows.add(Row(row.maxOf { it.third }, { cv, x, y, _, _ ->
+                        var fx = x
+                        row.forEach { (k, fw, fh) ->
+                            round(cv, fx, y, fw, fh, 12f, Color.BLACK); frames.add(RectF(fx, y, fx + fw, y + fh) to shown[k].second)
+                            fx += fw + 8
+                        }
+                    }))
+                }
             }
             else -> apps.forEach { ap ->
                 rows.add(Row(48f, { cv, x, y, ww, hh ->
@@ -693,6 +784,8 @@ class Dashboard(private val a: MainActivity) {
             yy += r.h + gap
         }
         c.restore()
+        // the screen sits where its row was drawn, cut to what's visible of the panel
+        screenBox = RectF(bx, by, bx + bw, by + bh); placeScreens(frames.toList(), screenBox)
     }
 
     inner class DashView : View(a) {
@@ -727,7 +820,7 @@ class Dashboard(private val a: MainActivity) {
                 ring(c, mx, PAD + 4, mw, mh, mh / 2, 1.5f, rgba(ACCENT))
                 text(c, msg, 13f, rgba(ACCENT), mx + 14, PAD + 4 + (mh - textH(msg, 13f, true)) / 2, bold = true)
             }
-            if (panel != null) drawPanel(c, w, h)
+            if (panel != null) drawPanel(c, w, h) else if (webs.isNotEmpty()) dropScreen() // posted, not during the draw
             c.restore()
         }
 
@@ -870,6 +963,37 @@ class Dashboard(private val a: MainActivity) {
         }
 
         private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+        const val SCRCPY_BAR = 52f // ws-scrcpy's button column at the frame's right (dp)
+
+        /** A device's screen slider next to its ADB / Stream Control switch: adb_xperia → pantalla_xperia, stream_tv_control → stream_tv_video. */
+        fun screenSwitch(entity: String, stream: Boolean) =
+            if (stream) entity.replace(Regex("_control$"), "_video") else entity.replace("switch.adb_", "switch.pantalla_")
+
+        /**
+         * Screens laid out in a [w]-wide panel: one sideways screen per row at full width, upright ones two to a row, each
+         * frame its picture's shape plus [bar] for ws-scrcpy's buttons. Rows of (index, width, height).
+         */
+        fun screenRows(screens: List<Pair<Float, Boolean>>, w: Float, bar: Float): List<List<Triple<Int, Float, Float>>> {
+            val half = (w - 8) / 2
+            fun frame(k: Int, fw: Float) = screens[k].let { (aspect, landscape) -> val a = max(1f, aspect)
+                Triple(k, fw, (fw - bar) * if (landscape) 1 / a else a) }
+            val out = mutableListOf<List<Triple<Int, Float, Float>>>(); var upright: Int? = null
+            screens.indices.forEach { k ->
+                if (screens[k].second) out.add(listOf(frame(k, w)))
+                else upright?.let { out.add(listOf(frame(it, half), frame(k, half))); upright = null } ?: run { upright = k }
+            }
+            upright?.let { out.add(listOf(frame(it, half))) }
+            return out
+        }
+
+        /** ws-scrcpy's page for one device: the same address ha-adb-control's /view and the desktop's Screens build. */
+        fun scrcpyLink(scrcpy: String, ip: String): String {
+            val udid = "$ip:5555"
+            val ws = scrcpy.replaceFirst("http", "ws") + "?action=proxy-adb&remote=tcp%3A8886&udid=" + enc(udid)
+            return scrcpy + "#!" + listOf("action" to "stream", "udid" to udid, "player" to "mse", "ws" to ws, "fitToScreen" to "true")
+                .joinToString("&") { (k, v) -> "$k=" + enc(v) }
+        }
         private fun Float?.orZero() = this ?: 0f
         internal fun JSONArray?.objs(): List<JSONObject> = this?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } } ?: emptyList()
         private fun JSONArray?.strings(): List<String> = this?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList()

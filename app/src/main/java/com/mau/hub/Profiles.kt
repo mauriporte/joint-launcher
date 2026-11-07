@@ -42,7 +42,7 @@ class Profiles(private val a: MainActivity) {
         if (from != null) copy(hub.prefs, store(from), clearFirst = true)
         val saved = store(to)
         if (saved.all.isNotEmpty()) { hub.prefs.edit().apply { KEYS.forEach(::remove) }.commit(); copy(saved, hub.prefs, clearFirst = false) }
-        hub.prefs.edit().putString("uid", to).commit()
+        hub.prefs.edit().putString("uid", to).putString(Hub.UID_SERVER, hub.serverSetting).commit()
         hub.userId = to
         a.applyBackground(); a.loadHome()
     }

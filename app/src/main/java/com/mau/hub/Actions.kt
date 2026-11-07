@@ -103,7 +103,7 @@ class Actions(private val a: MainActivity) {
             hub.main.post {
                 r.onSuccess { auth ->
                     auth ?: return@onSuccess
-                    hub.prefs.edit().putString("key", auth.first).putString("uid", auth.second).apply()
+                    hub.prefs.edit().putString("key", auth.first).apply(); hub.saveUser(auth.second)
                     hub.userId = auth.second; dialog.dismiss(); a.toast("Jellyfin connected"); a.loadHome()
                 }.onFailure { msg.text = "Quick Connect failed: ${it.message}\n(Is Quick Connect enabled in the Jellyfin dashboard?)" }
             }
