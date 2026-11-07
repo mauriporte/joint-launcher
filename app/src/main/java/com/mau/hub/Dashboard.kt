@@ -183,6 +183,18 @@ class Dashboard(private val a: MainActivity) {
         trees = t; notes = n
     }
 
+    /** A device's live screen (ws-scrcpy, or a Stream Control player) full size over the dashboard; Back closes it. */
+    private fun showScreen(name: String, src: String) {
+        val web = android.webkit.WebView(a).apply {
+            settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = false
+            webViewClient = android.webkit.WebViewClient(); setBackgroundColor(Color.BLACK)
+            loadUrl(src, Hub.cfAccess(src))
+        }
+        android.app.Dialog(a, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+            setContentView(web); setOnDismissListener { web.destroy() }; setTitle(name); show()
+        }
+    }
+
     private fun openNote(path: String) {
         runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("obsidian://open?vault=" + enc(VAULT_NAME) + "&file=" + enc(path))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             .onFailure { flash("Obsidian isn't installed") }
@@ -203,6 +215,11 @@ class Dashboard(private val a: MainActivity) {
                     picture(c.optString("entity"))?.let { pic -> runCatching { image(pic) }.getOrNull()?.let { d[c.optString("entity")] = it } }
                 }
             }
+            // ADB / Stream Control: the devices ADB Control is connected to (its /viewdata), as the desktop's Screens view lists them
+            if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
+                JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
+                    .optJSONArray("devices").objs()
+            }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)
     }
@@ -654,6 +671,25 @@ class Dashboard(private val a: MainActivity) {
                         }
                     }, cells = trio to cw))
                 }
+                // the live screens: one row per connected device; a tap shows its screen full size
+                val stream = sv.optString("screens") == "Stream"
+                @Suppress("UNCHECKED_CAST") val devs = data?.get("devs") as? List<JSONObject>
+                head("Screens")
+                when {
+                    BuildConfig.ADB_API.isEmpty() -> note("No ADB Control address in this build (adb.api in local.properties).")
+                    data?.get("devErr") == true -> note("ADB Control isn't reachable (only from home for now).")
+                    devs == null -> note("…")
+                    devs.isEmpty() -> note(if (stream) "Nothing is streaming. Turn a device's Video on above." else "No device is connected to ADB Control.")
+                }
+                devs.orEmpty().forEach { dv ->
+                    val name = dv.optString("name").ifEmpty { dv.optString("model") }
+                    val src = if (stream) dv.optString("player") else scrcpyLink(BuildConfig.ADB_SCRCPY, dv.optString("ip"))
+                    rows.add(Row(42f, { cv, x, y, ww, hh ->
+                        glassTile(cv, x, y, ww, hh, 14f, true)
+                        text(cv, name, 13f, Color.WHITE, x + 12, y + (hh - 16) / 2, ww - 90, 1, true)
+                        if (dv.has("battery")) dv.optString("battery").let { b -> text(cv, "$b%", 12f, rgba("#8a8a8e"), x + ww - 12 - textW("$b%", 12f), y + (hh - 15) / 2) }
+                    }, { if (src.isNotEmpty()) showScreen(name, src) }))
+                }
             }
             else -> apps.forEach { ap ->
                 rows.add(Row(48f, { cv, x, y, ww, hh ->
@@ -864,6 +900,14 @@ class Dashboard(private val a: MainActivity) {
         }
 
         private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+        /** ws-scrcpy's page for one device: the same address ha-adb-control's /view and the desktop's Screens build. */
+        fun scrcpyLink(scrcpy: String, ip: String): String {
+            val udid = "$ip:5555"
+            val ws = scrcpy.replaceFirst("http", "ws") + "?action=proxy-adb&remote=tcp%3A8886&udid=" + enc(udid)
+            return scrcpy + "#!" + listOf("action" to "stream", "udid" to udid, "player" to "mse", "ws" to ws, "fitToScreen" to "true")
+                .joinToString("&") { (k, v) -> "$k=" + enc(v) }
+        }
         private fun Float?.orZero() = this ?: 0f
         internal fun JSONArray?.objs(): List<JSONObject> = this?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } } ?: emptyList()
         private fun JSONArray?.strings(): List<String> = this?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList()

@@ -21,6 +21,9 @@ android {
         // Home Assistant for the tablet's section: ha.local (used when it answers, i.e. at home) and ha.remote in local.properties
         buildConfigField("String", "HA_LOCAL", "\"${local.getProperty("ha.local", "")}\"")
         buildConfigField("String", "HA_REMOTE", "\"${local.getProperty("ha.remote", "")}\"")
+        // ADB Control's API and ws-scrcpy, for the dashboard's live device screens: adb.api and adb.scrcpy in local.properties
+        buildConfigField("String", "ADB_API", "\"${local.getProperty("adb.api", "")}\"")
+        buildConfigField("String", "ADB_SCRCPY", "\"${local.getProperty("adb.scrcpy", "")}\"")
     }
     // two separate apps from the same code, so the TV and the tablet never share an install or its settings:
     // assembleTvRelease for the TV, assembleTabletRelease for the tablet, assemblePhoneRelease for the phone

@@ -40,6 +40,13 @@ class DashboardTest {
         assertEquals("2 notes" to true, Dashboard.serverInfo(j("""{"kind":"notes","folder":"30-projects"}"""), emptyMap(), mapOf("30-projects" to 2)))
     }
 
+    @Test fun scrcpyLinkLikeTheDesktop() {
+        // what the desktop's Screens.jsx (URLSearchParams) builds for the same device
+        assertEquals("http://10.0.0.5:8001/#!action=stream&udid=10.0.0.9%3A5555&player=mse" +
+            "&ws=ws%3A%2F%2F10.0.0.5%3A8001%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%253A8886%26udid%3D10.0.0.9%253A5555&fitToScreen=true",
+            Dashboard.scrcpyLink("http://10.0.0.5:8001/", "10.0.0.9"))
+    }
+
     @Test fun notesCountOnlyNotes() {
         val tree = listOf(Dashboard.Note("B", "30-projects/B", listOf(Dashboard.Note("c", "30-projects/B/c", null))), Dashboard.Note("a", "30-projects/a", null))
         assertEquals(2, Dashboard.countNotes(tree))
