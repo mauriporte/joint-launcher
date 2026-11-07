@@ -126,6 +126,7 @@ class MainActivity : Activity() {
             // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen); the phone has no sidebar
             if (touch && !hub.phone) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             if (touch) addView(widgetPage.view, FrameLayout.LayoutParams(-1, -1)) // over the edge strip: no sidebar from the widget page
+            if (touch) addView(dashboard.view, FrameLayout.LayoutParams(-1, -1))
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
@@ -151,6 +152,9 @@ class MainActivity : Activity() {
     val widgets by lazy { Widgets(this) }
     val widgetPage by lazy { WidgetPage(this) }
     val phoneHome by lazy { PhoneHome(this) }
+    /** The desktop's glass dashboard as a page: the tablet opens it by a gesture, the phone by turning sideways. */
+    val dashboard by lazy { Dashboard(this) }
+    val dashOpen get() = hub.touch && dashboard.isOpen
     // the two remote cards (Joint Remote's widget each); the buttons: the tablet's top bar, the phone's Home
     val remote1 by lazy { RemotePanel(this, 1) }
     val remote2 by lazy { RemotePanel(this, 2).also { remote1.other = it; it.other = remote1 } }
@@ -461,6 +465,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             detail.isShown -> detail.close()
+            dashOpen -> dashboard.back()
             hub.touch && remote2.isOpen && !remote2.pinned -> remote2.close()
             hub.touch && remote1.isOpen && !remote1.pinned -> remote1.close()
             hub.phone && phoneHome.drawer.isOpen -> phoneHome.drawer.close()
@@ -486,6 +491,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
+        if (dashOpen && !(hub.phone && landscape())) dashboard.close() // a phone held sideways stays on it
         if (hub.touch) listOf(remote1, remote2).filter { !it.pinned }.forEach { it.close() } // pinned ones stay out
         if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
@@ -582,7 +588,11 @@ class MainActivity : Activity() {
         applyBackground()
         if (hub.touch) rows.refreshWidgets() // the widget grid has its own size and spots per orientation
         if (hub.touch) RemotePanel.relayout(remote1, remote2)
+        // the phone: turned sideways is the dashboard, upright is Home
+        if (hub.phone) root.post { if (landscape()) dashboard.open() else dashboard.close() }
     }
+
+    private fun landscape() = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)

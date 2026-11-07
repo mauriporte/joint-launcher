@@ -68,7 +68,7 @@ class Gestures(private val a: MainActivity) {
         return false
     }
 
-    private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown
+    private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown && !a.dashOpen
     private fun drawerOpen() = a.hub.phone && a.phoneHome.drawer.isOpen
     private fun onHome() = !drawerOpen() && !a.widgetPage.isOpen && !a.phoneHome.nowPanel.isOpen && !a.phoneHome.weatherPanel.isOpen
 
