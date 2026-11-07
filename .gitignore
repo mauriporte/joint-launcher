@@ -14,3 +14,5 @@ tools/connect.config.json
 app/src/main/assets/ha_tiles.json
 # Home Herald: the HA person whose picture is the masthead logo, one line
 app/src/main/assets/herald_logo.txt
+# Dashboard: the desktop dashboard's file (real Home Assistant entities), bundled into your build
+app/src/main/assets/overlay.json

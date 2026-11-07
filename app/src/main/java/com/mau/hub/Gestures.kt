@@ -65,7 +65,7 @@ class Gestures(private val a: MainActivity) {
         return false
     }
 
-    private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown
+    private fun allowed() = !a.moveMode.active && !a.widgets.editing && !a.sidebar.isOpen && !a.detail.isShown && !a.dashOpen
     private fun drawerOpen() = a.hub.phone && a.phoneHome.drawer.isOpen
 
     private fun swiped(right: Boolean) {
@@ -96,6 +96,7 @@ class Gestures(private val a: MainActivity) {
     private fun run(what: String) {
         when {
             what == WIDGETS -> a.widgetPage.open()
+            what == DASHBOARD -> if (!a.hub.phone) a.dashboard.open()
             what.startsWith("app:") -> {
                 val pkg = what.removePrefix("app:")
                 if (a.hub.phone) HomeButtonService.watch(a, pkg) // a swipe right from its left edge comes back here
@@ -142,6 +143,7 @@ class Gestures(private val a: MainActivity) {
     /** Settings → Gestures: one line per gesture. */
     fun choose(key: String, done: () -> Unit) {
         val opts = (if (key == SWIPE_RIGHT) listOf(WIDGETS to "Widget page") else emptyList()) +
+            (if (!a.hub.phone) listOf(DASHBOARD to "Dashboard") else emptyList()) +
             listOf("app" to "Open an app…", "notifications" to "Notifications", "search" to "Search", "lock" to "Lock the screen", NONE to "Nothing")
         AlertDialog.Builder(a).setTitle(LABELS.getValue(key)).setItems(opts.map { it.second }.toTypedArray()) { _, i ->
             val v = opts[i].first
@@ -167,7 +169,7 @@ class Gestures(private val a: MainActivity) {
             v.startsWith("app:") -> v.removePrefix("app:").let { pkg ->
                 runCatching { a.packageManager.getApplicationLabel(a.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
             }
-            else -> mapOf(WIDGETS to "Widget page", "notifications" to "Notifications", "search" to "Search", "lock" to "Lock the screen").getOrDefault(v, "Nothing")
+            else -> mapOf(WIDGETS to "Widget page", DASHBOARD to "Dashboard", "notifications" to "Notifications", "search" to "Search", "lock" to "Lock the screen").getOrDefault(v, "Nothing")
         }
     }
 
@@ -179,6 +181,7 @@ class Gestures(private val a: MainActivity) {
         const val SWIPE_LEFT = "gesture_swipe_left"
         const val DOUBLE_TAP = "gesture_double_tap"
         const val WIDGETS = "widgets"
+        const val DASHBOARD = "dashboard" // the tablet's copy of the desktop dashboard ([Dashboard])
         const val NONE = "none"
         val LABELS = mapOf(SWIPE_RIGHT to "Swipe right", SWIPE_LEFT to "Swipe left", DOUBLE_TAP to "Double-tap on empty space")
         private val DEFAULTS = mapOf(SWIPE_RIGHT to WIDGETS, SWIPE_LEFT to "app:com.beeper.android", DOUBLE_TAP to NONE)

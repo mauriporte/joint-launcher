@@ -126,6 +126,7 @@ class MainActivity : Activity() {
             // tablets: touching or swiping from the left edge slides the sidebar in (no Left key on a touchscreen); the phone has no sidebar
             if (touch && !hub.phone) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             if (touch) addView(widgetPage.view, FrameLayout.LayoutParams(-1, -1)) // over the edge strip: no sidebar from the widget page
+            if (touch && !hub.phone) addView(dashboard.view, FrameLayout.LayoutParams(-1, -1))
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
@@ -150,6 +151,8 @@ class MainActivity : Activity() {
     /** Tablet home-screen widgets (see [Widgets]). */
     val widgets by lazy { Widgets(this) }
     val widgetPage by lazy { WidgetPage(this) }
+    val dashboard by lazy { Dashboard(this) } // the tablet only
+    val dashOpen get() = hub.touch && !hub.phone && dashboard.isOpen
     val phoneHome by lazy { PhoneHome(this) }
     // the two remote cards (Joint Remote's widget each); the buttons: the tablet's top bar, the phone's Home
     val remote1 by lazy { RemotePanel(this, 1) }
@@ -467,6 +470,7 @@ class MainActivity : Activity() {
             hub.phone && phoneHome.nowPanel.isOpen -> phoneHome.nowPanel.close()
             hub.phone && phoneHome.weatherPanel.isOpen -> phoneHome.weatherPanel.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
+            dashOpen -> dashboard.back()
             hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
             inSearch -> loadHome()
@@ -486,6 +490,7 @@ class MainActivity : Activity() {
         if (moveMode.active) moveMode.end()
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
+        if (dashOpen) dashboard.close()
         if (hub.touch) listOf(remote1, remote2).filter { !it.pinned }.forEach { it.close() } // pinned ones stay out
         if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
