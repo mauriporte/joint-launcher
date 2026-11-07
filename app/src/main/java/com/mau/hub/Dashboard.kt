@@ -234,8 +234,8 @@ class Dashboard(private val a: MainActivity) {
             if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
                 JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
                     .optJSONArray("devices").objs()
-                    // shown: ADB Control's own wall screen (the Xperia), which isn't meant to be here
-                    .filter { !it.optBoolean("shown", false) }
+                    // the owner's list of devices whose screen isn't meant to be here (adb.hide: their IPs)
+                    .filter { it.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) }
             }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)

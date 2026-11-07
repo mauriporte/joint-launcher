@@ -24,6 +24,8 @@ android {
         // ADB Control's API and ws-scrcpy, for the dashboard's live device screens: adb.api and adb.scrcpy in local.properties
         buildConfigField("String", "ADB_API", "\"${local.getProperty("adb.api", "")}\"")
         buildConfigField("String", "ADB_SCRCPY", "\"${local.getProperty("adb.scrcpy", "")}\"")
+        // devices (IP addresses, comma-separated) the dashboard never shows a screen of: adb.hide in local.properties
+        buildConfigField("String", "ADB_HIDE", "\"${local.getProperty("adb.hide", "")}\"")
     }
     // two separate apps from the same code, so the TV and the tablet never share an install or its settings:
     // assembleTvRelease for the TV, assembleTabletRelease for the tablet, assemblePhoneRelease for the phone
