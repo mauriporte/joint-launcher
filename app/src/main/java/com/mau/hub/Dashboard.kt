@@ -218,10 +218,6 @@ class Dashboard(private val a: MainActivity) {
     /** No screen any more: the pages stop streaming. */
     private fun dropScreen() = placeScreens(emptyList(), null)
 
-    /** This device's own addresses on the network, so its screen isn't listed. */
-    private fun ownIps(): List<String> = runCatching {
-        java.net.NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }.mapNotNull { it.hostAddress }
-    }.getOrDefault(emptyList())
 
 
     private fun openNote(path: String) {
@@ -248,8 +244,8 @@ class Dashboard(private val a: MainActivity) {
             if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
                 JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
                     .optJSONArray("devices").objs()
-                    // not this device's own screen, nor any on the owner's list (adb.hide: their IPs)
-                    .filter { dv -> (dv.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) + ownIps()).also { if (!it) d["self"] = (d["self"] as? List<*>).orEmpty() + dv.optString("name") } }
+                    // every device, this one's own screen included (Mau); only the owner's list is left out (adb.hide: their IPs)
+                    .filter { it.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) }
             }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)
@@ -736,7 +732,7 @@ class Dashboard(private val a: MainActivity) {
                     data?.get("devErr") == true -> note("ADB Control isn't reachable (only from home for now).")
                     devs == null -> note("…")
                 }
-                // the screens switched on (not this device's own: devs leaves it out), each framed to its picture:
+                // the screens switched on, each framed to its picture:
                 // one sideways device per row, two upright ones side by side
                 val shown = chips.filter(::on).mapNotNull(::dev).mapNotNull { dv ->
                     (if (stream) dv.optString("player") else scrcpyLink(BuildConfig.ADB_SCRCPY, dv.optString("ip"))).takeIf { it.isNotEmpty() }?.let { dv to it }
