@@ -356,6 +356,8 @@ class TabletSettings(private val a: MainActivity) {
             if (id.isEmpty() || secret.isEmpty()) a.toast("Paste both the Client ID and the Client Secret")
             else { p.edit().putString(Hub.CF_ID, id).putString(Hub.CF_SECRET, secret).apply(); a.toast("Cloudflare token saved"); draw() }
         }, "Remove token" to { p.edit().remove(Hub.CF_ID).remove(Hub.CF_SECRET).apply(); a.toast("Cloudflare token removed"); draw() })
+        // the same page the TV shows for signing in: open its address in a computer's browser and paste there
+        buttons("Paste from a computer" to { ConnectScreen(a).show() })
 
         heading("Pro Launcher")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Pick its backup (.zip, from Pro Launcher → Settings → Backup): your Home list, app names, categories, hidden apps, shortcuts and swipe-left app come over." })

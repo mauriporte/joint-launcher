@@ -112,6 +112,12 @@ class PhonePage(
                 HaWidget.refresh(hub.ctx); HeraldWidget.refresh(hub.ctx, force = true)
                 send(out, 200, done("Home Assistant token saved. The MauHome widget refreshes now."))
             }
+            "/cloudflare" -> {
+                val id = params["client_id"].orEmpty().trim(); val secret = params["secret"].orEmpty().trim()
+                if (id.isEmpty() || secret.isEmpty()) return send(out, 200, done("Paste both the Client ID and the Client Secret.", ok = false))
+                hub.prefs.edit().putString(Hub.CF_ID, id).putString(Hub.CF_SECRET, secret).apply()
+                send(out, 200, done("Cloudflare token saved on this device."))
+            }
             // the same accounts, for setting up another device (tablet) from this one; same random path, only while the screen is open
             "/export" -> {
                 val form = (ACCOUNT_KEYS.mapNotNull { k -> hub.prefs.getString(k, null)?.let { k to it } } +
@@ -223,6 +229,9 @@ class PhonePage(
         <h2>Home Assistant${mark(hub.prefs.contains("ha_token"))}</h2>
         <form method=post action="/$token/homeassistant"><input name=token placeholder="Long-lived access token" autocomplete=off autocapitalize=off spellcheck=false><button>Save token</button></form>
         <p class=hint>For the MauHome widget. In Home Assistant: your profile → Security → Long-lived access tokens → Create token. Stays on this device only.</p>
+        <h2>Cloudflare token${mark(hub.prefs.contains(Hub.CF_SECRET))}</h2>
+        <form method=post action="/$token/cloudflare"><input name=client_id type=password placeholder="Client ID" autocomplete=off autocapitalize=off spellcheck=false><input name=secret type=password placeholder="Client Secret" autocomplete=off autocapitalize=off spellcheck=false><button>Save token</button></form>
+        <p class=hint>This device's service token from Cloudflare Zero Trust (Access → Service credentials). Sent only to the home domain's public addresses. Stays on this device only.</p>
     """)
 
     private fun done(msg: String, ok: Boolean = true) = page("Joint Launcher", "<p class=${if (ok) "msg" else "err"}>$msg</p><p><a href=\"/$token\">← Back</a></p>")
