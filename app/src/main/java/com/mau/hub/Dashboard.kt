@@ -654,7 +654,6 @@ class Dashboard(private val a: MainActivity) {
                         }
                     }, cells = trio to cw))
                 }
-                note("The live device screens are on the desktop dashboard.")
             }
             else -> apps.forEach { ap ->
                 rows.add(Row(48f, { cv, x, y, ww, hh ->
