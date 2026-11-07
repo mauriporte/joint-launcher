@@ -113,6 +113,8 @@ class PhoneHome(private val a: MainActivity) {
         a.topBar.opensApp(clock, "clock", "clock", listOf("clock", "reloj"))
         a.topBar.opensApp(date, "calendar", "date", listOf("calendar", "calendario", "agenda"))
         if (p.getBoolean("phone_dock_hidden", false)) dockScroll.visibility = View.GONE
+        // pages are as wide as the dock was when they were made: turning the phone sideways and back makes them again
+        dockScroll.addOnLayoutChangeListener { _, l, _, r, _, ol, _, or, _ -> if (ol != or && r - l != or - ol) dockScroll.post(::render) }
         if (p.getBoolean("phone_clean", false)) showClean(true)
     }
 

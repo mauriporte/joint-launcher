@@ -82,7 +82,7 @@ class Dashboard(private val a: MainActivity) {
     fun close() {
         if (!isOpen) return
         val w = a.window.decorView.width.toFloat()
-        panel = null; view.removeCallbacks(loop)
+        panel = null; view.removeCallbacks(loop); view.post(::dropScreen)
         view.animate().translationX(w).setDuration(220).withEndAction { view.visibility = View.GONE }.start()
         a.page.animate().translationX(0f).setDuration(220).start()
     }
@@ -183,17 +183,32 @@ class Dashboard(private val a: MainActivity) {
         trees = t; notes = n
     }
 
-    /** A device's live screen (ws-scrcpy, or a Stream Control player) full size over the dashboard; Back closes it. */
-    private fun showScreen(name: String, src: String) {
-        val web = android.webkit.WebView(a).apply {
+    // the live screen inside the ADB / Stream Control panel, as the desktop's iframe: a real WebView over the drawn panel,
+    // so ws-scrcpy gets the touches (tap, swipe on the device's screen)
+    private var web: android.webkit.WebView? = null
+    private var webSrc = ""
+    private var pick: String? = null // the device chosen by its chip (ip); the first one otherwise
+    private var screenAt: RectF? = null; private var screenSrc = ""
+
+    /** Puts the screen WebView on [r] (dp, in the dashboard's coordinates) showing [src], or hides it (null). */
+    private fun placeScreen(r: RectF?, src: String) = view.post {
+        if (r == null || src.isEmpty() || !isOpen) { web?.visibility = View.GONE; return@post }
+        val w = web ?: android.webkit.WebView(a).apply {
             settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = false
             webViewClient = android.webkit.WebViewClient(); setBackgroundColor(Color.BLACK)
-            loadUrl(src, Hub.cfAccess(src))
+            (view.parent as android.view.ViewGroup).addView(this, android.widget.FrameLayout.LayoutParams(0, 0))
+        }.also { web = it }
+        val d = view.resources.displayMetrics.density
+        (w.layoutParams as android.widget.FrameLayout.LayoutParams).let { lp ->
+            val l = (r.left * d).roundToInt(); val t = (r.top * d).roundToInt(); val ww = (r.width() * d).roundToInt(); val hh = (r.height() * d).roundToInt()
+            if (lp.leftMargin != l || lp.topMargin != t || lp.width != ww || lp.height != hh) { lp.leftMargin = l; lp.topMargin = t; lp.width = ww; lp.height = hh; w.layoutParams = lp }
         }
-        android.app.Dialog(a, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
-            setContentView(web); setOnDismissListener { web.destroy() }; setTitle(name); show()
-        }
+        w.visibility = View.VISIBLE
+        if (src != webSrc) { webSrc = src; w.loadUrl(src, Hub.cfAccess(src)) }
     }
+
+    /** No screen any more: the page stops streaming. */
+    private fun dropScreen() { web?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.destroy() }; web = null; webSrc = "" }
 
     private fun openNote(path: String) {
         runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("obsidian://open?vault=" + enc(VAULT_NAME) + "&file=" + enc(path))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -219,6 +234,8 @@ class Dashboard(private val a: MainActivity) {
             if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
                 JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
                     .optJSONArray("devices").objs()
+                    // shown: ADB Control's own wall screen (the Xperia), which isn't meant to be here
+                    .filter { !it.optBoolean("shown", false) }
             }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)
@@ -546,6 +563,7 @@ class Dashboard(private val a: MainActivity) {
 
     private fun drawPanel(c: Canvas, w: Float, h: Float) {
         val sv = panel ?: return
+        screenAt = null
         hit(0f, 0f, w, h) { panel = null; view.invalidate() } // a tap outside the panel closes it
         val kind = sv.optString("kind"); val screens = sv.has("screens")
         val pw = min(w * (if (screens || kind == "security") 0.62f else 0.5f), 560f)
@@ -671,24 +689,36 @@ class Dashboard(private val a: MainActivity) {
                         }
                     }, cells = trio to cw))
                 }
-                // the live screens: one row per connected device; a tap shows its screen full size
+                // the live screens, as the desktop's Screens view: a chip per connected device, the chosen one's screen underneath
                 val stream = sv.optString("screens") == "Stream"
                 @Suppress("UNCHECKED_CAST") val devs = data?.get("devs") as? List<JSONObject>
-                head("Screens")
                 when {
                     BuildConfig.ADB_API.isEmpty() -> note("No ADB Control address in this build (adb.api in local.properties).")
                     data?.get("devErr") == true -> note("ADB Control isn't reachable (only from home for now).")
                     devs == null -> note("…")
                     devs.isEmpty() -> note(if (stream) "Nothing is streaming. Turn a device's Video on above." else "No device is connected to ADB Control.")
                 }
-                devs.orEmpty().forEach { dv ->
-                    val name = dv.optString("name").ifEmpty { dv.optString("model") }
-                    val src = if (stream) dv.optString("player") else scrcpyLink(BuildConfig.ADB_SCRCPY, dv.optString("ip"))
-                    rows.add(Row(42f, { cv, x, y, ww, hh ->
-                        glassTile(cv, x, y, ww, hh, 14f, true)
-                        text(cv, name, 13f, Color.WHITE, x + 12, y + (hh - 16) / 2, ww - 90, 1, true)
-                        if (dv.has("battery")) dv.optString("battery").let { b -> text(cv, "$b%", 12f, rgba("#8a8a8e"), x + ww - 12 - textW("$b%", 12f), y + (hh - 15) / 2) }
-                    }, { if (src.isNotEmpty()) showScreen(name, src) }))
+                if (!devs.isNullOrEmpty()) {
+                    val sel = devs.firstOrNull { it.optString("ip") == pick } ?: devs[0]
+                    fun label(dv: JSONObject) = dv.optString("name").ifEmpty { dv.optString("model") } + (if (dv.has("battery")) "  ${dv.optString("battery")}%" else "")
+                    // chips wrap onto as many lines as they need
+                    val lines = mutableListOf(mutableListOf<Pair<JSONObject, Float>>()); var lw = 0f
+                    devs.forEach { dv -> val cw = textW(label(dv), 12f, true) + 24
+                        if (lw + cw > bw && lines.last().isNotEmpty()) { lines.add(mutableListOf()); lw = 0f }
+                        lines.last().add(dv to cw); lw += cw + 8 }
+                    lines.forEach { line -> rows.add(Row(30f, { cv, x, y, _, hh ->
+                        var cx = x
+                        line.forEach { (dv, cw) ->
+                            val on = dv === sel
+                            round(cv, cx, y, cw, hh, hh / 2, if (on) rgba(ACCENT) else white(0.12f))
+                            text(cv, label(dv), 12f, if (on) Color.BLACK else rgba("#c9cbd3"), cx + 12, y + (hh - 15) / 2, bold = true)
+                            val ip = dv.optString("ip"); hit(cx, y, cw, hh) { pick = ip; view.invalidate() }
+                            cx += cw + 8
+                        }
+                    })) }
+                    screenSrc = if (stream) sel.optString("player") else scrcpyLink(BuildConfig.ADB_SCRCPY, sel.optString("ip"))
+                    val used = rows.sumOf { (it.h + 8f).toDouble() }.toFloat()
+                    rows.add(Row(max(220f, bh - used), { cv, x, y, ww, hh -> round(cv, x, y, ww, hh, 12f, Color.BLACK); screenAt = RectF(x, y, x + ww, y + hh) }))
                 }
             }
             else -> apps.forEach { ap ->
@@ -723,6 +753,8 @@ class Dashboard(private val a: MainActivity) {
             yy += r.h + gap
         }
         c.restore()
+        // the screen sits where its row was drawn, cut to what's visible of the panel
+        placeScreen(screenAt?.let { s -> RectF(s.left, max(s.top, by), s.right, min(s.bottom, by + bh)).takeIf { it.height() > 40 } }, screenSrc)
     }
 
     inner class DashView : View(a) {
@@ -757,7 +789,7 @@ class Dashboard(private val a: MainActivity) {
                 ring(c, mx, PAD + 4, mw, mh, mh / 2, 1.5f, rgba(ACCENT))
                 text(c, msg, 13f, rgba(ACCENT), mx + 14, PAD + 4 + (mh - textH(msg, 13f, true)) / 2, bold = true)
             }
-            if (panel != null) drawPanel(c, w, h)
+            if (panel != null) drawPanel(c, w, h) else if (web != null) view.post(::dropScreen) // not during the draw
             c.restore()
         }
 
