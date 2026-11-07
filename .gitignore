@@ -16,3 +16,5 @@ app/src/main/assets/ha_tiles.json
 app/src/main/assets/herald_logo.txt
 # Dashboard: the desktop dashboard's file (real Home Assistant entities), bundled into your build
 app/src/main/assets/overlay.json
+# Lan: home addresses and their outside ones (real hosts), bundled into your build
+app/src/main/assets/remote_urls.json

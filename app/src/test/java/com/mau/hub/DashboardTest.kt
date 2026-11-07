@@ -40,6 +40,13 @@ class DashboardTest {
         assertEquals("2 notes" to true, Dashboard.serverInfo(j("""{"kind":"notes","folder":"30-projects"}"""), emptyMap(), mapOf("30-projects" to 2)))
     }
 
+    @Test fun homeAddressesSwapOnlyWhenAway() {
+        val pairs = mapOf("http://10.0.0.5:3006" to "https://video.example.com")
+        assertEquals("http://10.0.0.5:3006/feed", Lan.swap("http://10.0.0.5:3006/feed", pairs, emptySet()))
+        assertEquals("https://video.example.com/feed", Lan.swap("http://10.0.0.5:3006/feed", pairs, setOf("http://10.0.0.5:3006")))
+        assertEquals("http://10.0.0.5:30060", Lan.swap("http://10.0.0.5:30060", pairs, setOf("http://10.0.0.5:3006"))) // another port
+    }
+
     @Test fun scrcpyLinkLikeTheDesktop() {
         // what the desktop's Screens.jsx (URLSearchParams) builds for the same device
         assertEquals("http://10.0.0.5:8001/#!action=stream&udid=10.0.0.9%3A5555&player=mse" +
@@ -50,6 +57,19 @@ class DashboardTest {
     @Test fun notesCountOnlyNotes() {
         val tree = listOf(Dashboard.Note("B", "30-projects/B", listOf(Dashboard.Note("c", "30-projects/B/c", null))), Dashboard.Note("a", "30-projects/a", null))
         assertEquals(2, Dashboard.countNotes(tree))
+    }
+
+    @Test fun screenSlidersPairWithTheirSwitch() {
+        assertEquals("switch.pantalla_xperia", Dashboard.screenSwitch("switch.adb_xperia", false))
+        assertEquals("switch.stream_tv_video", Dashboard.screenSwitch("switch.stream_tv_control", true))
+    }
+
+    @Test fun sidewaysScreensGetARowUprightOnesShareOne() {
+        // Xperia sideways, two upright phones, a sideways TV, one more upright phone
+        val rows = Dashboard.screenRows(listOf(16 / 9f to true, 16 / 9f to false, 20 / 9f to false, 16 / 9f to true, 16 / 9f to false), 508f, 52f)
+        assertEquals(listOf(listOf(0), listOf(1, 2), listOf(3), listOf(4)), rows.map { r -> r.map { it.first } })
+        assertEquals(508f, rows[0][0].second, 0.01f); assertEquals(456f * 9 / 16, rows[0][0].third, 0.01f) // full width, short
+        assertEquals(250f, rows[1][0].second, 0.01f); assertEquals(198f * 16 / 9, rows[1][0].third, 0.01f) // half width, tall
     }
 
     @Test fun datesAndNotes() {

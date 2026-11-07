@@ -9,7 +9,7 @@ import java.util.concurrent.Executors
 
 /** Shared state and services for every part of the home screen: settings, thread pools, accounts, Jellyfin access. */
 class Hub(val ctx: Context) {
-    init { app = ctx.applicationContext }
+    init { app = ctx.applicationContext; Lan.init(ctx) }
     val pool = Sources.bgPool(8) // network-bound row loads, background priority so scrolling stays smooth
     val imagePool = Sources.bgPool(4) // separate, so posters never queue behind slow row loads
     val diskPool = Executors.newSingleThreadExecutor() // saved rows: quick sequential reads at normal priority
