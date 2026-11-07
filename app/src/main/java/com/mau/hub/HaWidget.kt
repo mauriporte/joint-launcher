@@ -197,7 +197,7 @@ class HaWidget : AppWidgetProvider() {
         internal fun snapshot(c: Context, entity: String, width: Int): android.graphics.Bitmap? = runCatching {
             val conn = java.net.URL("${base(c)}/api/camera_proxy/$entity").openConnection() as java.net.HttpURLConnection
             conn.connectTimeout = 6000; conn.readTimeout = 12000
-            auth(c).forEach(conn::setRequestProperty)
+            (auth(c) + Hub.cfAccess(conn.url.toString())).forEach(conn::setRequestProperty)
             val bytes = try { if (conn.responseCode >= 400) null else conn.inputStream.readBytes() } finally { conn.disconnect() } ?: return null
             val size = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, size)
@@ -208,7 +208,7 @@ class HaWidget : AppWidgetProvider() {
 
         private fun token(c: Context) = c.getSharedPreferences("hub", Context.MODE_PRIVATE).getString("ha_token", null)?.takeIf { it.isNotBlank() }
         internal fun auth(c: Context) = mapOf("Authorization" to "Bearer ${token(c) ?: error("no token")}")
-        internal fun base(c: Context) = (Hub.haUrl() ?: error("no address")).trimEnd('/')
+        internal fun base(c: Context) = (Hub.haUrl().also { Hub.app = c.applicationContext } ?: error("no address")).trimEnd('/')
         private fun msg(c: Context, e: Throwable) = when {
             token(c) == null -> "Add your Home Assistant token on the Connect page"
             e is Sources.FetchError && e.code == 401 -> "Home Assistant refused the token"

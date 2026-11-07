@@ -340,6 +340,23 @@ class TabletSettings(private val a: MainActivity) {
             else { p.edit().putString("ha_token", t).apply(); token.setText(""); HaWidget.refresh(a); HeraldWidget.refresh(a, force = true); a.toast("Token saved"); draw() }
         })
 
+        // this device's Cloudflare Access service token: sent only to the home domain's public addresses (Hub.cfAccess)
+        heading("Cloudflare token")
+        list.addView(a.text(14f, TEXT_MUTED).apply { text = "This phone's service token from Cloudflare Zero Trust (Access → Service credentials), for the home " +
+            "addresses that need it from outside. " + if (p.contains(Hub.CF_SECRET)) "A token is saved." else "No token yet." })
+        fun secretField(h: String) = EditText(a).apply {
+            hint = h; isSingleLine = true; textSize = 16f; setTextColor(Color.WHITE); setHintTextColor(TEXT_MUTED)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+        val cfId = secretField("Client ID"); val cfSecret = secretField("Client Secret")
+        list.addView(cfId); list.addView(cfSecret)
+        buttons("Save token" to {
+            val id = cfId.text.toString().trim(); val secret = cfSecret.text.toString().trim()
+            if (id.isEmpty() || secret.isEmpty()) a.toast("Paste both the Client ID and the Client Secret")
+            else { p.edit().putString(Hub.CF_ID, id).putString(Hub.CF_SECRET, secret).apply(); a.toast("Cloudflare token saved"); draw() }
+        }, "Remove token" to { p.edit().remove(Hub.CF_ID).remove(Hub.CF_SECRET).apply(); a.toast("Cloudflare token removed"); draw() })
+
         heading("Pro Launcher")
         list.addView(a.text(14f, TEXT_MUTED).apply { text = "Pick its backup (.zip, from Pro Launcher → Settings → Backup): your Home list, app names, categories, hidden apps, shortcuts and swipe-left app come over." })
         buttons("Import from Pro Launcher" to {
@@ -574,7 +591,7 @@ class TabletSettings(private val a: MainActivity) {
         // backups leave out sign-ins (secrets don't belong in a file on the tablet's storage) and what only means
         // something on this install (placed widgets, picture files, the widget being added)
         private val NOT_BACKED_UP = setOf("key", "jarvis_log", "jarvis_conv", "uid", "stremio", "seerr_key", "immich_key", "screensaver_android", AppLock.PIN, "spotify_refresh", "google_client_secret",
-            "google_refresh", "widgets", "widget_pending", "bg_current", "ha_token")
+            "google_refresh", "widgets", "widget_pending", "bg_current", "ha_token", Hub.CF_ID, Hub.CF_SECRET)
         private fun backedUp(k: String) = k !in NOT_BACKED_UP && !k.startsWith("widget_size_") && !k.startsWith("wspan_") &&
             !k.startsWith("wpos_") && !k.startsWith("logo_")
 

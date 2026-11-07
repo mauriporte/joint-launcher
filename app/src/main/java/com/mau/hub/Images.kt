@@ -26,7 +26,7 @@ class Images(private val hub: Hub) {
             val bmp = runCatching {
                 (URL(url).openConnection() as HttpURLConnection).run {
                     connectTimeout = 6000; readTimeout = 12000
-                    headers.forEach(::setRequestProperty)
+                    (headers + Hub.cfAccess(url)).forEach(::setRequestProperty)
                     try { decodeScaled(inputStream.use { it.readBytes() }, maxPx) } finally { disconnect() }
                 }
             }.getOrNull() ?: return@execute

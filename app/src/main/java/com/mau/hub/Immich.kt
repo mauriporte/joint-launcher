@@ -47,7 +47,7 @@ object Immich {
     /** One photo, at the server's "preview" size (about 1440 px: right for a TV, far lighter than the original). */
     fun photo(base: String, key: String, id: String): Bitmap? = runCatching {
         (URL("$base/api/assets/$id/thumbnail?size=preview").openConnection() as HttpURLConnection).run {
-            connectTimeout = 6000; readTimeout = 15000; setRequestProperty("x-api-key", key)
+            connectTimeout = 6000; readTimeout = 15000; setRequestProperty("x-api-key", key); Hub.cfAccess(base).forEach(::setRequestProperty)
             try { if (responseCode == 200) inputStream.use(BitmapFactory::decodeStream) else null } finally { disconnect() }
         }
     }.getOrNull()
