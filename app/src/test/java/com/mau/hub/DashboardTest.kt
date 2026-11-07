@@ -40,6 +40,11 @@ class DashboardTest {
         assertEquals("2 notes" to true, Dashboard.serverInfo(j("""{"kind":"notes","folder":"30-projects"}"""), emptyMap(), mapOf("30-projects" to 2)))
     }
 
+    @Test fun notesCountOnlyNotes() {
+        val tree = listOf(Dashboard.Note("B", "30-projects/B", listOf(Dashboard.Note("c", "30-projects/B/c", null))), Dashboard.Note("a", "30-projects/a", null))
+        assertEquals(2, Dashboard.countNotes(tree))
+    }
+
     @Test fun datesAndNotes() {
         val today = LocalDate.of(2026, 11, 7)
         assertEquals("Today", Dashboard.dayLabel(today, today))
