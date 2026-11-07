@@ -207,9 +207,6 @@ class Dashboard(private val a: MainActivity) {
         if (src != webSrc) { webSrc = src; w.loadUrl(src, Hub.cfAccess(src)) }
     }
 
-    /** This device's own addresses, so its own screen isn't among the others. */
-    private fun ownIps() = runCatching { java.net.NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }.mapNotNull { it.hostAddress } }.getOrDefault(emptyList())
-
     /** No screen any more: the page stops streaming. */
     private fun dropScreen() { web?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.destroy() }; web = null; webSrc = "" }
 
@@ -237,8 +234,8 @@ class Dashboard(private val a: MainActivity) {
             if (sv.has("screens") && BuildConfig.ADB_API.isNotEmpty()) d["devs"] = runCatching {
                 JSONObject(Sources.get(BuildConfig.ADB_API.trimEnd('/') + "/viewdata" + if (sv.optString("screens") == "Stream") "?mode=stream" else ""))
                     .optJSONArray("devices").objs()
-                    // every other device: never this one's own screen, nor any in adb.hide (their IPs)
-                    .filter { it.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) + ownIps() }
+                    // every device, except any in adb.hide (their IPs)
+                    .filter { it.optString("ip") !in BuildConfig.ADB_HIDE.split(',').map(String::trim) }
             }.getOrElse { d["devErr"] = true; emptyList<JSONObject>() }
         }
         if (panel === sv) pdata = pdata + (sv.optString("name") to d)
