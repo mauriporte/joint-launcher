@@ -40,6 +40,18 @@ class DashboardTest {
         assertEquals("2 notes" to true, Dashboard.serverInfo(j("""{"kind":"notes","folder":"30-projects"}"""), emptyMap(), mapOf("30-projects" to 2)))
     }
 
+    @Test fun homeAddressesSwapOnlyWhenAway() {
+        val pairs = mapOf("http://10.0.0.5:3006" to "https://video.example.com")
+        assertEquals("http://10.0.0.5:3006/feed", Lan.swap("http://10.0.0.5:3006/feed", pairs, emptySet()))
+        assertEquals("https://video.example.com/feed", Lan.swap("http://10.0.0.5:3006/feed", pairs, setOf("http://10.0.0.5:3006")))
+        assertEquals("http://10.0.0.5:30060", Lan.swap("http://10.0.0.5:30060", pairs, setOf("http://10.0.0.5:3006"))) // another port
+    }
+
+    @Test fun notesCountOnlyNotes() {
+        val tree = listOf(Dashboard.Note("B", "30-projects/B", listOf(Dashboard.Note("c", "30-projects/B/c", null))), Dashboard.Note("a", "30-projects/a", null))
+        assertEquals(2, Dashboard.countNotes(tree))
+    }
+
     @Test fun datesAndNotes() {
         val today = LocalDate.of(2026, 11, 7)
         assertEquals("Today", Dashboard.dayLabel(today, today))

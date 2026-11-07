@@ -15,7 +15,10 @@ class Hub(val ctx: Context) {
     val main = Handler(Looper.getMainLooper())
     val prefs: SharedPreferences = ctx.getSharedPreferences("hub", Context.MODE_PRIVATE)
 
-    val server get() = prefs.getString("server", BuildConfig.JELLYFIN_SERVER)!!.trimEnd('/')
+    init { Lan.init(ctx) }
+    /** Jellyfin as set in Settings; [server] is what to use now (its outside address away from home, see [Lan]). */
+    val serverSetting get() = prefs.getString("server", BuildConfig.JELLYFIN_SERVER)!!.trimEnd('/')
+    val server get() = Lan.pick(serverSetting)
     val jfKey get() = prefs.getString("key", "")!!
     val stremioKey get() = prefs.getString("stremio", "")!!
     val country = Locale.getDefault().country.ifEmpty { "US" }

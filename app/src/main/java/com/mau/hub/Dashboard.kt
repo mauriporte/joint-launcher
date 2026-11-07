@@ -58,6 +58,9 @@ class Dashboard(private val a: MainActivity) {
     @Volatile private var events: List<JSONObject>? = null
     @Volatile private var calFail = false
     @Volatile private var pdata: Map<String, Map<String, Any>> = emptyMap()
+    @Volatile private var notes: Map<String, Int> = emptyMap() // Projects: notes per vault folder
+    @Volatile private var trees: Map<String, List<Note>> = emptyMap()
+    private val openFolders = mutableSetOf<String>()
     private var armed: Any? = null
     private var panel: JSONObject? = null
     private var msg = ""
@@ -95,6 +98,7 @@ class Dashboard(private val a: MainActivity) {
             if (tick % POLL == 0) bg("states", ::refresh)
             if (tick % CAM_POLL == 0) { bg("cams", ::cameras); if (panel?.optString("kind") == "security") bg("panel", ::loadPanel) }
             if (tick % CAL_POLL == 0 || (calFail && tick % 30 == 0)) bg("events", ::readEvents)
+            if (tick % CAL_POLL == 0) bg("notes", ::readNotes)
             tick++
             view.postDelayed(this, 1000)
         }
@@ -156,8 +160,37 @@ class Dashboard(private val a: MainActivity) {
         return r.optJSONObject("service_response")?.optJSONObject(entity)?.optJSONArray("items").objs()
     }
 
+    /** A vault entry: a folder (children) or a Markdown note; path is inside the vault, for Obsidian. */
+    class Note(val name: String, val path: String, val children: List<Note>?)
+
+    // shortcut: a fixed folder (Syncthing's copy) read with All files access; this tablet's folder picker lists nothing
+    private fun vault(): java.io.File? = java.io.File(android.os.Environment.getExternalStorageDirectory(), "Documents/$VAULT_NAME")
+        .takeIf { android.os.Environment.isExternalStorageManager() }
+
+    /** The Projects entries' folders: folders first, then Markdown notes (without .md), hidden ones skipped. */
+    private fun readNotes() {
+        val root = vault() ?: return
+        fun walk(d: java.io.File, path: String): List<Note> = d.listFiles().orEmpty()
+            .filter { !it.name.startsWith(".") && (it.isDirectory || it.name.endsWith(".md")) }
+            .map { if (it.isDirectory) Note(it.name, path + it.name, walk(it, path + it.name + "/")) else Note(it.name.removeSuffix(".md"), path + it.name.removeSuffix(".md"), null) }
+            .sortedWith(compareBy({ it.children == null }, { it.name.lowercase() }))
+        val t = trees.toMutableMap(); val n = notes.toMutableMap()
+        servers.filter { it.optString("kind") == "notes" }.forEach { sv ->
+            val folder = sv.optString("folder").trim('/')
+            val dir = java.io.File(root, folder)
+            if (dir.canonicalPath.startsWith(root.canonicalPath) && dir.isDirectory) walk(dir, if (folder.isEmpty()) "" else "$folder/").let { t[sv.optString("folder")] = it; n[sv.optString("folder")] = countNotes(it) }
+        }
+        trees = t; notes = n
+    }
+
+    private fun openNote(path: String) {
+        runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("obsidian://open?vault=" + enc(VAULT_NAME) + "&file=" + enc(path))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { flash("Obsidian isn't installed") }
+    }
+
     private fun loadPanel() {
         val sv = panel ?: return
+        if (sv.optString("kind") == "notes") { readNotes(); return }
         val d = mutableMapOf<String, Any>()
         runCatching {
             when (sv.optString("kind")) {
@@ -234,9 +267,14 @@ class Dashboard(private val a: MainActivity) {
         view.post { view.invalidate() }
     }
 
+    /** A home-network address opens as itself at home and as its outside address away ([Lan]). */
     private fun openUrl(u: String?) {
         if (u == null || !(u.startsWith("http://") || u.startsWith("https://"))) return
-        runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        pool.execute {
+            Lan.check()
+            val go = Lan.pick(u)
+            view.post { runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(go)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+        }
     }
 
     private fun openPage(t: JSONObject) = openUrl(t.optString("url").ifEmpty { null }
@@ -463,7 +501,7 @@ class Dashboard(private val a: MainActivity) {
         c.saveLayerAlpha(sx - 2, sy - 2, sx + sw + 2, sy + sh + 2, (fade() * 255).roundToInt())
         servers.forEachIndexed { i, sv ->
             val ey = sy + i * (eh + gap)
-            val (info, lit) = serverInfo(sv, states, null)
+            val (info, lit) = serverInfo(sv, states, notes)
             glassTile(c, sx, ey, sw, eh, 12 * k, lit)
             val bs = min(eh - 8, 32 * k)
             badge(c, sx + 8, ey + (eh - bs) / 2, bs, lit, ACCENT, sv.optString("icon"))
@@ -507,6 +545,7 @@ class Dashboard(private val a: MainActivity) {
         val count = when {
             kind.isEmpty() && !screens -> "${apps.count { states[it.optString("entity")]?.optString("state") == "on" }}/${apps.size} ${if (sv.optBoolean("readonly")) "online" else "running"}"
             kind == "notifications" && data != null -> ((data["items"] as? List<*>)?.size ?: 0).toString()
+            kind == "notes" -> notes[sv.optString("folder")]?.toString() ?: ""
             else -> ""
         }
         val (tw, th) = text(c, sv.optString("name"), 20f, Color.WHITE, px + pad, pad, bold = true)
@@ -581,8 +620,30 @@ class Dashboard(private val a: MainActivity) {
                     }, { todoDone(sv.optString("list"), item.optString("uid")) }))
                 }
             }
-            // shortcut: the notes vault is a synced copy on the desktops, not on the tablet; sync one here to list it
-            kind == "notes" -> note("No notes vault on this tablet.")
+            kind == "notes" -> {
+                val tree = trees[sv.optString("folder")]
+                if (vault() == null) {
+                    note("To list the notes in Documents/$VAULT_NAME, allow Joint Launcher All files access.")
+                    rows.add(Row(42f, { cv, x, y, ww, hh ->
+                        glassTile(cv, x, y, ww, hh, 14f, true)
+                        text(cv, "Allow All files access", 13f, Color.WHITE, x + 12, y + (hh - 16) / 2, ww - 24, 1, true)
+                    }, { runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + a.packageName))) } }))
+                } else if (tree == null) note("…")
+                fun treeRows(nodes: List<Note>, depth: Int) { nodes.forEach { nd ->
+                    val folder = nd.children != null
+                    rows.add(Row(30f, { cv, x, y, ww, hh ->
+                        val ix = x + 8 + depth * 16
+                        if (folder) {
+                            icon(cv, MDI.getValue(if (nd.path in openFolders) "down" else "chevron"), 24f, rgba(ACCENT), ix, y + (hh - 14) / 2, 14f)
+                            val n = countNotes(nd.children!!).toString()
+                            text(cv, n, 12f, rgba("#8a8a8e"), x + ww - 8 - textW(n, 12f), y + (hh - 15) / 2)
+                        }
+                        text(cv, nd.name, 13f, if (folder) Color.WHITE else rgba("#c9cbd3"), ix + 20, y + (hh - 16) / 2, ww - (ix + 20 - x) - 40, 1, folder)
+                    }, if (folder) ({ if (!openFolders.remove(nd.path)) openFolders.add(nd.path); view.invalidate() }) else ({ openNote(nd.path) })))
+                    if (folder && nd.path in openFolders) treeRows(nd.children!!, depth + 1)
+                } }
+                treeRows(tree.orEmpty(), 0)
+            }
             screens -> {
                 val cw = (bw - 16) / 3
                 apps.chunked(3).forEach { trio ->
@@ -718,9 +779,11 @@ class Dashboard(private val a: MainActivity) {
             "drop" to "M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z",
             "chevron" to "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
             "check" to "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
+            "down" to "M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z",
             "close" to "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
         )
         private val HM = DateTimeFormatter.ofPattern("HH:mm")
+        const val VAULT_NAME = "SecondMemory" // the notes vault: Documents/<this>, also its name in Obsidian
 
         /** Places tiles of (w, h) cells left to right, top to bottom, each in the first free spot (CSS grid "dense"). */
         fun pack(sizes: List<Pair<Int, Int>>, cols: Int): List<IntArray> {
@@ -782,6 +845,8 @@ class Dashboard(private val a: MainActivity) {
                 }
             }
         }
+
+        fun countNotes(tree: List<Note>): Int = tree.sumOf { it.children?.let(::countNotes) ?: 1 }
 
         fun dayLabel(d: LocalDate, today: LocalDate): String = when (java.time.temporal.ChronoUnit.DAYS.between(today, d)) {
             0L -> "Today"; 1L -> "Tomorrow"

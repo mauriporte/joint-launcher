@@ -193,7 +193,7 @@ class PhonePage(
     private fun home() = page("Joint Launcher", """
         ${googleMsg?.let { "<p class=msg>${esc(it)}</p>" }.orEmpty()}
         <h2>Jellyfin${mark(hub.jfKey.isNotEmpty())}</h2>
-        <form method=post action="/$token/jellyfin"><input name=server placeholder="http://192.168.x.x:8096" value="${esc(hub.server)}"><button>Save server</button></form>
+        <form method=post action="/$token/jellyfin"><input name=server placeholder="http://192.168.x.x:8096" value="${esc(hub.serverSetting)}"><button>Save server</button></form>
         <p class=hint>Then sign in on the TV with Quick Connect.</p>
         <h2>Jellyseerr${mark(hub.prefs.contains("seerr_key"))}</h2>
         <form method=post action="/$token/jellyseerr">

@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- tablet dashboard: Projects lists the notes vault Syncthing keeps in Documents (granted by hand: All files access) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" /> <!-- "Voice to Jarvis" widget -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" /> <!-- Settings: the background picture on the lock screen too -->
     <!-- the TV's own network address, for the phone sign-in page's QR code -->

@@ -24,7 +24,7 @@ class TabletSettings(private val a: MainActivity) {
     private val device get() = if (hub.phone) "phone" else if (hub.touch) "tablet" else "TV" // "Like the tablet" / "Like the TV"
     private val list = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(24), 0, a.dp(24), a.dp(24)) }
     // made once so a redraw keeps what you've typed
-    private val url = field("Jellyfin URL", hub.server)
+    private val url = field("Jellyfin URL", hub.serverSetting)
     private val key = field("Jellyfin API key (Dashboard → API Keys)", hub.jfKey)
 
     fun show() {
@@ -564,7 +564,7 @@ class TabletSettings(private val a: MainActivity) {
 
     private fun saveJellyfin() {
         val u = url.text.toString().trim(); val k = key.text.toString().trim()
-        if (u == hub.server && k == hub.jfKey) return
+        if (u == hub.serverSetting && k == hub.jfKey) return
         if (k != hub.jfKey) p.edit().remove("uid").apply() // manual key: look the user up again
         p.edit().putString("server", u).putString("key", k).apply()
         hub.userId = null
