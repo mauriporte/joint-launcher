@@ -123,7 +123,7 @@ class HeraldWidget : AppWidgetProvider() {
                 ?.optString("entity_picture")?.takeIf { it.isNotEmpty() } ?: return
             val bytes = (java.net.URL(base + pic).openConnection() as java.net.HttpURLConnection).run {
                 connectTimeout = 6000; readTimeout = 15000
-                HaWidget.auth(c).forEach(::setRequestProperty)
+                (HaWidget.auth(c) + Hub.cfAccess(url.toString())).forEach(::setRequestProperty)
                 try { inputStream.readBytes() } finally { disconnect() }
             }
             val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return

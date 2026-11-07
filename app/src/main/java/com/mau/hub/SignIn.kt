@@ -27,7 +27,7 @@ object SignIn {
         (URL(url).openConnection() as HttpURLConnection).run {
             connectTimeout = 8000; readTimeout = 15000
             requestMethod = "POST"; doOutput = true
-            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            setRequestProperty("Content-Type", "application/x-www-form-urlencoded"); Hub.cfAccess(url).forEach(::setRequestProperty)
             outputStream.use { it.write(form.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }.toByteArray()) }
             try {
                 val code = responseCode
@@ -87,7 +87,7 @@ object SignIn {
         val login = (URL("$url/api/v1/auth/jellyfin").openConnection() as HttpURLConnection).run {
             connectTimeout = 8000; readTimeout = 15000
             requestMethod = "POST"; doOutput = true
-            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Content-Type", "application/json"); Hub.cfAccess(url).forEach(::setRequestProperty)
             // same body Jellyseerr's own login page sends (it repeats the username as email)
             outputStream.use { it.write(JSONObject(mapOf("username" to username, "password" to password, "email" to username)).toString().toByteArray()) }
             try {

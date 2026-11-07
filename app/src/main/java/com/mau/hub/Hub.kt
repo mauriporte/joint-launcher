@@ -9,6 +9,7 @@ import java.util.concurrent.Executors
 
 /** Shared state and services for every part of the home screen: settings, thread pools, accounts, Jellyfin access. */
 class Hub(val ctx: Context) {
+    init { app = ctx.applicationContext }
     val pool = Sources.bgPool(8) // network-bound row loads, background priority so scrolling stays smooth
     val imagePool = Sources.bgPool(4) // separate, so posters never queue behind slow row loads
     val diskPool = Executors.newSingleThreadExecutor() // saved rows: quick sequential reads at normal priority
@@ -91,6 +92,28 @@ class Hub(val ctx: Context) {
     fun shutdown() { pool.shutdownNow(); imagePool.shutdownNow(); diskPool.shutdownNow() }
 
     companion object {
+        /** Any of the app's contexts, for [cfAccess] (set by the launcher and by the widgets before they reach HA). */
+        @Volatile internal var app: Context? = null
+
+        /**
+         * The device's Cloudflare Access service token (Settings → Cloudflare token), as the two headers Access wants, for a
+         * request to a host under the HA public address's domain; nothing for home addresses or any other site.
+         */
+        fun cfAccess(url: String): Map<String, String> {
+            val p = app?.getSharedPreferences("hub", Context.MODE_PRIVATE) ?: return emptyMap()
+            val id = p.getString(CF_ID, "").orEmpty(); val secret = p.getString(CF_SECRET, "").orEmpty()
+            if (id.isEmpty() || secret.isEmpty() || !cfHost(runCatching { java.net.URI(url).host }.getOrNull())) return emptyMap()
+            return mapOf("CF-Access-Client-Id" to id, "CF-Access-Client-Secret" to secret)
+        }
+        /** The headers as handshake lines, for the hand-made websockets. */
+        fun cfLines(url: String) = cfAccess(url).entries.joinToString("") { "${it.key}: ${it.value}\r\n" }
+        /** [host] is the public address's domain or under it (homeassist.example.com → example.com, *.example.com). */
+        internal fun cfHost(host: String?, remote: String = BuildConfig.HA_REMOTE): Boolean {
+            val domain = runCatching { java.net.URI(remote).host }.getOrNull()?.substringAfter('.')?.takeIf { '.' in it } ?: return false
+            return host != null && (host.equals(domain, true) || host.endsWith(".$domain", true))
+        }
+        const val CF_ID = "cf_id"; const val CF_SECRET = "cf_secret"
+
         /** Home Assistant (HA section, MauHome widget): the home address when it answers (on the home Wi-Fi), else the public one. Off the UI thread. */
         fun haUrl(): String? {
             val local = BuildConfig.HA_LOCAL.takeIf { it.isNotEmpty() }

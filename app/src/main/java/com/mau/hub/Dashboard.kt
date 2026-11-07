@@ -122,7 +122,7 @@ class Dashboard(private val a: MainActivity) {
     private fun image(pic: String): Bitmap? {
         val conn = java.net.URL(url(pic)).openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 6000; conn.readTimeout = 12000
-        auth().forEach(conn::setRequestProperty)
+        (auth() + Hub.cfAccess(conn.url.toString())).forEach(conn::setRequestProperty)
         return try { conn.inputStream.use { BitmapFactory.decodeStream(it) } } finally { conn.disconnect() }
     }
 
@@ -219,7 +219,7 @@ class Dashboard(private val a: MainActivity) {
         s.use {
             val ins = java.io.BufferedInputStream(it.getInputStream()); val out = it.getOutputStream()
             val key = android.util.Base64.encodeToString(ByteArray(16).also(java.security.SecureRandom()::nextBytes), android.util.Base64.NO_WRAP)
-            out.write("GET /api/websocket HTTP/1.1\r\nHost: ${u.host}:$port\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n\r\n".toByteArray())
+            out.write("GET /api/websocket HTTP/1.1\r\nHost: ${u.host}:$port\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n${Hub.cfLines(u.toString())}\r\n".toByteArray())
             val head = StringBuilder()
             while (!head.endsWith("\r\n\r\n")) { val b = ins.read(); if (b < 0) error("websocket closed"); head.append(b.toChar()) }
             if (" 101 " !in head.lineSequence().first()) error("websocket refused")

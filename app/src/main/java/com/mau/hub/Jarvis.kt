@@ -72,7 +72,7 @@ object Jarvis {
         val conn = URL(HaWidget.base(c) + path).openConnection() as HttpURLConnection
         return try {
             conn.connectTimeout = 8000; conn.readTimeout = 150_000
-            HaWidget.auth(c).forEach(conn::setRequestProperty)
+            (HaWidget.auth(c) + Hub.cfAccess(conn.url.toString())).forEach(conn::setRequestProperty)
             if (body != null) {
                 conn.requestMethod = "POST"; conn.doOutput = true; conn.setRequestProperty("Content-Type", "application/json")
                 conn.outputStream.use { it.write(body.toByteArray()) }
@@ -185,7 +185,7 @@ internal class MiniSocket(url: String) : Closeable {
         input = DataInputStream(BufferedInputStream(socket.getInputStream()))
         val key = android.util.Base64.encodeToString(ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }, android.util.Base64.NO_WRAP)
         output.write(("GET ${u.rawPath} HTTP/1.1\r\nHost: ${u.host}:$port\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-            "Sec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n\r\n").toByteArray())
+            "Sec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n" + Hub.cfLines(url) + "\r\n").toByteArray())
         val head = StringBuilder()
         while (!head.endsWith("\r\n\r\n")) head.append(input.readUnsignedByte().toChar())
         require(head.startsWith("HTTP/1.1 101")) { "Home Assistant didn't open the websocket: ${head.lineSequence().first()}" }

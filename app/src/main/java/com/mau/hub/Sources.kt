@@ -37,7 +37,7 @@ object Sources {
         return try {
             (u.openConnection() as HttpURLConnection).run {
                 connectTimeout = 6000; readTimeout = 12000
-                headers.forEach(::setRequestProperty)
+                (headers + Hub.cfAccess(url)).forEach(::setRequestProperty)
                 if (body != null) { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) } }
                 try {
                     if (responseCode >= 400) throw FetchError(host, responseCode)
@@ -362,7 +362,7 @@ object Sources {
     fun jellyfinFavourite(server: String, key: String, userId: String, itemId: String, on: Boolean) {
         (URL("$server/UserFavoriteItems/$itemId?userId=$userId").openConnection() as HttpURLConnection).run {
             requestMethod = if (on) "POST" else "DELETE"
-            Links.jfAuth(key).forEach(::setRequestProperty)
+            Links.jfAuth(key).forEach(::setRequestProperty); Hub.cfAccess(server).forEach(::setRequestProperty)
             try { if (responseCode >= 400) error("HTTP $responseCode") } finally { disconnect() }
         }
     }
