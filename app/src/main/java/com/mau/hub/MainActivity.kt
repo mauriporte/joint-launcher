@@ -626,6 +626,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rows.retryFailed()
+        topBar.refreshWeatherIfStale()
         if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
         if (hub.phone) HomeButtonService.edgeBack(this, hub.prefs.getBoolean("edge_back", true))
         if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min

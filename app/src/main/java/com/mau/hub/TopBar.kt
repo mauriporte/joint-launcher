@@ -361,9 +361,17 @@ class TopBar(private val a: MainActivity) {
                 }
                 Sources.weather(la, lo)
             }.getOrNull()
-            hub.main.post { weather.text = if (a.hub.phone) phoneWeather(text) else if (a.hub.touch) tabletWeather(text) else text.orEmpty() }
+            hub.main.post {
+                weather.text = if (a.hub.phone) phoneWeather(text) else if (a.hub.touch) tabletWeather(text) else text.orEmpty()
+                if (text != null) weatherAt = System.currentTimeMillis()
+                // a failed try (no network yet, e.g. right after an install) tries again in 2 minutes, not 30
+                hub.main.removeCallbacks(weatherTimer) // Settings refreshes it right away; keep one timer
+                hub.main.postDelayed(weatherTimer, if (text != null) 30 * 60_000L else 2 * 60_000L)
+            }
         }
-        hub.main.removeCallbacks(weatherTimer) // Settings refreshes it right away; keep one timer
-        hub.main.postDelayed(weatherTimer, 30 * 60_000L)
     }
+
+    private var weatherAt = 0L
+    /** Back on Home: the weather again if it's empty or over 30 minutes old (the timer stalls while the phone sleeps). */
+    fun refreshWeatherIfStale() { if (System.currentTimeMillis() - weatherAt > 30 * 60_000L) refreshWeather() }
 }
