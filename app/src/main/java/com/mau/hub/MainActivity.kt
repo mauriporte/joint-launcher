@@ -622,6 +622,7 @@ class MainActivity : Activity() {
         super.onResume()
         rows.retryFailed()
         hub.pool.execute(Lan::check) // home or away: Jellyfin and the dashboard's links follow
+        topBar.refreshWeatherIfStale()
         if (hub.phone && !nowPlaying.allowed) nowPlaying.start() // back from granting notification access
         if (hub.touch) HomeButtonService.edgeBack(this, hub.prefs.getBoolean("edge_back", true))
         if (hub.touch) { HaWidget.refresh(this); HeraldWidget.refresh(this) } // MauHome current, Herald at most every 15 min
