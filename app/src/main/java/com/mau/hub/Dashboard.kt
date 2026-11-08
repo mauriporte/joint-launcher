@@ -792,9 +792,9 @@ class Dashboard(private val a: MainActivity) {
         c.restore()
         bar = null
         smax["panel"]?.takeIf { it > 0 }?.let { most ->
-            val tx = bx + bw + SCROLLBAR - 10; val thumb = max(48f, bh * bh / (bh + most))
-            round(c, tx, by, 8f, bh, 4f, white(0.10f))
-            round(c, tx, by + (bh - thumb) * off / most, 8f, thumb, 4f, rgba(ACCENT))
+            val tx = bx + bw + SCROLLBAR - 5; val thumb = max(36f, bh * bh / (bh + most))
+            round(c, tx, by, 4f, bh, 2f, white(0.10f))
+            round(c, tx, by + (bh - thumb) * off / most, 4f, thumb, 2f, rgba(ACCENT))
             bar = RectF(bx + bw, by, bx + bw + SCROLLBAR + pad, by + bh) to thumb // the whole strip takes the finger
         }
         // the screen sits where its row was drawn, cut to what's visible of the panel
@@ -992,7 +992,7 @@ class Dashboard(private val a: MainActivity) {
         // the desktop's ws-scrcpy look (art-desktop-windows main.cjs SCRCPY_CSS); buttons shrink with the frame (7vh each)
         const val SCRCPY_CSS = "::-webkit-scrollbar{display:none}html,body{overflow:hidden!important;background:#000}.control-buttons-list{overflow:hidden!important;justify-content:space-evenly;align-items:center;padding:.3rem 0;box-sizing:border-box;background:#000!important}.control-button{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh)!important;height:min(1.95rem,7vh)!important;border-radius:999px;background:#1C1C1E!important;opacity:1!important;display:flex;align-items:center;justify-content:center}.control-button>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-button:active{background:#E8650A!important}.control-button:active>svg{fill:#050505!important}.control-wrapper>label{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh);height:min(1.95rem,7vh);border-radius:999px;background:#1C1C1E;display:flex!important;align-items:center;justify-content:center}.control-wrapper>label>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-wrapper>input:checked+label{background:#E8650A}.control-wrapper>input:checked+label>svg{fill:#050505!important}"
         const val SCRCPY_BAR = 52f
-        const val SCROLLBAR = 22f // the panels' scrollbar strip (dp) // ws-scrcpy's button column at the frame's right (dp)
+        const val SCROLLBAR = 14f // the panels' scrollbar strip (dp) // ws-scrcpy's button column at the frame's right (dp)
 
         /** A device's screen slider next to its ADB / Stream Control switch: adb_xperia → pantalla_xperia, stream_tv_control → stream_tv_video. */
         fun screenSwitch(entity: String, stream: Boolean) =
