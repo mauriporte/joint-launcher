@@ -198,7 +198,14 @@ class Dashboard(private val a: MainActivity) {
             val w = webs.getOrPut(src) {
                 android.webkit.WebView(a).apply {
                     settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = false
-                    webViewClient = android.webkit.WebViewClient(); setBackgroundColor(Color.BLACK)
+                    setBackgroundColor(Color.BLACK)
+                    webViewClient = object : android.webkit.WebViewClient() {
+                        // ws-scrcpy's buttons in the desktop's look, sized to the frame so the whole column fits
+                        override fun onPageFinished(v: android.webkit.WebView, url: String?) {
+                            if (BuildConfig.ADB_SCRCPY.isNotEmpty() && url?.startsWith(BuildConfig.ADB_SCRCPY) == true)
+                                v.evaluateJavascript("document.head.insertAdjacentHTML('beforeend','<style>$SCRCPY_CSS</style>')", null)
+                        }
+                    }
                     (view.parent as android.view.ViewGroup).addView(this, android.widget.FrameLayout.LayoutParams(0, 0))
                     loadUrl(src, Hub.cfAccess(src))
                 }
@@ -960,6 +967,8 @@ class Dashboard(private val a: MainActivity) {
 
         private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
+        // the desktop's ws-scrcpy look (art-desktop-windows main.cjs SCRCPY_CSS); buttons shrink with the frame (7vh each)
+        const val SCRCPY_CSS = "::-webkit-scrollbar{display:none}html,body{overflow:hidden!important;background:#000}.control-buttons-list{overflow:hidden!important;justify-content:space-evenly;align-items:center;padding:.3rem 0;box-sizing:border-box;background:#000!important}.control-button{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh)!important;height:min(1.95rem,7vh)!important;border-radius:999px;background:#1C1C1E!important;opacity:1!important;display:flex;align-items:center;justify-content:center}.control-button>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-button:active{background:#E8650A!important}.control-button:active>svg{fill:#050505!important}.control-wrapper>label{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh);height:min(1.95rem,7vh);border-radius:999px;background:#1C1C1E;display:flex!important;align-items:center;justify-content:center}.control-wrapper>label>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-wrapper>input:checked+label{background:#E8650A}.control-wrapper>input:checked+label>svg{fill:#050505!important}"
         const val SCRCPY_BAR = 52f // ws-scrcpy's button column at the frame's right (dp)
 
         /** A device's screen slider next to its ADB / Stream Control switch: adb_xperia → pantalla_xperia, stream_tv_control → stream_tv_video. */
