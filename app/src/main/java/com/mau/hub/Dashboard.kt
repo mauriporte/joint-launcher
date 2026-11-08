@@ -374,6 +374,8 @@ class Dashboard(private val a: MainActivity) {
     private val scroll = mutableMapOf<String, Float>()
     private val smax = mutableMapOf<String, Float>()
     private var slider: RectF? = null
+    private var bar: Pair<RectF, Float>? = null // the panel's scrollbar strip and its thumb's height
+    private var barDrag = false
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val layouts = HashMap<String, StaticLayout>()
@@ -604,7 +606,8 @@ class Dashboard(private val a: MainActivity) {
         if (count.isNotEmpty()) text(c, count, 13f, rgba("#8a8a8e"), px + pad + tw + 10, pad + th - 17)
         icon(c, MDI.getValue("close"), 24f, rgba("#8a8a8e"), w - pad - 20, pad + 2, 20f)
         hit(w - pad - 34, pad - 8, 40f, 40f) { panel = null; view.invalidate() }
-        val bx = px + pad; val by = pad + th + 12; val bw = pw - 2 * pad; val bh = h - by - pad
+        // the content leaves a strip on the right for the scrollbar: the live screens take every touch on them, so it's how to scroll
+        val bx = px + pad; val by = pad + th + 12; val bw = pw - 2 * pad - SCROLLBAR; val bh = h - by - pad
         val rows = mutableListOf<Row>()
         fun head(label: String) = rows.add(Row(22f, { cv, x, y, _, _ -> text(cv, label.uppercase(), 11f, rgba("#8a8a8e"), x, y + 6, bold = true) }))
         fun note(label: String) = rows.add(Row(36f, { cv, x, y, ww, _ -> text(cv, label, 13f, rgba("#8a8a8e"), x, y + 2, ww, 2) }))
@@ -787,6 +790,13 @@ class Dashboard(private val a: MainActivity) {
             yy += r.h + gap
         }
         c.restore()
+        bar = null
+        smax["panel"]?.takeIf { it > 0 }?.let { most ->
+            val tx = bx + bw + SCROLLBAR - 10; val thumb = max(48f, bh * bh / (bh + most))
+            round(c, tx, by, 8f, bh, 4f, white(0.10f))
+            round(c, tx, by + (bh - thumb) * off / most, 8f, thumb, 4f, rgba(ACCENT))
+            bar = RectF(bx + bw, by, bx + bw + SCROLLBAR + pad, by + bh) to thumb // the whole strip takes the finger
+        }
         // the screen sits where its row was drawn, cut to what's visible of the panel
         screenBox = RectF(bx, by, bx + bw, by + bh); placeScreens(frames.toList(), screenBox)
     }
@@ -828,6 +838,12 @@ class Dashboard(private val a: MainActivity) {
         }
 
         private fun findScroll(x: Float, y: Float) = scrolls.lastOrNull { (r, key) -> r.contains(x, y) && (key == "panel" || panel == null) }?.second
+        /** The scrollbar under the finger: the thumb's middle goes to [y]. */
+        private fun barTo(y: Float) {
+            val (r, thumb) = bar ?: return
+            scroll["panel"] = ((y - r.top - thumb / 2) / (r.height() - thumb)).coerceIn(0f, 1f) * (smax["panel"] ?: 0f); invalidate()
+        }
+
         private fun inSlider(x: Float, y: Float) = slider?.let { s -> panel == null && x >= s.left - 10 && x <= s.right + 10 && y >= s.top && y <= s.bottom } == true
         private fun setGlass(x: Float) { val s = slider ?: return; glass = (3 + (x - s.left) / s.width() * 97).toInt().coerceIn(3, 100); invalidate() }
 
@@ -835,20 +851,26 @@ class Dashboard(private val a: MainActivity) {
         override fun onTouchEvent(e: MotionEvent): Boolean {
             val x = e.x / d; val y = e.y / d
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { press = x to y; drag = null; if (inSlider(x, y)) { sliding = true; setGlass(x) } }
+                MotionEvent.ACTION_DOWN -> {
+                    press = x to y; drag = null
+                    if (inSlider(x, y)) { sliding = true; setGlass(x) }
+                    else if (bar?.first?.contains(x, y) == true) { barDrag = true; barTo(y) }
+                }
                 MotionEvent.ACTION_MOVE -> {
                     val p = press ?: return true
                     if (sliding) { setGlass(x); return true }
+                    if (barDrag) { barTo(y); return true }
                     if (drag == null && abs(y - p.second) > 10) drag = findScroll(p.first, p.second)?.let { it to (scroll[it] ?: 0f) } ?: ("none" to 0f)
                     drag?.takeIf { it.first != "none" }?.let { (key, b) -> scroll[key] = (b - (y - p.second)).coerceIn(0f, smax[key] ?: 0f); invalidate() }
                 }
                 MotionEvent.ACTION_UP -> {
                     val p = press; press = null
                     if (sliding) { sliding = false; prefs.edit().putInt("dash_glass", glass).apply(); return true }
+                    if (barDrag) { barDrag = false; return true }
                     if (drag != null || p == null || abs(x - p.first) > 10 || abs(y - p.second) > 10) { drag = null; return true }
                     hits.lastOrNull { it.first.contains(x, y) }?.second?.invoke()
                 }
-                MotionEvent.ACTION_CANCEL -> { press = null; drag = null; sliding = false }
+                MotionEvent.ACTION_CANCEL -> { press = null; drag = null; sliding = false; barDrag = false }
             }
             return true
         }
@@ -969,7 +991,8 @@ class Dashboard(private val a: MainActivity) {
 
         // the desktop's ws-scrcpy look (art-desktop-windows main.cjs SCRCPY_CSS); buttons shrink with the frame (7vh each)
         const val SCRCPY_CSS = "::-webkit-scrollbar{display:none}html,body{overflow:hidden!important;background:#000}.control-buttons-list{overflow:hidden!important;justify-content:space-evenly;align-items:center;padding:.3rem 0;box-sizing:border-box;background:#000!important}.control-button{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh)!important;height:min(1.95rem,7vh)!important;border-radius:999px;background:#1C1C1E!important;opacity:1!important;display:flex;align-items:center;justify-content:center}.control-button>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-button:active{background:#E8650A!important}.control-button:active>svg{fill:#050505!important}.control-wrapper>label{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh);height:min(1.95rem,7vh);border-radius:999px;background:#1C1C1E;display:flex!important;align-items:center;justify-content:center}.control-wrapper>label>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-wrapper>input:checked+label{background:#E8650A}.control-wrapper>input:checked+label>svg{fill:#050505!important}"
-        const val SCRCPY_BAR = 52f // ws-scrcpy's button column at the frame's right (dp)
+        const val SCRCPY_BAR = 52f
+        const val SCROLLBAR = 22f // the panels' scrollbar strip (dp) // ws-scrcpy's button column at the frame's right (dp)
 
         /** A device's screen slider next to its ADB / Stream Control switch: adb_xperia → pantalla_xperia, stream_tv_control → stream_tv_video. */
         fun screenSwitch(entity: String, stream: Boolean) =
