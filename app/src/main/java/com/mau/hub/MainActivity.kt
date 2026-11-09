@@ -127,6 +127,7 @@ class MainActivity : Activity() {
             if (touch && !hub.phone) addView(View(this@MainActivity).apply { setOnTouchListener(edgeOpensSidebar()) }, FrameLayout.LayoutParams(dp(24), -1, Gravity.START))
             if (touch) addView(widgetPage.view, FrameLayout.LayoutParams(-1, -1)) // over the edge strip: no sidebar from the widget page
             if (touch && !hub.phone) addView(dashboard.view, FrameLayout.LayoutParams(-1, -1))
+            if (touch && !hub.phone) addView(allApps, FrameLayout.LayoutParams(-1, -1))
             addView(sidebar.dim, FrameLayout.LayoutParams(-1, -1))
             // tablet: wide enough to cover the section icons on Home when it slides in
             addView(sidebar.panel, FrameLayout.LayoutParams(dp(if (touch) 104 else RAIL_DP + 8), -1))
@@ -154,6 +155,28 @@ class MainActivity : Activity() {
     val dashboard by lazy { Dashboard(this) } // the tablet only
     val dashOpen get() = hub.touch && !hub.phone && dashboard.isOpen
     val phoneHome by lazy { PhoneHome(this) }
+
+    /** Tablet top bar's apps button: every app A to Z on a page of its own, like a launcher's app drawer. */
+    private val appsGrid by lazy { FlowBox(this).apply { clipChildren = false } }
+    val allApps by lazy {
+        FrameLayout(this).apply {
+            visibility = View.GONE; isClickable = true // touches stay here, not on Home under it
+            setBackgroundColor(android.graphics.Color.argb(252, 10, 10, 12))
+            addView(android.widget.ScrollView(this@MainActivity).apply {
+                isVerticalScrollBarEnabled = false
+                addView(appsGrid, FrameLayout.LayoutParams(-1, -2))
+                setPadding(dp(48), dp(40), dp(48), dp(40)); clipToPadding = false
+            }, FrameLayout.LayoutParams(-1, -1))
+        }
+    }
+    val allAppsOpen get() = hub.touch && !hub.phone && allApps.visibility == View.VISIBLE
+    fun openAllApps() {
+        allApps.visibility = View.VISIBLE
+        hub.diskPool.execute { val list = apps.all(); hub.main.post { fillAppsRow(appsGrid, list, everything = true) } }
+    }
+    fun closeAllApps() { allApps.visibility = View.GONE }
+    /** Home's apps section, and the apps page when it's open. */
+    fun refreshAll() { refreshApps(); if (allAppsOpen) openAllApps() }
     // the two remote cards (Joint Remote's widget each); the buttons: the tablet's top bar, the phone's Home
     val remote1 by lazy { RemotePanel(this, 1) }
     val remote2 by lazy { RemotePanel(this, 2).also { remote1.other = it; it.other = remote1 } }
@@ -371,13 +394,13 @@ class MainActivity : Activity() {
     var refreshApps: () -> Unit = {}
 
     /** "Your apps": every installed TV app, laid out like Google TV's apps row. OK opens, a long press offers Move. */
-    fun fillAppsRow(strip: ViewGroup, all: List<SideApp>) {
+    fun fillAppsRow(strip: ViewGroup, all: List<SideApp>, everything: Boolean = false) {
         strip.removeAllViews()
         val favs = apps.favourites()
         // tablet: A to Z like a launcher's app drawer (Collator, so "Cámara" sorts with the C's); the TV keeps your order
         val hidden = apps.hidden()
-        val searching = inSearch
-        val favsOnly = apps.favouritesOnly && !searching
+        val searching = inSearch && !everything // everything: the apps page, all of them whatever Home shows
+        val favsOnly = apps.favouritesOnly && !searching && !everything
         val list = when {
             searching -> Apps.matches(all.filter { it.key !in hidden }, searchQuery) // nothing when none match
             else -> (if (favsOnly) all.filter { it.key in favs } else all)
@@ -399,17 +422,17 @@ class MainActivity : Activity() {
                         (if (hub.touch || !favsOnly || desktopLocked()) emptyList() else moveMode.options(tile, strip, horizontal = true, host = tile.getChildAt(0) as FrameLayout)) + // Apps is A to Z; TV favorites: Move
                         (app.pkg?.let { pkg ->
                             listOfNotNull(
-                                (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshApps() },
+                                (if (pkg in favs) "Remove from favorites" else "Mark as favorite") to { apps.setFavourite(pkg, pkg !in favs); refreshAll() },
                                 // TV only for now: the tablet and phone have no Settings line to change the PIN
-                                if (hub.phone) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshApps() } },
+                                if (hub.phone) null else (if (appLock.isLocked(pkg)) "Unlock app" else "Lock app") to { appLock.toggle(pkg, app.label) { refreshAll() } },
                                 // back from Settings → Hidden apps
-                                "Hide app" to { apps.setHidden(pkg, true); refreshApps(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
+                                "Hide app" to { apps.setHidden(pkg, true); refreshAll(); toast("${app.label} hidden · Settings → Hidden apps to bring it back") },
                                 // Android asks you to confirm; the Apps section updates when you come back
                                 "Uninstall" to { runCatching { startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) }.onFailure { toast("Couldn't uninstall ${app.label}") }; Unit },
                             )
                         } ?: emptyList()) +
                         ("Change icon" to { IconPicker.forApp(this, app) { sidebar.dirty = true; loadHome() } ?: Unit }) +
-                        ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshApps() } }) +
+                        ("Rename" to { apps.rename(this, app) { sidebar.dirty = true; refreshAll() } }) +
                         ("App info" to { app.pkg?.let { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$it"))) } ?: Unit }),
                 )
             tile = cards.appTile(app, { onTileFocused(it) }, onClick = { app.pkg?.let(actions::launch) }) {
@@ -471,6 +494,7 @@ class MainActivity : Activity() {
             hub.phone && phoneHome.weatherPanel.isOpen -> phoneHome.weatherPanel.close()
             hub.touch && widgetPage.isOpen -> widgetPage.close()
             dashOpen -> dashboard.back()
+            allAppsOpen -> closeAllApps()
             hub.phone -> Unit // a phone's Home: Back stays here
             sidebar.rail.hasFocus() -> backToContent()
             inSearch -> loadHome()
@@ -491,6 +515,7 @@ class MainActivity : Activity() {
         if (detail.isShown) detail.close()
         if (hub.touch) widgetPage.close()
         if (dashOpen) dashboard.close()
+        if (hub.touch && !hub.phone) closeAllApps()
         if (hub.touch) listOf(remote1, remote2).filter { !it.pinned }.forEach { it.close() } // pinned ones stay out
         if (hub.phone) { phoneHome.drawer.close(); phoneHome.nowPanel.close(); phoneHome.weatherPanel.close(); return }
         sidebar.hide()
@@ -629,7 +654,7 @@ class MainActivity : Activity() {
         if (!hub.touch) Thread { HomeButtonService.restore(this) }.start() // the TV's Home button service, restarted if Android stopped it
         if (!hub.touch && SleepTimer.left(this) == null) SleepTimer.restore(this) // back from a sleep timer: the TV's own sleep setting again
         if (hub.touch) {
-            apps.forgetList(); refreshApps() // back from uninstalling (or installing) something
+            apps.forgetList(); refreshAll() // back from uninstalling (or installing) something
             if (backgrounds().isNotEmpty()) applyBackground() // takes in pictures dropped in the inbox
         }
     }

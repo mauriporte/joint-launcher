@@ -111,6 +111,8 @@ class TopBar(private val a: MainActivity) {
             }
             addView(lock)
             addView(search.also { touchSize(it) })
+            // every app on a page of its own (Back or Home closes it)
+            addView(a.iconButton(R.drawable.ic_apps, "All apps") { a.openAllApps() }.apply { touchSize(this) })
             // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
             addView(collapse)
