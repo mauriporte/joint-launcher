@@ -110,9 +110,10 @@ class TopBar(private val a: MainActivity) {
                 touchSize(this); background = a.bareButton(); setPadding(a.dp(13), a.dp(13), a.dp(13), a.dp(13))
             }
             addView(lock)
+            // every app on a page of its own, just left of search (Back or Home closes it)
+            val allApps = a.iconButton(R.drawable.ic_apps, "All apps") { a.openAllApps() }.apply { touchSize(this) }
+            addView(allApps)
             addView(search.also { touchSize(it) })
-            // every app on a page of its own (Back or Home closes it)
-            addView(a.iconButton(R.drawable.ic_apps, "All apps") { a.openAllApps() }.apply { touchSize(this) })
             // arrow: folds away everything after it (tabs, buttons, weather, clock); remembered
             val collapse = a.iconButton(R.drawable.ic_chevron, "Hide the top bar") {}.apply { touchSize(this); background = a.bareButton() }
             addView(collapse)
@@ -151,6 +152,8 @@ class TopBar(private val a: MainActivity) {
                 lock.contentDescription = if (locked) "Unlock the desktop" else "Lock the desktop"
                 applyFold()
                 collapse.visibility = if (locked) View.GONE else View.VISIBLE // the bar stays folded as it was
+                allApps.visibility = if (locked) View.GONE else View.VISIBLE // locked: Home's favorites only, as usual
+                if (locked) a.closeAllApps()
                 if (locked) titlesButton.visibility = View.GONE // titles are gone while locked anyway
             }
             lock.setOnClickListener { a.hub.prefs.edit().putBoolean("desktop_locked", !a.desktopLocked()).apply(); applyLock(); a.loadHome() }
