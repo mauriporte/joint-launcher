@@ -26,6 +26,8 @@ android {
         buildConfigField("String", "ADB_SCRCPY", "\"${local.getProperty("adb.scrcpy", "")}\"")
         // devices (IP addresses, comma-separated) the dashboard never shows a screen of: adb.hide in local.properties
         buildConfigField("String", "ADB_HIDE", "\"${local.getProperty("adb.hide", "")}\"")
+        // the dashboard's shared master overlay (URL; read with the HA token): overlay.master in local.properties
+        buildConfigField("String", "OVERLAY_MASTER", "\"${local.getProperty("overlay.master", "")}\"")
     }
     // two separate apps from the same code, so the TV and the tablet never share an install or its settings:
     // assembleTvRelease for the TV, assembleTabletRelease for the tablet, assemblePhoneRelease for the phone

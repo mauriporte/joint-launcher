@@ -44,8 +44,11 @@ class Dashboard(private val a: MainActivity) {
             if (it.startsWith("[")) JSONObject().put("tiles", JSONArray(it)) else JSONObject(it)
         }
     }.getOrDefault(JSONObject())
-    private val tiles = conf.optJSONArray("tiles").objs()
-    private val servers = conf.optJSONArray("servers").objs()
+    private val bundledTiles = conf.optJSONArray("tiles").objs()
+    private val bundledServers = conf.optJSONArray("servers").objs()
+    // the shared master overlay (overlay.master in local.properties) replaces matching entries; bundled otherwise
+    @Volatile private var tiles = bundledTiles
+    @Volatile private var servers = bundledServers
     private val prefs = a.hub.prefs
     private var glass = prefs.getInt("dash_glass", conf.optInt("glass", 40))
     private var hidden = prefs.getStringSet("dash_cal_hidden", null)?.toList() ?: conf.optJSONArray("calHidden").strings()
@@ -99,6 +102,7 @@ class Dashboard(private val a: MainActivity) {
             if (tick % CAM_POLL == 0) { bg("cams", ::cameras); if (panel?.optString("kind") == "security") bg("panel", ::loadPanel) }
             if (tick % CAL_POLL == 0 || (calFail && tick % 30 == 0)) bg("events", ::readEvents)
             if (tick % CAL_POLL == 0) bg("notes", ::readNotes)
+            if (tick % CAL_POLL == 0) bg("master", ::readMaster)
             tick++
             view.postDelayed(this, 1000)
         }
@@ -111,6 +115,14 @@ class Dashboard(private val a: MainActivity) {
 
     private fun auth() = HaWidget.auth(a)
     private fun url(path: String) = (base ?: HaWidget.base(a).also { base = it }) + path
+
+    /** The master overlay: each of our tiles/side entries it also has takes its copy whole; ours keep their order. */
+    private fun readMaster() {
+        if (BuildConfig.OVERLAY_MASTER.isEmpty()) return
+        val m = JSONObject(Sources.get(BuildConfig.OVERLAY_MASTER, auth())) // 401 or offline: keeps what we have
+        tiles = mergeMaster(bundledTiles, m.optJSONArray("tiles").objs())
+        servers = mergeMaster(bundledServers, m.optJSONArray("servers").objs())
+    }
 
     private fun refresh() {
         base = HaWidget.base(a)
@@ -459,7 +471,8 @@ class Dashboard(private val a: MainActivity) {
         val lit = if (domain in TOGGLES && !t.has("action")) isOn(s) else !missing
         if (missing) c.saveLayerAlpha(x - 4, y - 4, x + w + 4, y + h + 4, 128)
         glassTile(c, x, y, w, h, rad, lit, hue)
-        val cam = if (t.optBoolean("camera")) cams[ent] else null
+        val pcDown = pcOff(states) && pcOnly(ent.orEmpty())
+        val cam = if (t.optBoolean("camera") && !pcDown) cams[ent] else null // MauStation off: no stale picture
         if (cam != null) {
             c.save(); c.clipPath(Path().apply { addRoundRect(x, y, x + w, y + h, rad, rad, Path.Direction.CW) })
             val sc = max(w / cam.width, h / cam.height)
@@ -469,7 +482,7 @@ class Dashboard(private val a: MainActivity) {
         badge(c, x + ip, y + ip, bsz, lit, hue, t.optString("icon"))
         val name = if (armed == "tile$i") "Tap again to confirm" else
             t.optString("name").ifEmpty { s?.optJSONObject("attributes")?.optString("friendly_name")?.ifEmpty { null } ?: ent ?: "" }
-        val v = value(t, s, loaded); val tw = w - 2 * ip
+        val v = value(t, s, loaded, pcDown); val tw = w - 2 * ip
         val vh = if (v.isNotEmpty()) textH(v, fv) else 0f
         val nh = textH(name, fn, true, tw, 2)
         val ny = y + h - ip - vh - nh
@@ -629,7 +642,8 @@ class Dashboard(private val a: MainActivity) {
                             val cx = x + m * (cw + 8)
                             round(cv, cx, y, cw, hh, 14f, Color.BLACK)
                             val img = data?.get(cam.optString("entity")) as? Bitmap
-                            if (img != null) {
+                            if (pcOff(states) && pcOnly(cam.optString("entity"))) text(cv, PC_OFF, 12f, rgba("#8a8a8e"), cx + cw / 2 - textW(PC_OFF, 12f) / 2, y + hh / 2 - 7)
+                            else if (img != null) {
                                 cv.save(); cv.clipPath(Path().apply { addRoundRect(cx, y, cx + cw, y + hh, 14f, 14f, Path.Direction.CW) })
                                 val sc = max(cw / img.width, hh / img.height)
                                 cv.translate(cx + (cw - img.width * sc) / 2, y + (hh - img.height * sc) / 2); cv.scale(sc, sc)
@@ -708,7 +722,8 @@ class Dashboard(private val a: MainActivity) {
                             val on = states[ap.optString("entity")]?.optString("state") == "on"
                             val cx = x + m * (cw3 + 8)
                             glassTile(cv, cx, y, cw3, hh, 14f, on)
-                            text(cv, ap.optString("name").ifEmpty { ap.optString("entity") }, 13f, if (on) Color.WHITE else rgba("#9e9e9e"), cx + 10, y + (hh - 16) / 2, cw3 - 62, 1, true)
+                            val nm = if (pcOff(states) && pcOnly(ap.optString("entity"))) PC_OFF else ap.optString("name").ifEmpty { ap.optString("entity") }
+                            text(cv, nm, 13f, if (on) Color.WHITE else rgba("#9e9e9e"), cx + 10, y + (hh - 16) / 2, cw3 - 62, 1, true)
                             val kx = cx + cw3 - 46; val ky = y + (hh - 20) / 2
                             round(cv, kx, ky, 36f, 20f, 10f, if (on) rgba(ACCENT) else white(0.2f))
                             fill.color = Color.WHITE; cv.drawCircle(kx + if (on) 26 else 10, ky + 10, 8f, fill)
@@ -769,7 +784,7 @@ class Dashboard(private val a: MainActivity) {
                     val nm = if (armed == key) ap.optString("confirm") else ap.optString("name").ifEmpty {
                         (s?.optJSONObject("attributes")?.optString("friendly_name")?.ifEmpty { null } ?: ap.optString("entity")).removeSuffix(" Contenedor").removeSuffix(" contenedor")
                     }
-                    val stt = when { s == null -> "…"; s.optString("state") == "unavailable" -> "Unavailable"
+                    val stt = when { pcOff(states) && pcOnly(ap.optString("entity")) -> PC_OFF; s == null -> "…"; s.optString("state") == "unavailable" -> "Unavailable"
                         sv.optBoolean("readonly") -> if (on) "Online" else "Offline"; else -> if (on) "Running" else "Stopped" }
                     text(cv, nm, 13f, if (on) Color.WHITE else rgba("#9e9e9e"), x + 54, y + 8, ww - 64, 1, true)
                     text(cv, stt, 11f, if (on) rgba(ACCENT) else rgba("#8a8a8e"), x + 54, y + 26, ww - 64)
@@ -931,9 +946,27 @@ class Dashboard(private val a: MainActivity) {
 
         fun isOn(s: JSONObject?) = s?.optString("state") in setOf("on", "open", "unlocked", "heat", "cool", "playing")
 
-        /** The small line under the name, as the Windows tile shows it. */
-        fun value(t: JSONObject, s: JSONObject?, loaded: Boolean): String {
+        /** Our entries in our order, each replaced whole by the master's entry with the same id (tiles) or name (servers). */
+        fun mergeMaster(mine: List<JSONObject>, master: List<JSONObject>): List<JSONObject> {
+            fun key(o: JSONObject) = o.optString("id").ifEmpty { o.optString("name") }
+            val byKey = master.filter { key(it).isNotEmpty() }.associateBy(::key)
+            return mine.map { byKey[key(it)] ?: it }
+        }
+
+        /** MauStation's power in HA: "on" up, "off" off or asleep; "unavailable" is unknown, so it never says off then. */
+        const val PC_POWER = "binary_sensor.maustation_encendido"
+        const val PC_OFF = "MauStation está apagado" // the tablet's labels here are Spanish ("MauStation vídeo/audio")
+
+        /** What only works while MauStation is on: its webcam and webcam stream switches, and its own sensors (CPU, RAM, LHM, Glances). */
+        fun pcOnly(entity: String) = entity == "camera.webcam_maustation" || entity.startsWith("switch.webcam_") ||
+            (entity.startsWith("sensor.") && "maustation" in entity)
+
+        fun pcOff(states: Map<String, JSONObject>) = states[PC_POWER]?.optString("state") == "off"
+
+        /** The small line under the name, as the Windows tile shows it; [pcDown]: a MauStation-only tile while it's off. */
+        fun value(t: JSONObject, s: JSONObject?, loaded: Boolean, pcDown: Boolean = false): String {
             val ent = t.optString("entity"); val domain = ent.substringBefore('.')
+            if (pcDown) return PC_OFF
             if (t.optBoolean("camera") || ent.isEmpty()) return ""
             if (s == null) return if (loaded) "Unavailable" else "…"
             val state = s.optString("state")
