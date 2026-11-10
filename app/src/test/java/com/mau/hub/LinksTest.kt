@@ -389,8 +389,8 @@ class HaWidgetTest {
         val cam = HaTile("Webcam MauStation", 0, HaTile.Kind.CAMERA, listOf("camera.webcam_maustation"))
         val webcam = st("camera.webcam_maustation", "unavailable")
         // off: says so, even though the camera itself is unavailable
-        assertEquals("MauStation is off", HaWidget.look(cam, mapOf(webcam, st(HaWidget.STATION_POWER, "off"))).status)
-        // unavailable sensor = unknown: the normal look, never "MauStation is off"
+        assertEquals("MauStation está apagado", HaWidget.look(cam, mapOf(webcam, st(HaWidget.STATION_POWER, "off"))).status)
+        // unavailable sensor = unknown: the normal look, never the off text
         assertEquals("No disponible", HaWidget.look(cam, mapOf(webcam, st(HaWidget.STATION_POWER, "unavailable"))).status)
         assertEquals("No disponible", HaWidget.look(cam, mapOf(webcam)).status)
         // on: the camera's own look

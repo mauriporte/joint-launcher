@@ -116,7 +116,7 @@ class HaWidget : AppWidgetProvider() {
         internal val STATION_ONLY = setOf("camera.webcam_maustation")
         /** "on" once MauStation answers pings for 30 s, "off" after 3 min without (asleep counts as off). */
         internal const val STATION_POWER = "binary_sensor.maustation_encendido"
-        internal const val STATION_OFF = "MauStation is off"
+        internal const val STATION_OFF = "MauStation está apagado" // the widget's own language (its other states are Spanish)
 
         /**
          * A MauStation-only tile while the PC is off. Only a real "off" counts: "unavailable" (.30's helper isn't
