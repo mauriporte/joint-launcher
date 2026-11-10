@@ -72,6 +72,16 @@ class DashboardTest {
         assertEquals(250f, rows[1][0].second, 0.01f); assertEquals(198f * 16 / 9, rows[1][0].third, 0.01f) // half width, tall
     }
 
+    @Test fun mauStationOnlyTilesSayItsOff() {
+        assertTrue(Dashboard.pcOnly("camera.webcam_maustation") && Dashboard.pcOnly("switch.webcam_video") && Dashboard.pcOnly("sensor.maustation_cpu_load"))
+        // its plug and its Tailscale status keep working while it's off
+        assertTrue(!Dashboard.pcOnly("switch.kill_switch_maustation") && !Dashboard.pcOnly("binary_sensor.maustation_conectado_al_control"))
+        val off = mapOf(Dashboard.PC_POWER to j("""{"state":"off"}"""))
+        assertTrue(Dashboard.pcOff(off))
+        assertTrue(!Dashboard.pcOff(mapOf(Dashboard.PC_POWER to j("""{"state":"unavailable"}""")))) // unknown: the normal unavailable look
+        assertEquals("MauStation is off", Dashboard.value(j("""{"entity":"sensor.maustation_cpu_load"}"""), null, true, pcDown = true))
+    }
+
     @Test fun datesAndNotes() {
         val today = LocalDate.of(2026, 11, 7)
         assertEquals("Today", Dashboard.dayLabel(today, today))
