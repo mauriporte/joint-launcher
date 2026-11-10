@@ -79,7 +79,16 @@ class DashboardTest {
         val off = mapOf(Dashboard.PC_POWER to j("""{"state":"off"}"""))
         assertTrue(Dashboard.pcOff(off))
         assertTrue(!Dashboard.pcOff(mapOf(Dashboard.PC_POWER to j("""{"state":"unavailable"}""")))) // unknown: the normal unavailable look
-        assertEquals("MauStation is off", Dashboard.value(j("""{"entity":"sensor.maustation_cpu_load"}"""), null, true, pcDown = true))
+        assertEquals("MauStation está apagado", Dashboard.value(j("""{"entity":"sensor.maustation_cpu_load"}"""), null, true, pcDown = true))
+    }
+
+    @Test fun masterEntriesReplaceOursKeepingOurOrder() {
+        val mine = listOf(j("""{"name":"Tailscale","apps":[1]}"""), j("""{"name":"Mine only"}"""), j("""{"id":"t1","name":"Old"}"""))
+        val master = listOf(j("""{"id":"t1","name":"New"}"""), j("""{"name":"Tailscale","apps":[1,2]}"""), j("""{"name":"Master only"}"""))
+        val out = Dashboard.mergeMaster(mine, master)
+        assertEquals(listOf("Tailscale", "Mine only", "New"), out.map { it.optString("name") })
+        assertEquals(2, out[0].optJSONArray("apps")!!.length())
+        assertEquals(mine, Dashboard.mergeMaster(mine, emptyList()))
     }
 
     @Test fun datesAndNotes() {
