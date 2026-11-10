@@ -108,12 +108,27 @@ class HaWidget : AppWidgetProvider() {
         }
 
         @Volatile private var states: Map<String, JSONObject> = emptyMap()
+        internal val lastStates get() = states
         @Volatile private var shots: Map<String, android.graphics.Bitmap> = emptyMap() // camera tiles: their latest still, small
         @Volatile private var problem: String? = null
+
+        /** Entities that only exist while MauStation (the PC) is running: its webcam. */
+        internal val STATION_ONLY = setOf("camera.webcam_maustation")
+        /** "on" once MauStation answers pings for 30 s, "off" after 3 min without (asleep counts as off). */
+        internal const val STATION_POWER = "binary_sensor.maustation_encendido"
+        internal const val STATION_OFF = "MauStation is off"
+
+        /**
+         * A MauStation-only tile while the PC is off. Only a real "off" counts: "unavailable" (.30's helper isn't
+         * posting) is unknown, so the tile keeps its normal look.
+         */
+        internal fun stationOff(t: HaTile, st: Map<String, JSONObject>) =
+            t.entities.any { it in STATION_ONLY } && st[STATION_POWER]?.optString("state") == "off"
 
         /** What a tile shows for these HA states. */
         internal fun look(t: HaTile, st: Map<String, JSONObject>): Look {
             if (t.entities.isEmpty()) return Look(false, GREY, "Sin asignar")
+            if (stationOff(t, st)) return Look(false, GREY, STATION_OFF)
             val all = t.entities.mapNotNull { st[it] }
             val state = all.firstOrNull()?.optString("state")
             if (all.isEmpty() || all.all { it.optString("state") == "unavailable" }) return Look(false, GREY, if (st.isEmpty()) "—" else "No disponible")
@@ -159,7 +174,7 @@ class HaWidget : AppWidgetProvider() {
                         (0 until arr.length()).map(arr::getJSONObject).associateBy { it.getString("entity_id") }
                     }.onSuccess { states = it; problem = null }.onFailure { problem = msg(app, it) }
                     // cameras: a small still each (a widget's pictures all travel in one bundle, which has a size limit)
-                    if (problem == null) shots = tiles(app).filter { it.kind == HaTile.Kind.CAMERA }.mapNotNull { t ->
+                    if (problem == null) shots = tiles(app).filter { it.kind == HaTile.Kind.CAMERA && !stationOff(it, states) }.mapNotNull { t ->
                         snapshot(app, t.entities[0], 240)?.let { t.entities[0] to it }
                     }.toMap()
                     ids.forEach { m.updateAppWidget(it, views(app, m.getAppWidgetOptions(it))) }
@@ -272,6 +287,11 @@ class HaTap : Activity() {
 
     /** A camera tile: the camera big, a new still every 2 seconds while it's open; tap or Back closes it. */
     private fun camera(t: HaTile) {
+        if (HaWidget.stationOff(t, HaWidget.lastStates)) {
+            AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t.name).setMessage(HaWidget.STATION_OFF)
+                .setPositiveButton("OK", null).setOnDismissListener { finish() }.show()
+            return
+        }
         val img = android.widget.ImageView(this).apply { adjustViewBounds = true; setBackgroundColor(android.graphics.Color.BLACK) }
         var open = true
         val d = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t.name).setView(img)

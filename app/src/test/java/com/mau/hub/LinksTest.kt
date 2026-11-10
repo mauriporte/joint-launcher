@@ -385,6 +385,20 @@ class HaWidgetTest {
         assertEquals(listOf("Power Strip"), HaWidget.TILES.filter { it.guard != null }.map { it.name })
     }
 
+    @Test fun maustationOnlyTilesSayThePcIsOff() {
+        val cam = HaTile("Webcam MauStation", 0, HaTile.Kind.CAMERA, listOf("camera.webcam_maustation"))
+        val webcam = st("camera.webcam_maustation", "unavailable")
+        // off: says so, even though the camera itself is unavailable
+        assertEquals("MauStation is off", HaWidget.look(cam, mapOf(webcam, st(HaWidget.STATION_POWER, "off"))).status)
+        // unavailable sensor = unknown: the normal look, never "MauStation is off"
+        assertEquals("No disponible", HaWidget.look(cam, mapOf(webcam, st(HaWidget.STATION_POWER, "unavailable"))).status)
+        assertEquals("No disponible", HaWidget.look(cam, mapOf(webcam)).status)
+        // on: the camera's own look
+        assertTrue(!HaWidget.stationOff(cam, mapOf(st(HaWidget.STATION_POWER, "on"))))
+        // other tiles never care about the PC
+        assertEquals("Apagado", HaWidget.look(tile("Desk Plug"), mapOf(st("switch.desk_plug", "off"), st(HaWidget.STATION_POWER, "off"))).status)
+    }
+
     @Test fun exampleTilesFileReadsBack() {
         val list = HaWidget.fromJson(java.io.File("ha_tiles.example.json").readText())
         assertEquals(HaTile.Kind.values().toSet(), list.map { it.kind }.toSet()) // one of every kind
