@@ -28,6 +28,8 @@ internal object Accent {
     /** Recomputes [ACCENT]; true when it changed. */
     fun load(c: Context): Boolean {
         val now = override(c) ?: shared(c) ?: ORANGE
+        // Joint Remote (0.36+) on this device takes its accent from us; "" = the default orange; it ignores repeats
+        runCatching { c.sendBroadcast(android.content.Intent("com.mau.remote.ACCENT").setPackage("com.mau.remote").putExtra("accent", if (now == ORANGE) "" else hex(now))) }
         return (now != ACCENT).also { ACCENT = now }
     }
 
