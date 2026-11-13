@@ -15,7 +15,7 @@ import android.widget.Toast
 // ---- colours ----
 
 internal const val BG = 0xFF050505.toInt()           // near-black, Netflix TV style
-internal const val ACCENT = 0xFFE8650A.toInt()       // dark orange (Netflix's red, in orange)
+// ACCENT (the adjustable A.R.T. accent) lives in Accent.kt
 internal const val TEXT_SOFT = 0xFFC9CBD3.toInt()    // descriptions
 internal const val TEXT_MUTED = 0xFF9A9DA8.toInt()   // meta lines
 internal const val IMDB_YELLOW = 0xFFF5C518.toInt()

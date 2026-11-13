@@ -241,7 +241,7 @@ class PhonePage(
         body{font-family:system-ui,sans-serif;background:#0b0b0d;color:#eee;margin:0 auto;max-width:520px;padding:16px}
         h1{font-size:1.3em}h2{font-size:1.05em;margin:28px 0 8px;border-top:1px solid #2a2b30;padding-top:18px}
         input,button{display:block;width:100%;box-sizing:border-box;margin:6px 0;padding:12px;border-radius:10px;border:1px solid #333;background:#1a1b21;color:#eee;font-size:16px}
-        button{background:#e8650a;border:0;color:#fff;font-weight:600}a{color:#f39a52}.ok{color:#5fd068;font-size:.85em}
+        button{background:${Accent.hex(ACCENT)};border:0;color:#fff;font-weight:600}a{color:${Accent.hex(Accent.light())}}.ok{color:#5fd068;font-size:.85em}
         .hint{color:#9a9da8;font-size:.85em}.msg{color:#5fd068}.err{color:#ff8080}code{word-break:break-all}
         </style></head><body><h1>Joint Launcher · Connect accounts</h1>$body</body></html>"""
 

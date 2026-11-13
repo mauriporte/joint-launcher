@@ -63,6 +63,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         if (openedAsAppWhileHome()) return
+        Accent.load(this) // before any view takes its colour
         Thread { HomeButtonService.restore(this) }.start() // may wait a moment (see restore)
         heroImg = FadedImage(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         heroTitle = text(26f, Color.WHITE).apply {

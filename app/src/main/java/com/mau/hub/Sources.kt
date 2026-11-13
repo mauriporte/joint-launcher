@@ -26,19 +26,21 @@ object Sources {
     fun get(url: String, headers: Map<String, String> = emptyMap()) = http(url, null, headers)
     fun post(url: String, body: String, headers: Map<String, String> = emptyMap()) =
         http(url, body, headers + ("Content-Type" to "application/json"))
+    fun put(url: String, body: String, headers: Map<String, String> = emptyMap()) =
+        http(url, body, headers + ("Content-Type" to "application/json"), "PUT")
 
     /** A request that failed: which server, and either its HTTP status or the network error (no answer, timeout...). */
     class FetchError(val host: String, val code: Int?, cause: Throwable? = null) :
         Exception(code?.let { "HTTP $it from $host" } ?: "$host: ${cause?.message}", cause)
 
-    private fun http(url: String, body: String?, headers: Map<String, String>): String {
+    private fun http(url: String, body: String?, headers: Map<String, String>, method: String = "POST"): String {
         val u = URL(url)
         val host = if (u.port > 0) "${u.host}:${u.port}" else u.host
         return try {
             (u.openConnection() as HttpURLConnection).run {
                 connectTimeout = 6000; readTimeout = 12000
                 (headers + Hub.cfAccess(url)).forEach(::setRequestProperty)
-                if (body != null) { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) } }
+                if (body != null) { requestMethod = method; doOutput = true; outputStream.use { it.write(body.toByteArray()) } }
                 try {
                     if (responseCode >= 400) throw FetchError(host, responseCode)
                     inputStream.bufferedReader().readText()

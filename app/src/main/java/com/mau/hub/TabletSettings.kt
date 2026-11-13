@@ -61,6 +61,14 @@ class TabletSettings(private val a: MainActivity) {
         buttons("Connect accounts" to { ConnectScreen(a).show() })
         }
 
+        heading("Accent colour")
+        val own = Accent.override(a); val shared = Accent.shared(a)
+        line("Accent", when {
+            own != null -> "This device only: ${Accent.hex(own)}"
+            shared != null -> "All devices: ${Accent.hex(shared)}"
+            else -> "All devices: the A.R.T. orange (default)"
+        }) { accentPicker() }
+
         heading("Background")
         val modes = linkedMapOf("black" to "Black", "wallpaper" to "The $device's wallpaper", "picture" to "My pictures (landscape and portrait)")
         line("Background", modes.getValue(a.bgMode())) {
@@ -434,6 +442,36 @@ class TabletSettings(private val a: MainActivity) {
     })
 
     // ---- choices ----
+
+    /** Pick a swatch, then where it applies: every device (the master overlay), this one only, or back to the shared one. */
+    private fun accentPicker() {
+        var pick = ACCENT
+        val grid = android.widget.GridLayout(a).apply { columnCount = 5; setPadding(a.dp(20), a.dp(12), a.dp(20), 0) }
+        fun paint() = (0 until grid.childCount).forEach { i ->
+            (grid.getChildAt(i).background as android.graphics.drawable.GradientDrawable).setStroke(a.dp(3), if (Accent.SWATCHES[i] == pick) Color.WHITE else Color.TRANSPARENT)
+        }
+        Accent.SWATCHES.forEach { c ->
+            grid.addView(View(a).apply {
+                background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(c) }
+                contentDescription = Accent.hex(c); isFocusable = true
+                setOnClickListener { pick = c; paint() }
+            }, android.widget.GridLayout.LayoutParams().apply { width = a.dp(44); height = a.dp(44); setMargins(a.dp(6), a.dp(6), a.dp(6), a.dp(6)) })
+        }
+        paint()
+        fun done(changed: Boolean) { if (changed) a.recreate() else draw() }
+        AlertDialog.Builder(a).setTitle("Accent colour").setView(grid)
+            .setPositiveButton("All devices") { _, _ ->
+                hub.pool.execute {
+                    val r = runCatching { Accent.writeShared(a, pick) }
+                    a.runOnUiThread {
+                        r.onSuccess { Accent.setOverride(a, null); a.recreate() }.onFailure { a.toast("Couldn't save it for all devices: ${Sources.explain(it)}") }
+                    }
+                }
+            }
+            .setNeutralButton("This device only") { _, _ -> done(Accent.setOverride(a, pick)) }
+            .setNegativeButton("Follow shared") { _, _ -> done(Accent.setOverride(a, null)) }
+            .show()
+    }
 
     private fun iconPack(packs: List<Pair<String, String>>, current: String?) {
         val names = (listOf("The apps' own icons") + packs.map { it.second }).toTypedArray()
