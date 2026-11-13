@@ -122,6 +122,7 @@ class Dashboard(private val a: MainActivity) {
         val m = JSONObject(Sources.get(BuildConfig.OVERLAY_MASTER, auth())) // 401 or offline: keeps what we have
         tiles = mergeMaster(bundledTiles, m.optJSONArray("tiles").objs())
         servers = mergeMaster(bundledServers, m.optJSONArray("servers").objs())
+        if (Accent.sharedFromMaster(a, m)) a.runOnUiThread { a.recreate() } // a new shared accent: rebuild every view in it
     }
 
     private fun refresh() {
@@ -901,8 +902,8 @@ class Dashboard(private val a: MainActivity) {
         val TOGGLES = setOf("light", "switch", "input_boolean", "fan", "cover", "lock")
         val TONES = mapOf("blue" to "#29B6F6", "purple" to "#AB47BC", "amber" to "#FFC107", "green" to "#66BB6A", "red" to "#f44336", "yellow" to "#FFEB3B",
             "cyan" to "#26C6DA", "indigo" to "#7E57C2", "darkblue" to "#1E66D0", "white" to "#F2F2F2", "teal" to "#26A69A")
-        val CAL_TONES = listOf("#E8650A", "#29B6F6", "#AB47BC", "#66BB6A", "#FFC107", "#f44336", "#26C6DA", "#EC407A")
-        const val ACCENT = "#E8650A"; const val GROUP = "#B34700"; const val RED = "#f44336"
+        val CAL_TONES get() = listOf(ACCENT, "#29B6F6", "#AB47BC", "#66BB6A", "#FFC107", "#f44336", "#26C6DA", "#EC407A")
+        val ACCENT get() = Accent.hex(com.mau.hub.ACCENT); val GROUP get() = Accent.hex(Accent.dark()); const val RED = "#f44336"
         // tiles that drive Windows-only things (voice assistant, another Claude session, projects, dock apps) keep their
         // place and show their name and value, but a tap does nothing here
         val SKIP = listOf("assist", "relay", "projects", "app")
@@ -1023,7 +1024,7 @@ class Dashboard(private val a: MainActivity) {
         private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
         // the desktop's ws-scrcpy look (art-desktop-windows main.cjs SCRCPY_CSS); buttons shrink with the frame (7vh each)
-        const val SCRCPY_CSS = "::-webkit-scrollbar{display:none}html,body{overflow:hidden!important;background:#000}.control-buttons-list{overflow:hidden!important;justify-content:space-evenly;align-items:center;padding:.3rem 0;box-sizing:border-box;background:#000!important}.control-button{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh)!important;height:min(1.95rem,7vh)!important;border-radius:999px;background:#1C1C1E!important;opacity:1!important;display:flex;align-items:center;justify-content:center}.control-button>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-button:active{background:#E8650A!important}.control-button:active>svg{fill:#050505!important}.control-wrapper>label{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh);height:min(1.95rem,7vh);border-radius:999px;background:#1C1C1E;display:flex!important;align-items:center;justify-content:center}.control-wrapper>label>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-wrapper>input:checked+label{background:#E8650A}.control-wrapper>input:checked+label>svg{fill:#050505!important}"
+        val SCRCPY_CSS get() = "::-webkit-scrollbar{display:none}html,body{overflow:hidden!important;background:#000}.control-buttons-list{overflow:hidden!important;justify-content:space-evenly;align-items:center;padding:.3rem 0;box-sizing:border-box;background:#000!important}.control-button{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh)!important;height:min(1.95rem,7vh)!important;border-radius:999px;background:#1C1C1E!important;opacity:1!important;display:flex;align-items:center;justify-content:center}.control-button>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-button:active{background:${ACCENT}!important}.control-button:active>svg{fill:#050505!important}.control-wrapper>label{margin:0!important;flex-shrink:1;width:min(1.95rem,7vh);height:min(1.95rem,7vh);border-radius:999px;background:#1C1C1E;display:flex!important;align-items:center;justify-content:center}.control-wrapper>label>svg{fill:#d8d8d8!important;width:60%;height:60%}.control-wrapper>input:checked+label{background:${ACCENT}}.control-wrapper>input:checked+label>svg{fill:#050505!important}"
         const val SCRCPY_BAR = 52f
         const val SCROLLBAR = 14f // the panels' scrollbar strip (dp) // ws-scrcpy's button column at the frame's right (dp)
 
