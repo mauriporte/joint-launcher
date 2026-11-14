@@ -336,6 +336,7 @@ class MainActivity : Activity() {
         }
         if (hub.installed(Links.SMARTTUBE)) rows.content("YouTube", listOf { Sources.youtube(q, hub.country) }, false, 40, null)
         showHero(null, "Results for “$q”")
+        rows.top() // the list kept Home's scroll position: start at the matching apps, the first result
     }
 
     fun selectTab(t: Tab) {

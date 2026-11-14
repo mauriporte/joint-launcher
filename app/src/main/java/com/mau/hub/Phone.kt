@@ -248,7 +248,7 @@ class AllApps(private val a: MainActivity) {
         setOnEditorActionListener { _, _, _ -> adapter.shown.firstOrNull()?.let(::launch); true }
         addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(t: Editable?) {
-                show()
+                show(); recycler.scrollToPosition(0) // the best match first, wherever the list was scrolled
                 // only one app left: open it straight away, like Olauncher / Pro Launcher
                 if (!t.isNullOrBlank() && adapter.shown.size == 1) launch(adapter.shown[0])
             }
