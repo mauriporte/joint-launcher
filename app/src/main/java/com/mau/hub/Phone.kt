@@ -303,25 +303,64 @@ class AllApps(private val a: MainActivity) {
         return if (c in 'A'..'Z') c.toString() else "#"
     }
 
+    /**
+     * The A–Z strip: small grey letters at rest; while a finger is on it the letters bend out from the edge in a wave
+     * around the finger, the one under it bigger and in the accent colour, with a light tick on each new letter.
+     */
     private val letters = object : View(a) {
         var keys: List<String> = emptyList()
+        var left = false // which edge it sits on (Settings → A–Z letters in the list)
+        private var touchY = -1f // finger position while touching, -1 = at rest
+        private var wave = 0f // 0 = at rest, 1 = fully bent (eases in and out)
+        private var active = -1
+        private var anim: android.animation.ValueAnimator? = null
         private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE; textAlign = android.graphics.Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD
-            setShadowLayer(6f, 0f, 1f, 0xCC000000.toInt())
+            textAlign = android.graphics.Paint.Align.CENTER; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            setShadowLayer(4f, 0f, 1f, 0x99000000.toInt())
         }
+        private val step get() = minOf(height.toFloat() / keys.size.coerceAtLeast(1), a.dp(22).toFloat())
+        private val top get() = (height - step * keys.size) / 2 // the letters sit centred, not stretched to the ends
+
         override fun onDraw(c: android.graphics.Canvas) {
             if (keys.isEmpty()) return
-            val step = height.toFloat() / keys.size
-            paint.textSize = minOf(step * 0.8f, a.dp(13).toFloat())
-            keys.forEachIndexed { i, k -> c.drawText(k, width / 2f, step * i + step / 2 + paint.textSize / 3, paint) }
+            val edgeX = if (left) a.dp(14).toFloat() else width - a.dp(14).toFloat()
+            val toward = if (left) 1 else -1 // the wave bends in, away from the edge
+            keys.forEachIndexed { i, k ->
+                val y = top + step * i + step / 2
+                // how close this letter is to the finger: 1 under it, fading out over about three letters
+                val near = if (touchY < 0) 0f else (1f - kotlin.math.abs(y - touchY) / (step * 3.5f)).coerceAtLeast(0f)
+                val w = (kotlin.math.sin(near * Math.PI / 2).toFloat()) * wave
+                paint.textSize = a.dp(11).toFloat() * (1f + 1.1f * w)
+                paint.color = if (i == active && wave > 0f) ACCENT
+                    else android.graphics.Color.argb((150 + 105 * w).toInt(), 255, 255, 255) // grey at rest, whiter near the finger
+                c.drawText(k, edgeX + toward * a.dp(34) * w, y + paint.textSize / 3, paint)
+            }
         }
+
+        private fun ease(to: Float) {
+            anim?.cancel()
+            anim = android.animation.ValueAnimator.ofFloat(wave, to).setDuration(if (to > 0f) 120 else 220).apply {
+                addUpdateListener { wave = it.animatedValue as Float; if (to == 0f && wave == 0f) touchY = -1f; invalidate() }
+                start()
+            }
+        }
+
         override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
             if (keys.isEmpty()) return false
             parent.requestDisallowInterceptTouchEvent(true) // a drag here picks letters, it doesn't scroll or swipe the drawer
-            val k = keys[(e.y / height * keys.size).toInt().coerceIn(0, keys.size - 1)]
-            val pos = adapter.shown.indexOfFirst { initial(it.label) == k }
-            if (pos >= 0) (recycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(pos, 0)
-            if (e.action == android.view.MotionEvent.ACTION_UP) performClick()
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> ease(1f)
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> { ease(0f); performClick(); return true }
+            }
+            touchY = e.y.coerceIn(top, top + step * keys.size - 1)
+            val i = ((touchY - top) / step).toInt().coerceIn(0, keys.size - 1)
+            if (i != active) {
+                active = i
+                performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                val pos = adapter.shown.indexOfFirst { initial(it.label) == keys[i] }
+                if (pos >= 0) (recycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(pos, 0)
+            }
+            invalidate()
             return true
         }
         override fun performClick() = super.performClick()
@@ -344,7 +383,7 @@ class AllApps(private val a: MainActivity) {
         // the list, with the A–Z strip down its right side: touch or drag a letter to jump there
         addView(FrameLayout(a).apply {
             addView(recycler, FrameLayout.LayoutParams(-1, -1))
-            addView(letters, FrameLayout.LayoutParams(a.dp(28), -1, Gravity.END).apply { setMargins(0, a.dp(8), a.dp(4), a.dp(24)) })
+            addView(letters, FrameLayout.LayoutParams(a.dp(64), -1, Gravity.END).apply { setMargins(0, a.dp(8), 0, a.dp(24)) }) // wide enough for the wave
         }, LinearLayout.LayoutParams(-1, 0, 1f))
         visibility = View.GONE
     }
@@ -418,9 +457,9 @@ class AllApps(private val a: MainActivity) {
         letters.visibility = if (letters.keys.size > 1) View.VISIBLE else View.GONE
         // left- or right-handed: Settings → A–Z letters in the list
         val left = a.hub.prefs.getBoolean("drawer_letters_left", false)
+        letters.left = left
         (letters.layoutParams as? FrameLayout.LayoutParams)?.takeIf { (it.gravity == Gravity.START) != left }?.let {
-            it.gravity = if (left) Gravity.START else Gravity.END
-            it.setMargins(if (left) a.dp(4) else 0, a.dp(8), if (left) 0 else a.dp(4), a.dp(24)); letters.layoutParams = it
+            it.gravity = if (left) Gravity.START else Gravity.END; letters.layoutParams = it
         }
         letters.invalidate()
     }
