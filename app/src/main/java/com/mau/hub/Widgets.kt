@@ -367,7 +367,8 @@ class Widgets(private val a: MainActivity) {
         val c = Math.round((c0 * grid.cell + dx) / grid.cell).coerceIn(1, maxCols(grid.width))
         val r = Math.round((r0 * grid.cell + dy) / grid.cell).coerceIn(1, maxRows(grid.width))
         if (c != grid.cols || r != grid.rows) { grid.cols = c; grid.rows = r; grid.requestLayout(); grid.invalidate() }
-        if (done) { a.hub.prefs.edit().putString("wgrid_$orient", "$c,$r").apply(); a.rows.refreshWidgets() } // widgets re-fit the new grid
+        // widgets re-fit the new grid; posted: rebuilding the page inside the handle's own touch event crashed the next draw
+        if (done) { a.hub.prefs.edit().putString("wgrid_$orient", "$c,$r").apply(); grid.post { a.rows.refreshWidgets() } }
     }
 
     /** A round drag handle; onStart runs on touch, onDrag gets the distance from where the drag started (and true on release). */
