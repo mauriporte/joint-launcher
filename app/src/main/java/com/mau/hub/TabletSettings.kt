@@ -307,6 +307,10 @@ class TabletSettings(private val a: MainActivity) {
         line("Apps in the list (swipe up)", if (drawerIcons) "Icons and names" else "Names only") {
             p.edit().putBoolean("drawer_icons", !drawerIcons).apply(); a.refreshApps(); draw()
         }
+        val lettersLeft = p.getBoolean("drawer_letters_left", false)
+        line("A–Z letters in the list", if (lettersLeft) "Left side (left-handed)" else "Right side (right-handed)") {
+            p.edit().putBoolean("drawer_letters_left", !lettersLeft).apply(); draw()
+        }
         list.addView(android.widget.Switch(a).apply {
             text = "Keyboard up when the app list opens"; textSize = 16f; setTextColor(Color.WHITE)
             isChecked = p.getBoolean("phone_keyboard", false)

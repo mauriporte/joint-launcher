@@ -297,6 +297,36 @@ class AllApps(private val a: MainActivity) {
         isVerticalScrollBarEnabled = false; clipToPadding = false; setPadding(0, a.dp(4), 0, a.dp(24))
     }
 
+    /** "Á" → "A", digits and symbols → "#": the letter an app is filed under. */
+    private fun initial(label: String): String {
+        val c = java.text.Normalizer.normalize(label.trim().take(1), java.text.Normalizer.Form.NFD).firstOrNull()?.uppercaseChar() ?: return "#"
+        return if (c in 'A'..'Z') c.toString() else "#"
+    }
+
+    private val letters = object : View(a) {
+        var keys: List<String> = emptyList()
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textAlign = android.graphics.Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD
+            setShadowLayer(6f, 0f, 1f, 0xCC000000.toInt())
+        }
+        override fun onDraw(c: android.graphics.Canvas) {
+            if (keys.isEmpty()) return
+            val step = height.toFloat() / keys.size
+            paint.textSize = minOf(step * 0.8f, a.dp(13).toFloat())
+            keys.forEachIndexed { i, k -> c.drawText(k, width / 2f, step * i + step / 2 + paint.textSize / 3, paint) }
+        }
+        override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+            if (keys.isEmpty()) return false
+            parent.requestDisallowInterceptTouchEvent(true) // a drag here picks letters, it doesn't scroll or swipe the drawer
+            val k = keys[(e.y / height * keys.size).toInt().coerceIn(0, keys.size - 1)]
+            val pos = adapter.shown.indexOfFirst { initial(it.label) == k }
+            if (pos >= 0) (recycler.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(pos, 0)
+            if (e.action == android.view.MotionEvent.ACTION_UP) performClick()
+            return true
+        }
+        override fun performClick() = super.performClick()
+    }
+
     val view: View = LinearLayout(a).apply {
         orientation = LinearLayout.VERTICAL
         isClickable = true // touches stay in the drawer, not on Home under it
@@ -311,9 +341,14 @@ class AllApps(private val a: MainActivity) {
             }.apply { setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton() },
                 LinearLayout.LayoutParams(a.dp(44), a.dp(44)).apply { marginStart = a.dp(8) })
         }, LinearLayout.LayoutParams(-1, -2).apply { setMargins(a.dp(20), a.dp(8), a.dp(12), a.dp(8)) })
-        addView(recycler, LinearLayout.LayoutParams(-1, 0, 1f))
+        // the list, with the A–Z strip down its right side: touch or drag a letter to jump there
+        addView(FrameLayout(a).apply {
+            addView(recycler, FrameLayout.LayoutParams(-1, -1))
+            addView(letters, FrameLayout.LayoutParams(a.dp(28), -1, Gravity.END).apply { setMargins(0, a.dp(8), a.dp(4), a.dp(24)) })
+        }, LinearLayout.LayoutParams(-1, 0, 1f))
         visibility = View.GONE
     }
+
     val isOpen get() = view.visibility == View.VISIBLE
 
     fun open(cat: String? = null, typing: Boolean = false) {
@@ -378,6 +413,16 @@ class AllApps(private val a: MainActivity) {
         adapter.shown = if (q.isNotBlank()) Apps.matches(all, q) // searching looks through every app, whatever the category
             else category?.let { c -> all.filter { home.category(it.key) == c } } ?: all
         adapter.notifyDataSetChanged()
+        // the strip only for the A–Z list (search results are ordered by best match), with the letters it has
+        letters.keys = if (q.isNotBlank()) emptyList() else adapter.shown.map { initial(it.label) }.distinct()
+        letters.visibility = if (letters.keys.size > 1) View.VISIBLE else View.GONE
+        // left- or right-handed: Settings → A–Z letters in the list
+        val left = a.hub.prefs.getBoolean("drawer_letters_left", false)
+        (letters.layoutParams as? FrameLayout.LayoutParams)?.takeIf { (it.gravity == Gravity.START) != left }?.let {
+            it.gravity = if (left) Gravity.START else Gravity.END
+            it.setMargins(if (left) a.dp(4) else 0, a.dp(8), if (left) 0 else a.dp(4), a.dp(24)); letters.layoutParams = it
+        }
+        letters.invalidate()
     }
 
     private fun launch(app: SideApp) { app.pkg?.let(a.apps::launch); close() }
