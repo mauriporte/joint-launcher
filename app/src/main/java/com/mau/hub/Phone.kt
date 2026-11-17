@@ -199,13 +199,13 @@ class PhoneHome(private val a: MainActivity) {
                         app?.pkg?.let { pkg -> "App info" to { appInfo(pkg) } },
                     )); true
                 }
-            })
+            }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL }) // only the name is pressable; the space either side stays for swipes
         }
     }
 
     /** One line on Home: the name, or in icon mode the app's LineX icon instead of it (categories keep their name). */
     private fun entry(label: String, iconPkg: String?, category: Boolean) = LinearLayout(a).apply {
-        gravity = Gravity.CENTER // the row is as wide as the screen: centre the name (or icon) in it
+        gravity = Gravity.CENTER
         setPadding(a.dp(20), a.dp(6), a.dp(20), a.dp(6))
         background = a.bareButton(); isClickable = true; contentDescription = label // TalkBack still says the name
         if (iconPkg != null) { addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40))); return@apply }
