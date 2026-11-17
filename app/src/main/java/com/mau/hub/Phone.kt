@@ -33,11 +33,22 @@ class PhoneHome(private val a: MainActivity) {
     private val dock = LinearLayout(a)
     private val dockScroll = object : HorizontalScrollView(a) {
         private var flung = false
+        private var downX = 0f
         override fun fling(velocityX: Int) { flung = true; snap(page() + if (velocityX > 0) 1 else -1) }
         override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
             flung = false
-            val handled = super.onTouchEvent(e) // a quick swipe calls fling() from in here
-            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) snap(page())
+            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) downX = e.x
+            val handled = super.onTouchEvent(e) // a quick swipe calls fling() from in here (but not past either end)
+            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) {
+                // past either end it wraps around: right from the first page → the last page with shortcuts, left from the last → the first
+                val dx = e.x - downX; val p = page(); val end = dock.childCount - 1
+                snap(when {
+                    e.actionMasked != android.view.MotionEvent.ACTION_UP || kotlin.math.abs(dx) < a.dp(48) -> p
+                    p == 0 && dx > 0 -> lastFullPage
+                    p == end && dx < 0 -> 0
+                    else -> p
+                })
+            }
             return handled
         }
         fun page() = (scrollX + width / 2) / maxOf(1, width)
@@ -220,8 +231,11 @@ class PhoneHome(private val a: MainActivity) {
         })
     }
 
+    private var lastFullPage = 0 // the last shortcut page with something on it (where a swipe right from the first lands)
+
     private fun fillDock(pages: List<List<String>>) {
         dock.removeAllViews()
+        lastFullPage = pages.indexOfLast { it.isNotEmpty() }.coerceAtLeast(0)
         val w = dockScroll.width.takeIf { it > 0 } ?: a.resources.displayMetrics.widthPixels
         pages.forEachIndexed { i, keys ->
             dock.addView(LinearLayout(a).apply {
