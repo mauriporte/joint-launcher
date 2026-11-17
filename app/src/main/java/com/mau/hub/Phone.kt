@@ -267,6 +267,31 @@ class PhoneHome(private val a: MainActivity) {
         if (cat != null && cat !in categories()) putString("phone_categories", (categories() + cat).joinToString("\n"))
     }.apply()
 
+    /**
+     * Settings → Sort apps into categories: every visible app without one gets [AutoCategory]'s guess; apps you placed keep theirs.
+     * Returns the report: the new categories, how many apps were placed, and the count in every category.
+     */
+    fun autoCategorize(): String {
+        val hidden = a.apps.hidden()
+        val apps = a.apps.all().filter { it.key !in hidden && it.pkg != null }
+        val placed = apps.mapNotNull { app -> category(app.key)?.let { app.key to it } }.toMap()
+        val before = categories().toSet()
+        var added = 0
+        apps.filter { it.key !in placed }.forEach { app ->
+            val declared = if (android.os.Build.VERSION.SDK_INT >= 26) runCatching { a.packageManager.getApplicationInfo(app.pkg!!, 0).category }.getOrDefault(-1) else -1
+            setCategory(app.key, AutoCategory.guess(app.pkg!!, app.label, declared, placed)); added++
+        }
+        if (categoryName(AutoCategory.UNSORTED) == null && apps.any { category(it.key) == AutoCategory.UNSORTED })
+            p.edit().putString("cat_name_${AutoCategory.UNSORTED}", "To sort").apply()
+        val counts = apps.groupingBy { category(it.key)!! }.eachCount()
+        val fresh = categories().filter { it !in before }
+        return buildString {
+            append("$added apps placed (${placed.size} you'd already placed stay where they were).\n\n")
+            append(if (fresh.isEmpty()) "No new categories." else "New: " + fresh.joinToString(", ") { catLabel(it).trim() }); append("\n\n")
+            categories().filter { it in counts }.forEach { append("${catLabel(it).trim()}: ${counts[it]}\n") }
+        }.trim()
+    }
+
     /** A category's own name beside its emoji ("🍥" → "Social"), or null. */
     fun categoryName(cat: String): String? = p.getString("cat_name_$cat", null)
     /** What Home shows for a category: "🍥  Social", or just the emoji while it has no name. */
@@ -634,5 +659,54 @@ object ProLauncherImport {
         r.swipeLeft?.let { e.putString(Gestures.SWIPE_LEFT, "app:$it") }
         e.apply()
         a.apps.forgetList()
+    }
+}
+
+/**
+ * Settings → Sort apps into categories: puts every app without a category into one, leaving the ones you placed alone.
+ * It guesses from (1) other apps by the same developer you already placed, (2) words in the name or package,
+ * (3) the category the app declares to Android. What it can't place goes to [UNSORTED] for you to sort.
+ */
+object AutoCategory {
+    const val UNSORTED = "❓"
+
+    // what a guess means → the emoji used for it (an existing category of yours when it has this emoji, else a new one)
+    private val WORDS = listOf(
+        "⌚" to listOf("watchface", "watch face", "wear", "stopwatch", "clock", "timer", "alarm"),
+        "🎮" to listOf("game", "games", "puzzle", "solitaire", "chess", "mahjong", "sudoku", "arcade", "emulator", "retroarch"),
+        "🎵" to listOf("music", "spotify", "radio", "podcast", "audio", "sound", "deezer", "tidal", "shazam", "soundcloud", "equalizer", "viper"),
+        "🎬" to listOf("video", "netflix", "youtube", "movie", "cinema", "prime video", "hbo", "max", "disney", "plex", "jellyfin", "stremio", "twitch", "iptv", "tv"),
+        "📸" to listOf("camera", "photo", "gallery", "wallpaper", "snapseed", "lightroom", "picture"),
+        "🍥" to listOf("whatsapp", "telegram", "messenger", "instagram", "facebook", "twitter", "threads", "chat", "signal", "discord",
+            "reddit", "tiktok", "snapchat", "linkedin", "dating", "tinder", "bumble", "hinge", "beeper", "social", "mastodon", "bluesky"),
+        "💱" to listOf("bank", "banco", "pay", "finance", "money", "crypto", "wallet", "wise", "revolut", "bbva", "santander", "caixa",
+            "sabadell", "openbank", "n26", "invest", "broker", "trade"),
+        "🛒" to listOf("shop", "amazon", "aliexpress", "temu", "ebay", "shein", "wallapop", "vinted", "ikea", "store", "market", "glovo", "uber eats", "deliveroo"),
+        "🏠" to listOf("homeassistant", "home assistant", "immich", "jellyseerr", "sonarr", "radarr", "qbit", "torrent", "tailscale", "nas", "server", "ssh"),
+        "⚡" to listOf("smart", "tuya", "iot", "bulb", "led", "plug", "tapo", "kasa", "hue", "xiaomi home", "mi home"),
+        "🌎" to listOf("maps", "travel", "flight", "booking", "airbnb", "weather", "uber", "cabify", "bolt", "transit", "metro", "train", "renfe"),
+        "📰" to listOf("news", "noticias", "rss", "reader", "feedly", "magazine"),
+        "⚙️" to listOf("vpn", "file", "files", "scanner", "scan", "keyboard", "calculator", "notes", "translate", "terminal", "termux",
+            "browser", "backup", "cleaner", "launcher", "settings", "tool", "utility", "authenticator", "password", "bitwarden", "mail", "office"),
+    )
+
+    // Android's own categories (ApplicationInfo.CATEGORY_GAME = 0 … CATEGORY_ACCESSIBILITY = 8)
+    private val DECLARED = mapOf(0 to "🎮", 1 to "🎵", 2 to "🎬", 3 to "📸", 4 to "🍥", 5 to "📰", 6 to "🌎", 7 to "⚙️", 8 to "⚙️")
+
+    // package prefixes shared by unrelated apps: the same "developer" says nothing about the category
+    private val SHARED = setOf("com.google", "com.android", "com.microsoft", "com.miui", "com.xiaomi", "com.samsung", "com.mi",
+        "com.mau", "me.mauri", "org.lineageos", "com.oneplus", "com.amazon", "app.revanced", "org.microg")
+
+    private fun prefix(pkg: String) = pkg.split('.').take(2).joinToString(".")
+
+    /** The category for one uncategorized app; [placed] is every app you already put somewhere, pkg → category. */
+    fun guess(pkg: String, label: String, declared: Int, placed: Map<String, String>): String {
+        prefix(pkg).takeIf { it !in SHARED && it.contains('.') }?.let { pre ->
+            placed.filterKeys { it != pkg && prefix(it) == pre }.values.toSet().singleOrNull()?.let { return it }
+        }
+        val text = "${label.lowercase()} ${pkg.lowercase().replace('.', ' ').replace('_', ' ')}"
+        val words = text.split(' ', '-', ':').filter { it.isNotEmpty() }.toSet()
+        WORDS.firstOrNull { (_, keys) -> keys.any { k -> if (' ' in k || k.length >= 5) k in text else k in words } }?.let { return it.first } // short words whole only ("tv", "led")
+        return DECLARED[declared] ?: UNSORTED
     }
 }

@@ -307,6 +307,13 @@ class TabletSettings(private val a: MainActivity) {
         line("Apps in the list (swipe up)", if (drawerIcons) "Icons and names" else "Names only") {
             p.edit().putBoolean("drawer_icons", !drawerIcons).apply(); a.refreshApps(); draw()
         }
+        // every app without a category gets a guess; what can't be guessed waits in ❓ To sort
+        buttons("Sort apps into categories" to {
+            hub.diskPool.execute {
+                val report = a.phoneHome.autoCategorize()
+                hub.main.post { a.phoneHome.drawer.refresh(); a.phoneHome.render(); AlertDialog.Builder(a).setTitle("Apps sorted").setMessage(report).setPositiveButton("OK", null).show() }
+            }
+        })
         val lettersLeft = p.getBoolean("drawer_letters_left", false)
         line("A–Z letters in the list", if (lettersLeft) "Left side (left-handed)" else "Right side (right-handed)") {
             p.edit().putBoolean("drawer_letters_left", !lettersLeft).apply(); draw()
