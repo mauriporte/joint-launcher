@@ -59,7 +59,7 @@ class PhoneHome(private val a: MainActivity) {
     }.apply { isHorizontalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER; addView(dock) }
     private val date = a.text(15f, TEXT_SOFT).apply { gravity = Gravity.CENTER; setShadowLayer(8f, 0f, 1f, 0xCC000000.toInt()) }
     private val clock = FlipClock(a, 144) // big: two cards fill most of the phone's width
-    private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { icons = !icons; render() }.apply {
+    private val iconsButton = a.iconButton(R.drawable.ic_apps, "Icons on Home") { if (lockedNote()) return@iconButton; icons = !icons; render() }.apply {
         setPadding(a.dp(11), a.dp(11), a.dp(11), a.dp(11)); background = a.bareButton()
     }
     val drawer = AllApps(a)
@@ -206,7 +206,7 @@ class PhoneHome(private val a: MainActivity) {
             list.addView(entry(label, if (icons) app?.pkg else null, category = key.startsWith("cat:")).apply {
                 setOnClickListener { if (app != null) a.apps.launch(key) else drawer.open(key.removePrefix("cat:")) }
                 setOnLongClickListener {
-                    MoveMode.holdMenu(a, this, beside = false, listOfNotNull(
+                    hold(this, listOfNotNull(
                         if (app != null) "Rename" to { a.apps.rename(a, app) { render() } }
                             else "Name" to { nameCategory(key.removePrefix("cat:")) { render() } },
                         app?.let { "Change icon" to { IconPicker.forApp(a, it) { render(); drawer.refresh() } ?: Unit } },
@@ -262,7 +262,7 @@ class PhoneHome(private val a: MainActivity) {
             fun move(by: Int) = setDockPage(page, dockPage(page).toMutableList().apply {
                 val i = indexOf(pkg); if (i + by in indices) { removeAt(i); add(i + by, pkg) }
             })
-            MoveMode.holdMenu(a, this, beside = false, listOf(
+            hold(this, listOf(
                 "Move left" to { move(-1); render() },
                 "Move right" to { move(1); render() },
                 "Move to another page" to { addToDock(pkg) },
@@ -272,6 +272,15 @@ class PhoneHome(private val a: MainActivity) {
     }
 
     companion object { const val DOCK_PAGES = 5 }
+
+    /** Settings → Lock the layout: holding apps, categories and shortcuts (and the names/icons button) changes nothing. */
+    var locked: Boolean
+        get() = p.getBoolean("phone_locked", false)
+        set(v) = p.edit().putBoolean("phone_locked", v).apply()
+    /** True (and says so) while locked. */
+    fun lockedNote() = locked.also { if (it) a.toast("Layout locked · hold empty space → Settings to unlock") }
+    /** The hold menu, unless the layout is locked. */
+    fun hold(anchor: View, options: List<Pair<String, () -> Unit>>) { if (!lockedNote()) MoveMode.holdMenu(a, anchor, beside = false, options) }
 
     fun appInfo(pkg: String) {
         runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))) }
@@ -493,7 +502,7 @@ class AllApps(private val a: MainActivity) {
             // hold a category: put it on Home (a tap there opens the list on it) or give it a name
             if (cat != null) setOnLongClickListener {
                 val key = "cat:$cat"; val onHome = key in home.home()
-                MoveMode.holdMenu(a, this, beside = false, listOf(
+                home.hold(this, listOf(
                     (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - key else home.home() + key); home.render() },
                     (if (key in home.dockApps()) "Remove from the shortcuts" else "Add to the shortcuts") to {
                         if (key in home.dockApps()) { home.removeFromDock(key); home.render() } else home.addToDock(key)
@@ -544,7 +553,7 @@ class AllApps(private val a: MainActivity) {
     private fun menu(anchor: View, app: SideApp) {
         val pkg = app.pkg ?: return
         val onHome = pkg in home.home()
-        MoveMode.holdMenu(a, anchor, beside = false, listOf(
+        home.hold(anchor, listOf(
             (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - pkg else home.home() + pkg); home.render() },
             (if (pkg in home.dockApps()) "Remove from the shortcuts" else "Add to the shortcuts") to {
                 if (pkg in home.dockApps()) { home.removeFromDock(pkg); home.render() } else home.addToDock(pkg)

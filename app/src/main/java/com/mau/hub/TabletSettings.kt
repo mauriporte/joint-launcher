@@ -300,6 +300,8 @@ class TabletSettings(private val a: MainActivity) {
     private fun phone() {
         val home = a.phoneHome
         heading("Home")
+        // against accidental presses: hold menus and the names/icons button do nothing until unlocked here
+        line("Layout", if (home.locked) "Locked (holding apps changes nothing)" else "Unlocked") { home.locked = !home.locked; draw() }
         line("Apps on Home", if (home.icons) "Icons (from the icon pack)" else "Names only (also the button at the top left of Home)") {
             home.icons = !home.icons; a.refreshApps(); draw()
         }
