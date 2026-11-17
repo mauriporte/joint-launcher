@@ -170,7 +170,7 @@ class PhoneHome(private val a: MainActivity) {
             val byKey = a.apps.all().associateBy { it.key }
             // A to Z by the name shown, as in Pro Launcher (the # category comes first by itself)
             val entries = home().mapNotNull { k ->
-                if (k.startsWith("cat:")) k to k.removePrefix("cat:") else byKey[k]?.let { k to it.label }
+                if (k.startsWith("cat:")) k to catLabel(k.removePrefix("cat:")) else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
             // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
             // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
@@ -192,7 +192,8 @@ class PhoneHome(private val a: MainActivity) {
                 setOnClickListener { if (app != null) a.apps.launch(key) else drawer.open(key.removePrefix("cat:")) }
                 setOnLongClickListener {
                     MoveMode.holdMenu(a, this, beside = false, listOfNotNull(
-                        app?.let { "Rename" to { a.apps.rename(a, it) { render() } } },
+                        if (app != null) "Rename" to { a.apps.rename(a, app) { render() } }
+                            else "Name" to { nameCategory(key.removePrefix("cat:")) { render() } },
                         app?.let { "Change icon" to { IconPicker.forApp(a, it) { render(); drawer.refresh() } ?: Unit } },
                         "Remove from Home" to { setHome(home() - key); render() },
                         app?.pkg?.let { pkg -> "App info" to { appInfo(pkg) } },
@@ -265,6 +266,20 @@ class PhoneHome(private val a: MainActivity) {
         if (cat == null) remove("app_cat_$pkg") else putString("app_cat_$pkg", cat)
         if (cat != null && cat !in categories()) putString("phone_categories", (categories() + cat).joinToString("\n"))
     }.apply()
+
+    /** A category's own name beside its emoji ("🍥" → "Social"), or null. */
+    fun categoryName(cat: String): String? = p.getString("cat_name_$cat", null)
+    /** What Home shows for a category: "🍥  Social", or just the emoji while it has no name. */
+    fun catLabel(cat: String) = categoryName(cat)?.let { "${cat.trim()}  $it" } ?: cat
+    fun nameCategory(cat: String, done: () -> Unit) {
+        val input = EditText(a).apply { hint = "e.g. Social"; isSingleLine = true; setText(categoryName(cat).orEmpty()) }
+        android.app.AlertDialog.Builder(a).setTitle("Name for ${cat.trim()}").setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val n = input.text.toString().trim()
+                p.edit().apply { if (n.isEmpty()) remove("cat_name_$cat") else putString("cat_name_$cat", n) }.apply(); done()
+            }
+            .setNegativeButton("Cancel", null).show()
+    }
 }
 
 /** Every app, slid up from Home: your categories as icons across the top, a search box, the list A to Z. */
@@ -429,8 +444,16 @@ class AllApps(private val a: MainActivity) {
         fun chip(cat: String?, v: View) = chips.addView(v.apply {
             setPadding(a.dp(10), a.dp(6), a.dp(10), a.dp(6)); isClickable = true
             background = if (cat == category) GradientDrawable().apply { cornerRadius = a.dp(20).toFloat(); setStroke(a.dp(2), ACCENT); setColor(0x1AFFFFFF) } else a.bareButton()
-            contentDescription = cat ?: "All apps"
+            contentDescription = cat?.let(home::catLabel) ?: "All apps"
             setOnClickListener { category = cat; search.setText(""); drawChips(); show(); recycler.scrollToPosition(0) }
+            // hold a category: put it on Home (a tap there opens the list on it) or give it a name
+            if (cat != null) setOnLongClickListener {
+                val key = "cat:$cat"; val onHome = key in home.home()
+                MoveMode.holdMenu(a, this, beside = false, listOf(
+                    (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - key else home.home() + key); home.render() },
+                    "Name" to { home.nameCategory(cat) { drawChips(); home.render() } },
+                )); true
+            }
         }, LinearLayout.LayoutParams(-2, a.dp(48)).apply { marginEnd = a.dp(4) })
         chip(null, ImageView(a).apply { setImageResource(R.drawable.ic_apps); setColorFilter(Color.WHITE); minimumWidth = a.dp(48) })
         home.categories().filter { it in used }.forEach { c ->
