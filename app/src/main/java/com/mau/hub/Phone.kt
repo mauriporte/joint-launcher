@@ -179,7 +179,7 @@ class PhoneHome(private val a: MainActivity) {
             // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
             // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
             // changes shortcut page and never Home's (widgets, Beeper)
-            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey } }.let { all -> all.take(minOf(DOCK_PAGES, all.indexOfLast { it.isNotEmpty() } + 2)) }
+            val pages = (0 until DOCK_PAGES).map { i -> dockPage(i).filter { it in byKey || it.startsWith("cat:") } }.let { all -> all.take(minOf(DOCK_PAGES, all.indexOfLast { it.isNotEmpty() } + 2)) }
             a.hub.main.post { fill(entries, byKey); fillDock(pages) }
         }
     }
@@ -238,11 +238,12 @@ class PhoneHome(private val a: MainActivity) {
         dockScroll.post { dockScroll.scrollTo(now * dockScroll.width, 0) }
     }
 
-    private fun dockIcon(page: Int, pkg: String) = ImageView(a).apply {
-        a.apps.iconInto(pkg, this)
-        setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10))
+    // an app's icon, or a category's emoji (a tap opens the app list on it)
+    private fun dockIcon(page: Int, pkg: String): View = (if (pkg.startsWith("cat:")) a.text(26f, Color.WHITE).apply {
+        text = pkg.removePrefix("cat:").trim(); gravity = Gravity.CENTER; contentDescription = catLabel(pkg.removePrefix("cat:"))
+    } else ImageView(a).apply { a.apps.iconInto(pkg, this); setPadding(a.dp(10), a.dp(10), a.dp(10), a.dp(10)) }).apply {
         background = a.bareButton()
-        setOnClickListener { a.apps.launch(pkg) }
+        setOnClickListener { if (pkg.startsWith("cat:")) drawer.open(pkg.removePrefix("cat:")) else a.apps.launch(pkg) }
         setOnLongClickListener {
             fun move(by: Int) = setDockPage(page, dockPage(page).toMutableList().apply {
                 val i = indexOf(pkg); if (i + by in indices) { removeAt(i); add(i + by, pkg) }
@@ -480,6 +481,9 @@ class AllApps(private val a: MainActivity) {
                 val key = "cat:$cat"; val onHome = key in home.home()
                 MoveMode.holdMenu(a, this, beside = false, listOf(
                     (if (onHome) "Remove from Home" else "Add to Home") to { home.setHome(if (onHome) home.home() - key else home.home() + key); home.render() },
+                    (if (key in home.dockApps()) "Remove from the shortcuts" else "Add to the shortcuts") to {
+                        if (key in home.dockApps()) { home.removeFromDock(key); home.render() } else home.addToDock(key)
+                    },
                     "Name" to { home.nameCategory(cat) { drawChips(); home.render() } },
                 )); true
             }
