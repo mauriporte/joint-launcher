@@ -171,9 +171,11 @@ class PhoneHome(private val a: MainActivity) {
             // A to Z by the name shown, as in Pro Launcher (the # category comes first by itself)
             val entries = home().mapNotNull { k ->
                 // a category flips like an app: its name in names mode (the emoji while it has none), its emoji in icon mode
-                if (k.startsWith("cat:")) k.removePrefix("cat:").let { c -> k to (if (icons) c else categoryName(c) ?: c) }
+                // and keeps its place: both modes sort by the name
+                if (k.startsWith("cat:")) k.removePrefix("cat:").let { c -> k to (categoryName(c) ?: c) }
                 else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
+                .map { (k, name) -> k to (if (icons && k.startsWith("cat:")) k.removePrefix("cat:") else name) }
             // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
             // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
             // changes shortcut page and never Home's (widgets, Beeper)
