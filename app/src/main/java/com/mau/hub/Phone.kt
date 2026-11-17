@@ -682,7 +682,7 @@ object AutoCategory {
         "💱" to listOf("bank", "banco", "pay", "finance", "money", "crypto", "wallet", "wise", "revolut", "bbva", "santander", "caixa",
             "sabadell", "openbank", "n26", "invest", "broker", "trade"),
         "🛒" to listOf("shop", "amazon", "aliexpress", "temu", "ebay", "shein", "wallapop", "vinted", "ikea", "store", "market", "glovo", "uber eats", "deliveroo"),
-        "🏠" to listOf("homeassistant", "home assistant", "immich", "jellyseerr", "sonarr", "radarr", "qbit", "torrent", "tailscale", "nas", "server", "ssh"),
+        "🏠" to listOf("homeassistant", "home assistant", "immich", "jellyseerr", "sonarr", "radarr", "qbit", "torrent", "tailscale", "syncthing", "nas", "server", "ssh", "paperless", "proxmox", "portainer", "pihole", "adguard"),
         "⚡" to listOf("smart", "tuya", "iot", "bulb", "led", "plug", "tapo", "kasa", "hue", "xiaomi home", "mi home"),
         "🌎" to listOf("maps", "travel", "flight", "booking", "airbnb", "weather", "uber", "cabify", "bolt", "transit", "metro", "train", "renfe"),
         "📰" to listOf("news", "noticias", "rss", "reader", "feedly", "magazine"),
@@ -697,10 +697,14 @@ object AutoCategory {
     private val SHARED = setOf("com.google", "com.android", "com.microsoft", "com.miui", "com.xiaomi", "com.samsung", "com.mi",
         "com.mau", "me.mauri", "org.lineageos", "com.oneplus", "com.amazon", "app.revanced", "org.microg")
 
+    // Mau's own apps (this launcher's family and the rest of his projects)
+    private val OWN = listOf("com.mau.", "me.mauri.", "io.github.mauriporte.")
+
     private fun prefix(pkg: String) = pkg.split('.').take(2).joinToString(".")
 
     /** The category for one uncategorized app; [placed] is every app you already put somewhere, pkg → category. */
     fun guess(pkg: String, label: String, declared: Int, placed: Map<String, String>): String {
+        if (OWN.any { pkg.startsWith(it) }) return "🏠" // Mau's own apps sit with the homelab
         prefix(pkg).takeIf { it !in SHARED && it.contains('.') }?.let { pre ->
             placed.filterKeys { it != pkg && prefix(it) == pre }.values.toSet().singleOrNull()?.let { return it }
         }

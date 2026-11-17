@@ -12,4 +12,6 @@ class AutoCategoryTest {
     @Test fun shortWordsWholeOnly() = assertEquals(AutoCategory.UNSORTED, AutoCategory.guess("com.example.ledger", "Ledgerly", -1, placed))
     @Test fun declaredCategory() = assertEquals("🎮", AutoCategory.guess("com.foo.bar", "Bar", 0, placed))
     @Test fun unknownWaits() = assertEquals(AutoCategory.UNSORTED, AutoCategory.guess("com.foo.bar", "Bar", -1, placed))
+    @Test fun ownAppsGoHome() = assertEquals("🏠", AutoCategory.guess("io.github.mauriporte.gymcoach", "Gym Coach", 0, placed))
+    @Test fun homelabGoesHome() = assertEquals("🏠", AutoCategory.guess("com.github.catfriend1.syncthingandroid", "Syncthing", -1, placed))
 }
