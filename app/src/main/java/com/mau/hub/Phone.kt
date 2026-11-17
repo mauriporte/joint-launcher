@@ -34,20 +34,25 @@ class PhoneHome(private val a: MainActivity) {
     private val dockScroll = object : HorizontalScrollView(a) {
         private var flung = false
         private var downX = 0f
+        private var downPage = 0
         override fun fling(velocityX: Int) { flung = true; snap(page() + if (velocityX > 0) 1 else -1) }
         override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
             flung = false
-            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) downX = e.x
             val handled = super.onTouchEvent(e) // a quick swipe calls fling() from in here (but not past either end)
-            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) {
-                // past either end it wraps around: right from the first page → the last page with shortcuts, left from the last → the first
-                val dx = e.x - downX; val p = page(); val end = dock.childCount - 1
-                snap(when {
-                    e.actionMasked != android.view.MotionEvent.ACTION_UP || kotlin.math.abs(dx) < a.dp(48) -> p
-                    p == 0 && dx > 0 -> lastFullPage
-                    p == end && dx < 0 -> 0
-                    else -> p
-                })
+            if ((e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL) && !flung) snap(page())
+            return handled
+        }
+        // past either end it wraps around: right from the first page → the last page with shortcuts, left from the last → the first.
+        // Watched here, not in onTouchEvent: the icon under the finger takes the touch's start, so onTouchEvent never sees it
+        override fun dispatchTouchEvent(e: android.view.MotionEvent): Boolean {
+            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) { downX = e.x; downPage = page() }
+            val handled = super.dispatchTouchEvent(e)
+            if (e.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                val dx = e.x - downX
+                if (kotlin.math.abs(dx) >= a.dp(48)) when {
+                    downPage == 0 && dx > 0 -> snap(lastFullPage)
+                    downPage == dock.childCount - 1 && dx < 0 -> snap(0)
+                }
             }
             return handled
         }
