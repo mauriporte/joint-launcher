@@ -130,7 +130,12 @@ class MoveMode(private val a: Activity, private val touch: Boolean, private val 
             }
             box.measure(0, 0)
             if (beside) popup.showAsDropDown(anchor, anchor.width, -(anchor.height + box.measuredHeight) / 2)
-            else popup.showAsDropDown(anchor, (anchor.width - box.measuredWidth) / 2, -(anchor.height + box.measuredHeight + a.dp(8)))
+            else {
+                // above the item; below it when there's no room above (the app list's category tabs at the top of the screen)
+                val at = IntArray(2).also(anchor::getLocationOnScreen)
+                val above = at[1] >= box.measuredHeight + a.dp(8)
+                popup.showAsDropDown(anchor, (anchor.width - box.measuredWidth) / 2, if (above) -(anchor.height + box.measuredHeight + a.dp(8)) else a.dp(8))
+            }
             box.getChildAt(0)?.requestFocus()
         }
     }
