@@ -170,7 +170,9 @@ class PhoneHome(private val a: MainActivity) {
             val byKey = a.apps.all().associateBy { it.key }
             // A to Z by the name shown, as in Pro Launcher (the # category comes first by itself)
             val entries = home().mapNotNull { k ->
-                if (k.startsWith("cat:")) k to catLabel(k.removePrefix("cat:")) else byKey[k]?.let { k to it.label }
+                // a category flips like an app: its name in names mode (the emoji while it has none), its emoji in icon mode
+                if (k.startsWith("cat:")) k.removePrefix("cat:").let { c -> k to (if (icons) c else categoryName(c) ?: c) }
+                else byKey[k]?.let { k to it.label }
             }.sortedWith(compareBy(Collator.getInstance()) { it.second })
             // pages up to the last one with apps (at least one); an emptied page in between stays, so the others don't move
             // the pages in use, plus one empty page to swipe to (5 at most): the row always slides sideways, so a swipe on it
@@ -209,7 +211,7 @@ class PhoneHome(private val a: MainActivity) {
         setPadding(a.dp(20), a.dp(6), a.dp(20), a.dp(6))
         background = a.bareButton(); isClickable = true; contentDescription = label // TalkBack still says the name
         if (iconPkg != null) { addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40))); return@apply }
-        addView(a.text(if (category) 22f else 21f, Color.WHITE).apply {
+        addView(a.text(if (category) (if (icons) 30f else 22f) else 21f, Color.WHITE).apply { // icon mode: the emoji is the icon
             text = label; letterSpacing = 0.03f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setShadowLayer(10f, 0f, 1f, 0xCC000000.toInt())
