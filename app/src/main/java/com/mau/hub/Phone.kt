@@ -213,7 +213,7 @@ class PhoneHome(private val a: MainActivity) {
         setPadding(a.dp(20), a.dp(6), a.dp(20), a.dp(6))
         background = a.bareButton(); isClickable = true; contentDescription = label // TalkBack still says the name
         if (iconPkg != null) { addView(ImageView(a).apply { a.apps.iconInto(iconPkg, this) }, LinearLayout.LayoutParams(a.dp(40), a.dp(40))); return@apply }
-        addView(a.text(if (category) (if (icons) 30f else 22f) else 21f, Color.WHITE).apply { // icon mode: the emoji is the icon
+        addView(a.text(if (category && icons) 30f else 21f, Color.WHITE).apply { // one size for every name; in icon mode the emoji is the icon
             text = label; letterSpacing = 0.03f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setShadowLayer(10f, 0f, 1f, 0xCC000000.toInt())
