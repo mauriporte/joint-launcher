@@ -591,7 +591,8 @@ class MainActivity : Activity() {
         if (hub.touch) rows.refreshWidgets() // the widget grid has its own size and spots per orientation
         if (hub.touch) RemotePanel.relayout(remote1, remote2)
         // the phone: turned sideways is the dashboard, upright is Home
-        if (hub.phone) root.post { if (landscape()) dashboard.open() else dashboard.close() }
+        // the widget page closes first: else turning back upright slides Home in under it and both stay on screen
+        if (hub.phone) root.post { if (landscape()) { widgetPage.close(); dashboard.open() } else dashboard.close() }
     }
 
     private fun landscape() = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
